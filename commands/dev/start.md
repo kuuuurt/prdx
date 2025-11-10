@@ -220,6 +220,9 @@ Task(
   6. Dependencies between tasks
   7. Risk assessment with technical details
   8. Testing strategy with specific test files
+  9. AC-to-test mapping: Every Acceptance Criterion must map to specific tests
+
+  CRITICAL: Ensure every AC from PRD has corresponding test(s) identified.
 
   Return structured plan ready to [add/update] inline in PRD."
 )
@@ -258,6 +261,9 @@ Task(
   7. Dependencies between tasks
   8. Risk assessment
   9. Testing strategy (unit + Compose UI tests)
+  10. AC-to-test mapping: Every Acceptance Criterion must map to specific tests
+
+  CRITICAL: Ensure every AC from PRD has corresponding test(s) identified.
 
   Return structured plan ready to [add/update] inline in PRD."
 )
@@ -296,6 +302,9 @@ Task(
   7. Dependencies between tasks
   8. Risk assessment
   9. Testing strategy (XCTest + UI tests)
+  10. AC-to-test mapping: Every Acceptance Criterion must map to specific tests
+
+  CRITICAL: Ensure every AC from PRD has corresponding test(s) identified.
 
   Return structured plan ready to [add/update] inline in PRD."
 )
@@ -376,31 +385,41 @@ Add new section after high-level Implementation section:
 
 ### Testing Strategy
 
+**CRITICAL**: Every Acceptance Criterion must have a corresponding test
+
 (From testing-strategy skill)
 
 **Unit Tests**:
 - Files: [Specific test file paths]
 - Coverage: [Target percentage]
-- Scenarios: [Key test cases]
+- AC Coverage: [Which ACs these tests verify]
+- Scenarios: [Key test cases mapped to ACs]
 
 **Integration Tests**:
 - Flows: [End-to-end scenarios]
+- AC Coverage: [Which ACs these tests verify]
 
 **Manual Testing**:
-- [ ] Test case 1
-- [ ] Test case 2
+- [ ] Test case 1 (verifies AC #X)
+- [ ] Test case 2 (verifies AC #Y)
 
 **Commands**:
 ```bash
 [Platform-specific test commands]
 ```
 
+**AC-to-Test Traceability**:
+- Each AC from PRD must map to at least one test (unit/integration/manual)
+
 ---
 
 ### Acceptance Criteria Mapping
 
-- AC #1: [Criterion] → Tasks: [task names]
-- AC #2: [Criterion] → Tasks: [task names]
+**Every AC must map to specific tasks AND tests**
+
+- AC #1: [Criterion] → Tasks: [task names] | Tests: [test file/type]
+- AC #2: [Criterion] → Tasks: [task names] | Tests: [test file/type]
+- AC #3: [Criterion] → Tasks: [task names] | Tests: [test file/type]
 ```
 
 **Display confirmation:**
@@ -892,6 +911,7 @@ Hook will:
 - **UPDATE PLAN** - Keep plan in sync with reality (strikethrough for changes)
 - **TRACK PROGRESS** - Use TodoWrite to keep user informed
 - **CLEAN GIT STATE** - Never proceed with uncommitted changes
+- **NEVER COMMIT PRDS** - PRD files are NEVER committed to git, only implementation code
 
 ### Testing
 - **DON'T SKIP TESTS** - Always run tests if they exist

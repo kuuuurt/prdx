@@ -210,78 +210,79 @@ Task(
 
 **What success looks like:**
 
-1. **Primary goal**: 1 sentence, specific and measurable
+1. **Primary goal**: 1-2 sentences max, specific and measurable
 
-2. **Acceptance criteria**: 3-5 testable requirements (STRICTER than /prdx:plan)
-   - Use format: `- [ ] As [user], I can [action] so that [benefit]`
-   - Cover: architecture, functional, error handling, non-functional
-   - Keep FOCUSED - only essential criteria (5th criterion is optional, remove if not needed)
+2. **Acceptance criteria**: 3-5 testable requirements
 
-3. **Out of scope**: What we're explicitly NOT doing (optional)
+   **CRITICAL RULE: No test = No acceptance criterion**
+   - Every AC must map to a specific test (unit, integration, or manual)
+   - Write ACs BEFORE designing the solution
+   - Each criterion = one clear pass/fail test
+   - Focus on observable outcomes, not implementation details
+
+   **Format**: `- [ ] [Testable outcome that can be verified]`
+
+   **Good examples** (each has a clear test):
+   - `- [ ] User can log in with fingerprint in <2s` → UI test
+   - `- [ ] API returns 401 for invalid tokens` → Integration test
+   - `- [ ] Database persists user session for 24h` → Integration test
+   - `- [ ] App handles network errors gracefully` → Unit test
+
+   **Bad examples** (too vague, no clear test):
+   - ❌ "Authentication is secure" → What test proves this?
+   - ❌ "Code is well-structured" → Not testable
+   - ❌ "Performance is good" → Not measurable
+
+**Keep it minimal** - Only what's absolutely essential to call this feature "done"
 
 ---
 
 ## Phase 4: High-Level Technical Approach
 
-**Define business-level technical approach:**
+**Keep it concise - 3 sections max:**
 
-**Optional**: Read skill if it exists: `.claude/skills/impl-patterns.md`
+1. **Architecture** (1-2 sentences): How we'll build this at a high level
+   - Example: "Add OAuth2 middleware to auth service, integrate with existing user flow"
+   - NO file paths or code details
 
-Use skill (if available) to:
-- Understand established project patterns
-- Apply platform-specific best practices
-- Identify correct high-level architecture approach
-
-**Define approach:**
-
-1. **Architecture**: 1-2 sentences on high-level approach
-   - Focus on architectural decisions and patterns
-   - NO specific file paths or code structure
-
-2. **Key components**: Bullet list of major components/areas that need work
-   - Examples: "Authentication service", "User profile UI", "Data sync layer"
+2. **Key Changes** (3-5 bullets): Major components/areas affected
+   - Example: "Authentication service", "User profile UI", "Token storage"
    - Keep high-level, describe WHAT not WHERE
 
-3. **Risks**: Top 2-3 risks with mitigation strategies
-   - Focus on real blockers, not hypotheticals
+3. **Risks** (2-3 max): Real blockers with mitigation
+   - Example: "OAuth providers may rate-limit → implement retry with backoff"
+
+**Optional**: Read `.claude/skills/impl-patterns.md` for platform patterns
 
 ---
 
 ## Phase 5: High-Level Implementation Phases
 
-**Break down into logical implementation phases:**
+**3-5 logical phases max:**
 
-1. Create 3-5 logical phases that group related work
-2. Each phase describes WHAT needs to be done (not HOW)
-3. Keep descriptions high-level and conceptual
-4. Mark overall phase complexity: S (simple), M (medium), L (complex)
-5. Include testing phase
+1. Each phase = logical group of work (WHAT needs doing)
+2. One sentence description per phase
+3. Mark complexity: S (simple), M (medium), L (complex)
+4. Always include Testing phase
 
-**Example structure:**
+**Example:**
 ```markdown
 ## Implementation
 
 ### Phase 1: Foundation (M)
-Set up authentication service structure and base configuration
+Set up OAuth2 service structure and configuration
 
 ### Phase 2: Core Logic (L)
 Implement OAuth2 flow and token management
 
 ### Phase 3: Integration (M)
-Connect with existing user service and frontend
+Connect with existing user service and UI
 
 ### Phase 4: Testing (M)
 Unit and integration tests for auth flows
-
-### Phase 5: Documentation (S)
-API documentation and integration guide
 ```
 
-**IMPORTANT**: This is **business-level planning**, not code-level.
-- Focus on logical work phases, not specific files
-- Describe outcomes, not implementation details
-- No file paths, no API contracts, no code patterns
-- Detailed technical planning happens in `/prdx:dev:start` automatically
+**Keep it high-level** - No file paths, no code details. `/prdx:dev:start` adds those automatically.
 
 ---
 
@@ -291,36 +292,78 @@ Use Write tool to create `.claude/prds/[platform]-[prd-slug].md`:
 
 **IMPORTANT**: PRDs should be stored in `.claude/prds/` directory.
 
-**Use the selected template** (from Phase 1):
-- Feature: `templates/feature-template.md`
-- Bug Fix: `templates/bug-fix-template.md`
-- Refactor: `templates/refactor-template.md`
-- Spike: `templates/spike-template.md`
+**Simple 1-pager format** (fits on one screen):
 
-**Add metadata**:
-- Platform, Status (draft), Created date
-- **Dependencies**: Add from `--depends-on` parameter (or "none")
-- **Blocks**: Leave empty initially (or "none")
-- **Related**: Leave empty initially (or "none")
-- **Branch Type**: Store the branch prefix (feat, fix, refactor, spike) for later use
-
-Example metadata line:
 ```markdown
-**Project**: android | **Status**: draft | **Created**: 2025-11-07 | **Branch Type**: fix
-**Dependencies**: #215, #218 | **Blocks**: none | **Related**: none
+# [Feature Title]
+
+**Project**: [platform] | **Status**: draft | **Created**: [YYYY-MM-DD] | **Branch Type**: [feat|fix|refactor|spike]
+**Dependencies**: [#issue-numbers or "none"] | **Blocks**: [#issue-numbers or "none"]
+
+## Goal
+
+[1-2 sentences: What are we building and why?]
+
+## Acceptance Criteria
+
+**Each criterion must have a corresponding test (unit/integration/manual)**
+
+- [ ] [Testable outcome 1] → [Test type]
+- [ ] [Testable outcome 2] → [Test type]
+- [ ] [Testable outcome 3] → [Test type]
+
+## Approach
+
+**Architecture**: [1-2 sentences on high-level approach]
+
+**Key Changes**:
+- [Component/area 1 that needs work]
+- [Component/area 2 that needs work]
+- [Component/area 3 that needs work]
+
+**Risks**:
+- [Risk 1]: [mitigation]
+- [Risk 2]: [mitigation]
+
+## Implementation
+
+### Phase 1: [Name] (S/M/L)
+[What needs to be done - high level, no file paths]
+
+### Phase 2: [Name] (S/M/L)
+[What needs to be done - high level, no file paths]
+
+### Phase 3: Testing (S/M/L)
+[What testing is needed]
 ```
 
-**Implementation section guidelines:**
-- High-level phases only (WHAT, not HOW)
-- No specific file paths or code details
-- Business/feature-focused descriptions
-- Use `/prdx:dev:plan` later for technical details
+**PRD Guidelines**:
+- **Keep it simple**: Entire PRD should fit on one screen/page
+- **No sections beyond these**: Goal, Acceptance Criteria (3-5), Approach, Implementation (3-5 phases)
+- **High-level only**: No file paths, API contracts, or code details here
+- **Business-focused**: Describe WHAT and WHY, not HOW
+- **Acceptance Criteria MUST be testable**: Every AC needs a corresponding test (unit/integration/manual)
+- **ACs come BEFORE solution**: Define success criteria before designing implementation
+- **Detailed plans later**: `/prdx:dev:start` adds technical details automatically
 
-Key differences from older workflows:
-- Acceptance Criteria: 3-5 items (more concise)
-- No Notes section (removed from template)
-- No detailed implementation plan (use `/prdx:dev:plan` for that)
-- Type-specific templates with tailored sections
+**Type-specific additions**:
+
+**Bug Fix**: Add after Goal section:
+```markdown
+## Bug Details
+**Severity**: [Critical/High/Medium/Low]
+**Reproduce**: [steps]
+**Expected**: [behavior]
+**Actual**: [behavior]
+```
+
+**Spike**: Add after Goal section:
+```markdown
+## Research
+**Question**: [what we need to answer]
+**Decision**: [what this will inform]
+**Timebox**: [hours/days]
+```
 
 ---
 

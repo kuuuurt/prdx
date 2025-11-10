@@ -103,23 +103,34 @@ Skills provide specialized knowledge bases that agents reference during PRD crea
 
 ## Key Workflows
 
-### PRD Creation Flow (Business-Level)
+### PRD Creation Flow (Simple 1-Pager)
 
 ```
-/prdx:wizard
+/prdx:wizard or /prdx:plan
     ↓
 Platform detection → PRD type selection → Gather requirements
     ↓
-Search for duplicates → Identify dependencies → Create slug
+Search for duplicates → Identify dependencies
     ↓
-Review & confirm → Invoke /prdx:plan
-    ↓
-Agent research → High-level phases (WHAT, not HOW)
+Create simple PRD (fits on 1 screen):
+  - Goal (1-2 sentences)
+  - Acceptance Criteria (3-5 items)
+  - Approach (Architecture + Key Changes + Risks)
+  - Implementation (3-5 high-level phases)
     ↓
 Multi-agent review (Technical, QA, Security)
     ↓
-Apply improvements inline → PRD created with business requirements
+Apply improvements inline → Simple business-level PRD created
 ```
+
+**PRD Structure** (1-pager):
+- Metadata (status, dependencies, branch type)
+- Goal (what & why)
+- Acceptance Criteria (testable outcomes - MUST have corresponding tests)
+- Approach (architecture, key changes, risks)
+- Implementation (high-level phases only)
+
+**Critical Rule**: Every Acceptance Criterion must map to a specific test (unit/integration/manual)
 
 ### Implementation Flow
 
@@ -155,19 +166,20 @@ Test → Finalize → Update PRD status
 
 ### Separation of Concerns
 
-**`/prdx:plan` (Business Level)**:
-- What needs to be done (business problem)
-- High-level implementation phases
-- No code details or file paths
-- Acceptance criteria
+**`/prdx:plan` (Business Level - 1 Pager)**:
+- Goal (1-2 sentences: what & why)
+- Acceptance Criteria (3-5 testable outcomes)
+- Approach (architecture, key changes, risks)
+- Implementation (3-5 high-level phases)
+- **Fits on one screen** - no code details or file paths
 
-**`/prdx:dev:start` Detailed Planning (Technical Level)**:
-- How to implement (technical details)
+**`/prdx:dev:start` (Technical Level - Detailed Plan)**:
 - Specific files to create/modify
 - API contracts and data models
 - Code patterns from impl-patterns skill
-- Testing files and strategies
-- Created automatically as part of implementation workflow
+- Task-by-task breakdown with file paths
+- Testing strategy with test files
+- **Created automatically** when starting implementation
 
 ## Development Guidelines
 
@@ -301,11 +313,16 @@ Example: Converting to Express.js backend
 - **Commands invoke agents**: Use Task tool with subagent_type
 - **Skills are passive**: Agents read them, they don't execute
 - **PRDs live in user projects**: Not in this repo
+- **PRDs are NEVER committed**: PRD files remain in `.claude/prds/` only, never committed to git
+- **PRDs are 1-pagers**: Simple format that fits on one screen (Goal, AC, Approach, Implementation)
+- **CRITICAL: No test = No AC**: Every Acceptance Criterion MUST have a corresponding test
+- **ACs before solution**: Define testable success criteria before designing implementation
 - **Adaptive workflow**: Automatically detects Full-Stack vs Single-Platform projects
-- **Two-level planning**: `/prdx:plan` for business, `/prdx:dev:start` creates technical plan inline
+- **Two-level planning**: `/prdx:plan` for business (1-pager), `/prdx:dev:start` creates technical plan inline
 - **Plan storage**: Detailed plans live in PRD as `## Detailed Implementation Plan` section
 - **Auto-planning**: `/prdx:dev:start` creates detailed plan if missing (Phase 3-4)
-- **Conventional commits**: All commits follow `type: description` format
+- **AC-to-test mapping**: Detailed plans include explicit mapping of ACs to tests
+- **Conventional commits**: All commits follow `type: description` format (implementation code only)
 - **No co-authors**: PRD system doesn't add co-author tags
 - **Strikethrough for history**: Use `~~old~~` → new in plan updates
 - **Multi-agent review**: Technical, QA, Security agents review in parallel

@@ -224,14 +224,7 @@
    ...
    ```
 
-3. **Commit metadata updates:**
-   ```bash
-   git add .claude/prds/[prd-file] .claude/prds/impl-plans/[impl-plan-file]
-   git commit -m "docs: add PR link to PRD and implementation plan"
-   git push
-   ```
-
-   **Note:** PRD status is automatically updated to "in-review" when PR is created.
+**IMPORTANT:** PRD and implementation plan files are NEVER committed to git. They remain in `.claude/prds/` directory only.
 
 ---
 
@@ -262,7 +255,7 @@ Description includes:
 ✅ Acceptance criteria ([count])
 ✅ Related PRD and implementation plan
 
-Documents updated:
+Documents updated (local only, not committed):
 ✅ PRD: .claude/prds/[prd-filename]
 ✅ Implementation Plan: .claude/prds/impl-plans/[impl-plan-filename]
 
@@ -312,9 +305,9 @@ Next steps:
 - **SHOW DEVIATIONS** - Include any documented deviations
 
 ### Document Updates
-- **UPDATE PRD** - Add PR number and update status
-- **UPDATE IMPL PLAN** - Add PR link to implementation notes
-- **COMMIT UPDATES** - Commit and push metadata updates
+- **UPDATE PRD** - Add PR number and update status (local only)
+- **UPDATE IMPL PLAN** - Add PR link to implementation notes (local only)
+- **NEVER COMMIT PRDS** - PRD and implementation plan files are NEVER committed to git
 
 ### Error Handling
 - **DIRTY WORKING TREE** - Warn and suggest commit/stash
