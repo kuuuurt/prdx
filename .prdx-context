@@ -1,0 +1,19 @@
+# PRDX Context File
+# This file tracks the current working context for PRDX commands
+# Automatically updated by commands, never commit to git
+
+# Last PRD worked on
+LAST_PRD_SLUG=""
+LAST_PRD_PATH=""
+LAST_PRD_PLATFORM=""
+
+# Last command executed
+LAST_COMMAND=""
+LAST_COMMAND_TIME=""
+
+# Current git branch (if in implementation)
+CURRENT_BRANCH=""
+
+# Project structure detection cache
+PROJECT_STRUCTURE=""  # full-stack or single-platform
+DEFAULT_PLATFORM=""   # backend, android, ios, web

@@ -1,41 +1,55 @@
 | description | argument-hint |
-| Enhanced implementation with auto-planning: creates detailed plan if missing, then implements. Accepts prompts for updates. | Feature slug, prompt/instruction, or leave empty to list |
+| Context-aware implementation: auto-plans, updates PRD, implements | [slug] [prompt] or empty to continue |
 
-# Enhanced Feature Implementation (PRD)
+# Develop Feature
 
-> **Intelligent workflow: Auto-create detailed plan if needed, update PRD when prompted, then implement**
-> Smart command that plans, updates, and implements based on context
+> **Context-aware implementation**
+> Remembers your last PRD, shows what you're working on, asks if context lost
 
 ---
 
 ## Usage Modes
 
-This command supports multiple usage patterns:
+This command is **context-aware** - it remembers your last PRD and **always shows what you're working on**.
 
-### Mode 1: Fresh Implementation (Slug Only)
+### Mode 1: Continue Where You Left Off (No Arguments)
 ```
-/prdx:dev:start backend-user-authentication
+/prdx:dev
 ```
-- Loads PRD
+- Uses last PRD you worked on automatically
+- **Displays PRD name visually** for confirmation
+- Continues implementation from where you stopped
+- Shows progress and next tasks
+
+### Mode 2: Fresh Implementation (Slug Only)
+```
+/prdx:dev backend-user-authentication
+```
+- Loads specified PRD
+- **Displays PRD name visually** for confirmation
+- Saves as current context
 - Creates detailed plan if missing (inline in PRD)
 - Starts implementation from scratch
 
-### Mode 2: Continuation with Prompt (Slug + Instruction)
+### Mode 3: Continuation with Prompt (Slug + Instruction)
 ```
-/prdx:dev:start backend-user-authentication "add OAuth support for Google and GitHub"
+/prdx:dev backend-user-authentication "add OAuth support for Google and GitHub"
 ```
 - Loads PRD
+- **Displays PRD name visually** for confirmation
 - Analyzes prompt to determine if PRD needs updating
 - Calls `/prdx:update` if requirements changed
 - Updates/regenerates detailed implementation plan
 - Continues or starts implementation with new context
 
-### Mode 3: Interactive Selection
+### Mode 4: Continue with Prompt (Prompt Only)
 ```
-/prdx:dev:start
+/prdx:dev "add error handling for network failures"
 ```
-- Lists all PRDs
-- Asks user to select and optionally provide prompt
+- Uses last PRD from context
+- **Displays PRD name visually** for confirmation
+- Applies prompt to current implementation
+- Updates plan if needed
 
 ---
 
@@ -56,23 +70,95 @@ Hook validates:
 
 ---
 
-## Phase 1: Parse Input & Load PRD
+## Phase 1: Parse Input & Load PRD with Context
 
-**Parse command arguments:**
+**Context-aware argument parsing:**
 
-1. **Extract slug and prompt:**
-   - Parse arguments to separate slug from optional prompt/instruction
-   - Examples:
-     - `backend-auth` → slug only
-     - `backend-auth "add OAuth"` → slug + prompt
-     - Empty → interactive mode
+1. **Load context file:**
+   ```bash
+   source .prdx-context 2>/dev/null || true
+   ```
+   - Read `LAST_PRD_SLUG`, `LAST_PRD_PATH`, `CURRENT_BRANCH`
+   - Context persists across command invocations
 
-2. **Find PRD:**
-   - If slug provided: `ls .claude/prds/*[slug]*.md`
-   - If not: list all PRDs and ask user to select
+2. **Parse arguments intelligently:**
+
+   **No arguments** → Continue mode:
+   ```
+   /prdx:dev:start
+   ```
+   - Check context: If `LAST_PRD_SLUG` exists → use it
+   - If no context: list PRDs and ask user to select
+   - Display: "Continuing: [last-prd-name]"
+
+   **One argument** → Could be slug or prompt:
+   ```
+   /prdx:dev:start android-219
+   /prdx:dev:start "add error handling"
+   ```
+   - If matches PRD slug → New PRD mode
+   - If doesn't match + context exists → Prompt mode (use last PRD)
+   - If doesn't match + no context → Search PRDs by keyword, ask to select
+
+   **Two+ arguments** → Slug + prompt:
+   ```
+   /prdx:dev:start backend-auth "add OAuth"
+   ```
+   - First arg = slug
+   - Remaining = prompt
+
+3. **Find PRD:**
+   - If slug from args: `ls .claude/prds/*[slug]*.md`
+   - If from context: use `LAST_PRD_PATH`
+   - If neither: list all PRDs and ask user to select
    - **DO NOT PROCEED** without valid PRD
 
-3. **Read PRD and detect project structure:**
+4. **Display PRD banner (ALWAYS show this):**
+
+   ```
+   ╔═══════════════════════════════════════════════════════════════╗
+   ║  WORKING ON: [Feature Name]                                   ║
+   ╠═══════════════════════════════════════════════════════════════╣
+   ║  PRD: [platform]-[slug].md                                    ║
+   ║  Status: [status] | Platform: [platform]                      ║
+   ║  [If issue:] Issue: #[number] | [If branch:] Branch: [name]  ║
+   ╚═══════════════════════════════════════════════════════════════╝
+   ```
+
+   **Visual confirmation for developer - make this prominent!**
+
+5. **Validate context if used:**
+
+   If no slug provided and using context:
+   ```
+   [Display PRD banner above]
+
+   Is this the correct PRD? (y/n)
+   ```
+
+   - If `y`: Continue
+   - If `n`: Ask which PRD to work on
+     ```
+     Which PRD would you like to work on?
+
+     Recent PRDs:
+     1. android-219-biometric-auth (in-progress)
+     2. backend-234-location-tracking (draft)
+     3. ios-456-dark-mode (draft)
+
+     Enter number or slug:
+     ```
+
+6. **Save to context:**
+   ```bash
+   echo "LAST_PRD_SLUG=[slug]" > .prdx-context
+   echo "LAST_PRD_PATH=[path]" >> .prdx-context
+   echo "LAST_PRD_PLATFORM=[platform]" >> .prdx-context
+   echo "LAST_COMMAND=dev" >> .prdx-context
+   echo "LAST_COMMAND_TIME=$(date +%s)" >> .prdx-context
+   ```
+
+7. **Read PRD and detect project structure:**
    - Extract platform(s) from PRD metadata or filename
    - Determine if **Full-Stack** (multi-platform PRD) or **Single-Platform**
    - Examples:

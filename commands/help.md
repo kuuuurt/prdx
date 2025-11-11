@@ -1,249 +1,250 @@
-# PRD Commands Help
+# PRDX Help
 
-Quick reference guide for all PRD workflow commands.
+Complete PRD workflow system for feature development with AI agents.
 
-## Instructions
+## Quick Start
 
-Display a comprehensive help guide for all available PRD commands.
+```bash
+# 1. Create a PRD (smart defaults, minimal questions)
+/prdx:plan "add biometric login"
 
-Show the following information:
+# 2. Publish to GitHub (optional)
+/prdx:publish android-219
 
-```
-╔════════════════════════════════════════════════════════════════════════════╗
-║                         PRD WORKFLOW COMMANDS                              ║
-╚════════════════════════════════════════════════════════════════════════════╝
+# 3. Start implementation (auto-creates detailed plan)
+/prdx:dev
 
-DISCOVERY & BROWSING
-────────────────────────────────────────────────────────────────────────────
-/prdx:list [--status <status>] [--platform <platform>]
-  List all PRDs with optional filtering
-  Examples:
-    /prdx:list                          # Show all PRDs
-    /prdx:list --status draft           # Show only drafts
-    /prdx:list --platform android       # Show Android PRDs
+# 4. Create PR (auto-verifies quality)
+/prdx:dev:push
 
-/prdx:search <keyword> [keywords...]
-  Search PRDs by keyword or phrase
-  Examples:
-    /prdx:search auth0                  # Find PRDs mentioning "auth0"
-    /prdx:search "memory leak"          # Search exact phrase
-    /prdx:search viewmodel state        # Multiple keywords (OR)
-
-/prdx:status <slug>
-  Show detailed status and progress for a specific PRD
-  Example:
-    /prdx:status android-219            # Show status for android-219.md
-
-/prdx:deps <slug>
-  Display dependency tree for a PRD
-  Example:
-    /prdx:deps backend-auth-refactor    # Show dependencies
-
-/prdx:help
-  Show this help guide
-
-────────────────────────────────────────────────────────────────────────────
-
-PLANNING & CREATION
-────────────────────────────────────────────────────────────────────────────
-/prdx:wizard
-  Interactive PRD creation wizard (RECOMMENDED FOR NEW USERS)
-  - Guides you through PRD creation step-by-step
-  - Auto-detects platform and suggests templates
-  - Searches for similar PRDs to avoid duplicates
-  - Helps identify dependencies
-
-/prdx:plan <feature> [--type <type>] [--depends-on <issue>]
-  Create a new PRD with agent-powered research and multi-agent review
-
-  Types: feature (default), bug-fix, refactor, spike
-
-  Examples:
-    /prdx:plan "add biometric login"
-    /prdx:plan "fix memory leak" --type bug-fix
-    /prdx:plan "refactor auth" --type refactor --depends-on #215
-
-  Flow:
-    1. Clarifying questions
-    2. Platform-specific codebase research
-    3. PRD creation with appropriate template
-    4. Multi-agent review (technical, testing, security)
-    5. Inline feedback consolidation
-
-/prdx:update <slug>
-  Update an existing PRD with agent impact analysis
-  Example:
-    /prdx:update android-219
-
-────────────────────────────────────────────────────────────────────────────
-
-GITHUB INTEGRATION
-────────────────────────────────────────────────────────────────────────────
-/prdx:publish <slug>
-  Publish PRD to GitHub issue
-  - Creates GitHub issue
-  - Renames PRD to [platform]-[issue-number].md
-  - Updates PRD metadata with issue link
-
-/prdx:sync <slug>
-  Bidirectional sync between PRD and GitHub issue
-  - Auto-detects sync direction based on timestamps
-  - Handles conflicts gracefully
-
-────────────────────────────────────────────────────────────────────────────
-
-DEVELOPMENT WORKFLOW
-────────────────────────────────────────────────────────────────────────────
-/prdx:dev:start <slug>
-  Start implementation (creates detailed plan automatically if needed)
-
-  Phase 1-2 (Auto-Planning):
-    - Checks for "## Detailed Implementation Plan" in PRD
-    - If missing, creates it inline using platform-specific agent
-    - Includes task breakdown, file paths, API contracts, testing strategy
-
-  Phase 3-8 (Implementation):
-    - Creates feature branch (feat/*, fix/*, refactor/*, etc.)
-    - Executes tasks from detailed plan
-    - One task = one commit (conventional format)
-    - Runs tests based on strategy
-    - Updates PRD status to "in-progress" automatically
-
-  Example:
-    /prdx:dev:start android-219
-
-/prdx:dev:check <slug>
-  Multi-agent verification of implementation
-  - Implementation quality check (platform-specific)
-  - Testing coverage validation
-  - Security/performance review
-  - Git commit validation
-  - Code quality scoring with actionable recommendations
-
-  Example:
-    /prdx:dev:check android-219
-
-/prdx:dev:push <slug>
-  Create GitHub pull request
-  - Pushes branch to remote
-  - Creates PR with detailed plan as description
-  - Links PR to issue
-  - Updates PRD status to "in-review" automatically
-
-  Example:
-    /prdx:dev:push android-219
-
-/prdx:close <slug>
-  Mark PRD as completed when work is done
-  - Updates status to "completed"
-  - Archives PRD metadata
-
-  Example:
-    /prdx:close android-219
-
-────────────────────────────────────────────────────────────────────────────
-
-TYPICAL WORKFLOWS
-────────────────────────────────────────────────────────────────────────────
-
-New Feature (Full Cycle):
-  1. /prdx:wizard                       # Create PRD interactively
-  2. /prdx:publish <slug>               # Publish to GitHub
-  3. /prdx:dev:start <slug>             # Implement (auto-creates detailed plan)
-  4. /prdx:dev:check <slug>             # Verify implementation
-  5. /prdx:dev:push <slug>              # Create PR
-  6. (Manual: Code review & merge)
-  7. /prdx:close <slug>                 # Mark as completed
-
-Bug Fix (Fast Track):
-  1. /prdx:plan "fix xyz" --type bug-fix
-  2. /prdx:dev:start <slug>             # Implement immediately
-  3. /prdx:dev:push <slug>              # Create PR
-
-Research/Spike:
-  1. /prdx:plan "investigate xyz" --type spike
-  2. /prdx:dev:start <slug>             # Conduct research
-  3. Update ## Findings section
-  4. /prdx:close <slug>                 # Document outcomes
-
-Finding & Updating Existing PRD:
-  1. /prdx:search "keyword"             # Find relevant PRD
-  2. /prdx:update <slug>                # Make changes
-  3. /prdx:sync <slug>                  # Sync with GitHub
-
-────────────────────────────────────────────────────────────────────────────
-
-PRD STATUSES
-────────────────────────────────────────────────────────────────────────────
-draft        → Initial creation, not yet published
-published    → GitHub issue created, ready for work
-in-progress  → Implementation underway (auto-set by /prdx:dev:start)
-in-review    → PR created, awaiting review (auto-set by /prdx:dev:push)
-implemented  → Code merged, PRD work complete
-completed    → Fully done, archived (set by /prdx:close)
-
-────────────────────────────────────────────────────────────────────────────
-
-PRD TYPES & TEMPLATES
-────────────────────────────────────────────────────────────────────────────
-feature      → New functionality (default template)
-bug-fix      → Fix broken behavior (simpler, includes reproduction steps)
-refactor     → Improve code quality (includes migration plan)
-spike        → Research/investigation (time-boxed, findings-focused)
-
-────────────────────────────────────────────────────────────────────────────
-
-BRANCH NAMING CONVENTIONS
-────────────────────────────────────────────────────────────────────────────
-feat/<platform>-<issue>-<slug>      → New features
-fix/<platform>-<issue>-<slug>       → Bug fixes
-refactor/<platform>-<issue>-<slug>  → Refactoring work
-chore/<platform>-<issue>-<slug>     → Maintenance tasks
-docs/<platform>-<issue>-<slug>      → Documentation updates
-
-Examples:
-  feat/android-219-biometric-login
-  fix/backend-215-memory-leak
-  refactor/ios-220-navigation
-
-────────────────────────────────────────────────────────────────────────────
-
-DOCUMENTATION
-────────────────────────────────────────────────────────────────────────────
-Full Guide:     .claude/docs/prd-workflow-guide.md
-Implementation: .claude/docs/prd-implementation-summary.md
-Templates:      .claude/prds/templates/
-
-────────────────────────────────────────────────────────────────────────────
-
-TIPS & BEST PRACTICES
-────────────────────────────────────────────────────────────────────────────
-✓ Use /prdx:wizard for your first few PRDs
-✓ Let agents do the research - they explore the codebase thoroughly
-✓ Keep acceptance criteria to 3-5 essential items only
-✓ Review agent feedback carefully - they catch real issues
-✓ One task = one commit for clean git history
-✓ Run /prdx:dev:check before creating PR
-✓ Use --type to get the right template for your work
-✓ Track dependencies to avoid blockers
-
-✗ Don't skip the planning phase
-✗ Don't commit without running tests
-✗ Don't ignore agent recommendations
-✗ Don't create PRDs for trivial changes (<30 min work)
-
-────────────────────────────────────────────────────────────────────────────
-
-Need more help? Check the full guide:
-.claude/docs/prd-workflow-guide.md
-
-╚════════════════════════════════════════════════════════════════════════════╝
+# 5. Sync issue status (after PR created)
+/prdx:sync
 ```
 
-## Additional Notes
+That's it! Clean separation: `plan/sync` for issues, `dev:*` for PRs.
 
-- Keep the output concise but comprehensive
-- Use clear formatting with borders and sections
-- Highlight key commands and examples
-- Show the most common workflows
-- Include links to detailed documentation
+---
+
+## Core Commands (8 total)
+
+### Planning & Discovery
+
+**`/prdx:plan <description> [options]`**
+- Create PRD with agent-powered planning
+- **Smart defaults**: Infers type and platform from description
+- **Auto-duplicate detection**: Prevents creating duplicate PRDs
+- **Minimal questions**: Only asks what can't be inferred
+- Options: `--type`, `--platform`, `--depends-on`
+- Examples:
+  ```bash
+  /prdx:plan "fix memory leak in auth"     # Infers: bug-fix, backend
+  /prdx:plan "add dark mode" --platform android
+  /prdx:plan "refactor auth" --depends-on #215
+  ```
+
+**`/prdx:show [slug or keyword] [options]`**
+- **Smart viewer**: Lists all, searches, or shows detailed status
+- No arguments → List all PRDs
+- Keyword → Search PRDs
+- Exact slug → Show detailed status
+- Options: `--status`, `--platform`
+- Examples:
+  ```bash
+  /prdx:show                    # List all PRDs
+  /prdx:show auth               # Search for "auth"
+  /prdx:show android-219        # Detailed status
+  /prdx:show --status draft     # Filter by status
+  ```
+
+**`/prdx:update [slug]`**
+- Update existing PRD with agent assistance
+- Uses strikethrough to preserve history
+- Agent-powered impact analysis
+- Optional auto-sync to GitHub
+- Example:
+  ```bash
+  /prdx:update android-219
+  ```
+
+---
+
+### Development
+
+**`/prdx:dev [slug] [prompt]`**
+- **Context-aware**: Remembers last PRD, no slug needed
+- **Shows what you're working on**: Visual PRD banner
+- **Validates context**: Asks if wrong PRD loaded
+- Auto-creates detailed implementation plan if missing
+- Handles PRD updates via prompt
+- Examples:
+  ```bash
+  /prdx:dev                   # Continue last PRD (confirms which one)
+  /prdx:dev android-219       # Start new PRD
+  /prdx:dev "add OAuth"       # Continue with prompt
+  ```
+
+**`/prdx:dev:push [slug] [options]`**
+- **Auto-verifies** before creating PR (runs quality checks)
+- Creates comprehensive PR description
+- Links PR to GitHub issue
+- Options: `--skip-check`
+- Examples:
+  ```bash
+  /prdx:dev:push                    # Use context
+  /prdx:dev:push android-219        # Specify PRD
+  /prdx:dev:push --skip-check       # Skip verification
+  ```
+
+---
+
+### GitHub Integration
+
+**`/prdx:publish [slug]`**
+- Create GitHub issue from PRD
+- Auto-updates PRD with issue number
+- Example:
+  ```bash
+  /prdx:publish android-219
+  ```
+
+**`/prdx:sync [slug]`**
+- Sync PRD status/updates to GitHub issue
+- Updates issue labels and posts comments
+- Context-aware (can omit slug)
+- Example:
+  ```bash
+  /prdx:sync android-219     # Sync specific PRD
+  /prdx:sync                 # Sync current PRD
+  ```
+
+**`/prdx:close [slug]`**
+- Mark PRD as completed
+- Closes GitHub issue
+- Example:
+  ```bash
+  /prdx:close android-219
+  ```
+
+---
+
+## Removed Commands (Simplified!)
+
+These commands were **removed** for simplicity:
+
+- ❌ `/prdx:wizard` → Use `/prdx:plan` (smarter, fewer steps)
+- ❌ `/prdx:list` → Use `/prdx:show` (smart viewer)
+- ❌ `/prdx:search` → Use `/prdx:show <keyword>`
+- ❌ `/prdx:status` → Use `/prdx:show <slug>`
+- ❌ `/prdx:deps` → Shown in `/prdx:show <slug>`
+- ❌ `/prdx:dev:check` → Auto-runs in `/prdx:dev:push`
+
+**Result**: 14 commands → 8 commands (43% reduction!)
+
+---
+
+## Key Features
+
+### 🎯 Context Awareness
+Commands remember your last PRD:
+```bash
+/prdx:dev android-219    # Set context (shows PRD banner)
+/prdx:dev                # Uses android-219 (confirms PRD)
+/prdx:dev:push           # Also uses android-219
+```
+
+### 🤖 Smart Defaults
+Minimal questions, maximum intelligence:
+- **Type inference**: "fix bug" → `bug-fix`, "add feature" → `feature`
+- **Platform detection**: From directory, description, or recent PRDs
+- **Duplicate detection**: Automatically checks for similar PRDs
+
+### ⚡ Automation
+Things that happen automatically:
+- Quality verification before PR
+- GitHub issue sync
+- Detailed implementation planning
+- Duplicate PRD detection
+- Type and platform inference
+
+### 🔍 All-in-One Viewer
+`/prdx:show` does everything:
+- List all PRDs
+- Search by keyword
+- Show detailed status
+- View dependencies
+- Check PR/issue status
+
+---
+
+## Typical Workflows
+
+### Quick Feature (5 commands)
+```bash
+/prdx:plan "add biometric login"
+/prdx:publish               # Create GitHub issue
+/prdx:dev                   # Start implementation (shows PRD banner)
+# ...implement...
+/prdx:dev:push             # Create PR
+/prdx:sync                 # Update issue status
+```
+
+### With Context (Fewer Args)
+```bash
+/prdx:plan "add dark mode"
+/prdx:publish android-219
+/prdx:dev                   # Remembers android-219 (shows banner)
+# ...work...
+/prdx:dev                   # Continue (confirms PRD)
+# ...more work...
+/prdx:dev:push             # Still remembers the PRD
+/prdx:sync                 # Sync to issue
+```
+
+### Bug Fix Flow
+```bash
+/prdx:plan "fix memory leak in auth service"
+→ Auto-infers: bug-fix type
+→ Asks: "Steps to reproduce?"
+/prdx:dev
+/prdx:dev:push
+```
+
+### Search & Continue
+```bash
+/prdx:show auth                  # Find auth-related PRDs
+/prdx:dev android-219            # Pick one (shows PRD banner)
+/prdx:dev "add OAuth"            # Continue with update
+```
+
+---
+
+## Full Command Reference
+
+| Command | Purpose | Manages | Context-Aware |
+|---------|---------|---------|---------------|
+| `/prdx:plan` | Create PRD | PRDs | No |
+| `/prdx:show` | View PRDs | PRDs | No |
+| `/prdx:update` | Update PRD | PRDs | Yes |
+| `/prdx:publish` | Create issue | GitHub Issues | No |
+| `/prdx:sync` | Sync to issue | GitHub Issues | Yes |
+| `/prdx:dev` | Implement | Code | Yes |
+| `/prdx:dev:push` | Create PR | GitHub PRs | Yes |
+| `/prdx:close` | Complete | PRDs + Issues | No |
+
+### Clean Separation of Concerns
+
+**Planning** (`plan`, `show`, `update`):
+- Manage PRD files locally
+- Agent-powered planning and review
+
+**GitHub Issues** (`publish`, `sync`):
+- Create and sync issues
+- Update status labels and comments
+- Track work at planning level
+
+**Development** (`dev`, `dev:push`):
+- Implement features
+- Create and manage PRs
+- Auto-verify quality
+
+**That's it!** Simple, smart, and context-aware.

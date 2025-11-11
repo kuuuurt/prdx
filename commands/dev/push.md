@@ -1,14 +1,89 @@
 | description | argument-hint |
-| Create PR with implementation plan as description | Feature slug or leave empty to list |
+| Auto-verify and create PR with implementation plan | Feature slug or leave empty [--skip-check] |
 
 # Create Pull Request
 
-> **Be simple. Be pragmatic. One phase = one committable work.**
-> Create a PR with implementation plan as the description for comprehensive review.
+> **Auto-verify then create PR**
+> Runs quality checks automatically, then creates PR with comprehensive description
+> Manages GitHub **PRs only** (use `/prdx:sync` for issue updates)
+
+## Options
+
+- `--skip-check` - Skip automatic verification (not recommended)
 
 ---
 
-## Phase 1: Validate Current State
+## Phase 1: Automatic Verification
+
+**Run quality checks before creating PR:**
+
+1. **Find PRD:**
+   - If slug provided: `ls .claude/prds/*[slug]*.md`
+   - If not provided: Use context (last PRD worked on) or list and ask
+   - **DO NOT PROCEED** without valid PRD
+
+2. **Check for --skip-check flag:**
+   - If present: Skip to Phase 2
+   - If not present: Run verification
+
+3. **Run /prdx:dev:check workflow inline:**
+
+   Execute verification (from dev/check.md):
+   - Load PRD and parse acceptance criteria
+   - Parse implementation tasks
+   - Run multi-agent verification:
+     - Implementation quality (platform agent)
+     - Testing verification (code-reviewer)
+     - Security & performance (performance-optimizer)
+   - Verify git commits exist
+   - Validate file changes
+
+4. **Display verification results:**
+   ```
+   Running pre-PR verification...
+
+   ✓ Acceptance Criteria: 5/5 complete (100%)
+   ✓ Implementation Tasks: 12/12 complete (100%)
+   ✓ Code Quality: 9.2/10 (Excellent)
+   ✓ Test Coverage: 87% (Target: 70%)
+   ✓ Security & Performance: PASS
+   ✓ Git Commits: 12 commits, conventional format
+
+   Verification PASSED - Ready for PR
+   ```
+
+5. **Handle verification failures:**
+
+   If verification fails:
+   ```
+   ⚠️ Verification Issues Found:
+
+   ❌ Acceptance Criteria: 3/5 complete (60%)
+      Missing: AC #3, AC #5
+
+   ⚠️ Test Coverage: 45% (Below target: 70%)
+      Missing tests: AuthViewModel, TokenRefresh
+
+   ❌ Security: 1 issue
+      Issue: API keys not stored securely
+
+   Options:
+   1. Fix issues and run again
+   2. Continue anyway (not recommended)
+   3. Cancel
+
+   What would you like to do?
+   ```
+
+   - If user chooses to continue: proceed with warning in PR
+   - If user chooses to fix: exit and show recommendations
+   - If user chooses to cancel: exit
+
+6. **Store verification results for PR description**
+
+---
+
+## Phase 2: Validate Current State
 
 **Ensure everything is ready for PR:**
 
@@ -68,77 +143,222 @@
 
 ## Phase 3: Prepare PR Description
 
-**Build comprehensive PR description from implementation plan:**
+**Build skimmable 1-pager PR description:**
 
-1. **If implementation plan exists:**
-   - Read entire implementation plan
-   - Extract key sections for PR description:
-     - Summary
-     - Task Breakdown (what was done)
-     - Technical Approach
-     - Testing Strategy
-     - Implementation Notes (deviations, issues)
+**Design Principles:**
+- **Scannable**: Use bullets, short sentences, visual hierarchy
+- **1-pager**: Should fit on one screen without scrolling
+- **No walls of text**: Maximum 2-3 sentences per section
+- **Essential only**: What changed, why, what to review
 
-2. **Build PR description:**
-   ```markdown
-   # [Feature Name]
+**Template Structure:**
 
-   ## Summary
+```markdown
+## What
 
-   [Summary from implementation plan or PRD goal]
+[1-2 sentence summary from PRD goal - the "why" and high-level "what"]
 
-   ## Implementation
+## Changes
 
-   ### What was done
+[3-5 bullet points of key changes - files/components affected, not implementation details]
+- New: [Component/Feature]
+- Updated: [Component/Feature]
+- Fixed: [Component/Feature]
 
-   [Task breakdown from implementation plan, organized by phase]
+## Testing
 
-   **Phase 1: Foundation**
-   - ✅ Task 1
-   - ✅ Task 2
+✅ [X] tests passing | ✅ Coverage: [Y]% | [⚠️ Manual test needed: [scenario]]
 
-   **Phase 2: Core Logic**
-   - ✅ Task 3
-   - ✅ Task 4
+## Review Focus
 
-   ### Technical Details
+[1-2 specific areas reviewers should pay attention to]
+- [ ] [Specific file/logic to review]
+- [ ] [Edge case to verify]
 
-   [Architecture and key technical decisions from implementation plan]
+---
+Closes #[issue] | [Verification passed ✅ / ⚠️ Warnings]
+```
 
-   ## Testing
+**Detailed Guidance:**
 
-   [Testing strategy and results from implementation notes]
+1. **What section** (2-3 lines max):
+   - Pull from PRD goal
+   - Format: "This PR [adds/fixes/refactors] [X] to [achieve Y]"
+   - Example: "Adds biometric authentication to replace password-only login for better UX and security"
 
-   - ✅ Unit tests: [count] passed
-   - ✅ Integration tests: [status]
-   - ✅ Manual testing: [status]
-   - ✅ Linting: Passed
+2. **Changes section** (3-5 bullets max):
+   - Focus on WHAT changed, not HOW
+   - Group related changes
+   - Use categories: "New:", "Updated:", "Fixed:", "Removed:"
+   - Example bullets:
+     - "New: `BiometricAuthService` handles fingerprint/face ID"
+     - "Updated: `LoginViewModel` supports biometric flow"
+     - "Fixed: Token refresh race condition"
 
-   ## Deviations
+3. **Testing section** (1 line):
+   - Just the numbers and critical manual tests
+   - Format: "✅ 23 tests | ✅ 87% coverage | ⚠️ Manual: Test on physical device"
+   - If manual test needed, be specific about what/why
 
-   [If any deviations were documented in implementation notes]
+4. **Review Focus section** (2-3 checkboxes):
+   - Guide reviewers to what matters
+   - Specific files or logic patterns
+   - Edge cases or security concerns
+   - Example:
+     - "[ ] Verify `BiometricAuthService.authenticate()` handles all failure modes"
+     - "[ ] Check token storage uses Keychain (not UserDefaults)"
 
-   ## Related
+5. **Footer** (1 line):
+   - Issue reference
+   - Verification status from Phase 1
+   - Format: "Closes #219 | Verification passed ✅" or "Closes #219 | ⚠️ Low test coverage (45%)"
 
-   - PRD: `.claude/prds/[prd-filename]`
-   - Implementation Plan: `.claude/prds/impl-plans/[impl-plan-filename]`
-   - Closes #[issue-number] (if GitHub issue exists)
+**If Implementation Plan Exists:**
+- Extract 3-5 key completed tasks for "Changes"
+- Pull verification results for footer
+- Use deviations for "Review Focus" if applicable
 
-   ## Acceptance Criteria
+**If No Implementation Plan:**
+- Use PRD Approach section for "Changes"
+- Use PRD Acceptance Criteria for "Review Focus"
+- Format ACs as review checkboxes
 
-   [List all acceptance criteria from PRD with checkboxes]
+**Real-World Examples:**
 
-   - ✅ [Criterion 1]
-   - ✅ [Criterion 2]
-   ```
+<details>
+<summary><b>Example 1: Backend Feature</b></summary>
 
-3. **If no implementation plan:**
-   - Use PRD as fallback
-   - Build description from:
-     - Goal
-     - Approach
-     - Acceptance Criteria
-     - Implementation checklist
+```markdown
+## What
+
+Adds real-time location tracking API for drivers to enable live map updates in rider app.
+
+## Changes
+
+- New: `LocationService` handles WebSocket connections and Redis pub/sub
+- New: `POST /api/v1/driver/location` endpoint validates and broadcasts location
+- Updated: Driver model includes `last_location_update` timestamp
+- Updated: Auth middleware validates driver session tokens
+
+## Testing
+
+✅ 15 tests passing | ✅ 89% coverage | ⚠️ Manual: Test WebSocket reconnection on network drop
+
+## Review Focus
+
+- [ ] Verify rate limiting prevents location spam (max 1/sec per driver)
+- [ ] Check Redis pub/sub scales to 10k+ concurrent drivers
+- [ ] Validate location data sanitization (no PII leakage)
+
+---
+Closes #234 | Verification passed ✅
+```
+
+</details>
+
+<details>
+<summary><b>Example 2: Mobile Bug Fix</b></summary>
+
+```markdown
+## What
+
+Fixes crash when users rotate device during biometric prompt on Android 12+.
+
+## Changes
+
+- Fixed: `BiometricPrompt` lifecycle handling in `LoginFragment`
+- Updated: Prompt cancellation clears state properly
+- Added: Rotation config change handling in manifest
+
+## Testing
+
+✅ 8 regression tests | ✅ Manual: Tested on Pixel 6 (Android 12 & 13)
+
+## Review Focus
+
+- [ ] Verify no memory leaks in Fragment lifecycle
+- [ ] Check prompt works after multiple rotations
+
+---
+Closes #456 | ⚠️ Manual testing required
+```
+
+</details>
+
+<details>
+<summary><b>Example 3: Refactor</b></summary>
+
+```markdown
+## What
+
+Simplifies LoginViewModel by removing Use Case layer and calling Auth0Client directly per new architecture.
+
+## Changes
+
+- Removed: `DoLoginUseCase` and `ConfirmOtpUseCase` (deprecated pattern)
+- Updated: `LoginViewModel` calls `Auth0Client` directly
+- Simplified: State management using `UIState` sealed class
+- Updated: 12 tests adapted to new structure
+
+## Testing
+
+✅ 24 tests passing | ✅ 91% coverage | ✅ No manual test needed
+
+## Review Focus
+
+- [ ] Verify error handling matches previous behavior
+- [ ] Check Login flow still works end-to-end
+
+---
+Closes #789 | Verification passed ✅
+```
+
+</details>
+
+**Anti-Patterns to Avoid:**
+
+❌ **Too verbose**:
+```markdown
+## Implementation Details
+In this PR, I've implemented a comprehensive solution for...
+[3 paragraphs of prose]
+```
+
+❌ **Too technical**:
+```markdown
+## Changes
+- Refactored the LocationService class to implement the Observer pattern
+  with a custom EventEmitter that uses WeakRefs to prevent memory leaks...
+```
+
+❌ **Task dump**:
+```markdown
+## What was done
+- Created LocationService.ts file
+- Added imports for Redis and Socket.io
+- Wrote validateLocation function
+- Added unit tests for validateLocation
+- Updated package.json with new dependencies
+[20 more bullets...]
+```
+
+✅ **Good**:
+```markdown
+## What
+Adds real-time location tracking for drivers.
+
+## Changes
+- New: LocationService handles WebSocket + Redis
+- New: POST /api/v1/driver/location endpoint
+- Updated: Driver model + auth middleware
+
+## Testing
+✅ 15 tests | 89% coverage
+
+## Review Focus
+- [ ] Rate limiting (1 update/sec max)
+- [ ] Redis pub/sub scalability
+```
 
 ---
 
@@ -248,6 +468,7 @@ Commits: [count]
 Files changed: [count]
 
 Description includes:
+✅ Verification results
 ✅ Summary
 ✅ Task breakdown ([count] tasks)
 ✅ Technical approach
@@ -262,9 +483,9 @@ Documents updated (local only, not committed):
 Next steps:
 - Review PR at [pr-url]
 - Request reviews from team
+- Update issue status: /prdx:sync [slug]
 - Address review comments if any
 - Merge when approved
-- Run /prdx:sync [slug] to sync status back to GitHub issue
 ```
 
 **Additional actions:**
@@ -277,14 +498,18 @@ Next steps:
 ## Example Usage
 
 ```bash
-# Create PR for implemented feature
+# Auto-verify and create PR (recommended)
 /prdx:dev:push android-feature-bug-fix
 
-# Create PR by filename
-/prdx:dev:push android-feature-bug-fix.md
+# Continue from context (remembers last PRD)
+/prdx:dev:push
 
-# Create PR for backend feature
-/prdx:dev:push backend-fix-context-storage-logger-tracing
+# Skip verification (not recommended)
+/prdx:dev:push android-219 --skip-check
+
+# After PR, sync issue status
+/prdx:dev:push android-219
+/prdx:sync android-219    # Updates issue to "in-review"
 ```
 
 ---

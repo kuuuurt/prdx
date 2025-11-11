@@ -1,431 +1,415 @@
 | description | argument-hint |
-| Bidirectional sync between GitHub issue and local PRD | PRD filename/slug or issue number |
+| Sync PRD status/updates to linked GitHub issue | Feature slug or leave empty for context |
 
-# Feature Sync
+# Sync PRD to GitHub Issue
 
-> **Be simple. Be pragmatic. One phase = one committable work.**
-> Smart bidirectional sync between GitHub issues and local PRDs.
+> **Keep GitHub issues in sync with PRD changes**
+> Updates issue status, labels, and posts PRD updates as comments
+
+## Scope
+
+**`/prdx:sync`** manages **GitHub Issues** ↔ PRD synchronization.
+**`/prdx:dev:push`** manages **GitHub PRs** (separate concern).
+
+**Clean separation:**
+- Issues = Planning/tracking (this command)
+- PRs = Code review (dev:push command)
 
 ---
 
-## Phase 1: Identify Sync Target & Direction
+## Usage
 
-**Goal**: Determine what to sync and detect optimal sync direction.
-
-**Parse user input:**
-
-1. **PRD filename or slug** (e.g., `android-feature-bug-fix` or `android-feature-bug-fix.md`):
-   - Find PRD in `.claude/prds/`
-   - Extract issue number from PRD metadata (`**Issue**: #123`)
-   - If no issue number: **STOP** and suggest `/prdx:publish` first
-
-2. **Issue number or URL** (e.g., `123` or `#123` or full GitHub URL):
-   - Detect repo from current directory (your-backend-project/android/ios)
-   - Check if local PRD exists with this issue number
-   - If no local PRD: proceed with GitHub → Local sync (original behavior)
-
-**Verify GitHub CLI:**
 ```bash
-gh auth status
+# Sync specific PRD
+/prdx:sync android-219
+
+# Sync current PRD from context
+/prdx:sync
+
+# Force sync even if no changes detected
+/prdx:sync android-219 --force
 ```
-If not authenticated: **STOP** and show error
 
 ---
 
-## Phase 2: Smart Sync Direction Detection
+## Phase 1: Load PRD and Context
 
-**Goal**: Compare timestamps to determine what changed and needs syncing.
+**Find PRD with context awareness:**
 
-**Fetch both sources:**
-
-1. **Load local PRD**:
-   - Read PRD file from `.claude/prds/`
-   - Extract metadata: Status, Issue, Created, Last Modified (file timestamp)
-   - Parse "Sync History" section for last sync timestamp
-   - Store PRD content hash for change detection
-
-2. **Fetch GitHub issue**:
+1. **Load context:**
    ```bash
-   cd your-[project] && gh issue view [number] --json title,body,labels,state,createdAt,updatedAt
+   source .prdx-context 2>/dev/null || true
    ```
-   - Extract `updatedAt` timestamp from GitHub
-   - Store issue content
 
-**Compare and decide sync direction:**
+2. **Determine PRD:**
+   - If slug provided: use it
+   - If no slug + context exists: use `LAST_PRD_SLUG`
+   - If neither: list PRDs and ask user to select
+
+3. **Read PRD:**
+   - Parse metadata: Issue number, status, dependencies
+   - Check if issue exists (must have `**Issue**: #[number]`)
+   - If no issue: error and suggest `/prdx:publish` first
+
+---
+
+## Phase 2: Detect Changes
+
+**Compare PRD with last sync:**
+
+1. **Check sync history** (stored in PRD metadata):
+   ```markdown
+   **Last Synced**: [YYYY-MM-DD HH:MM] | **Sync Hash**: [hash]
+   ```
+
+2. **Calculate current hash:**
+   - Hash of: Goal + Acceptance Criteria + Approach + Status
+   - If hash matches last sync: no changes detected
+   - If `--force`: skip hash check
+
+3. **Detect specific changes:**
+   - Status changed? (draft → published → in-progress → etc.)
+   - Acceptance criteria added/modified?
+   - Approach updated?
+   - Dependencies changed?
+   - PRD revised? (check Revision History section)
+
+4. **Display changes:**
+   ```
+   Changes detected since last sync (2 days ago):
+
+   Status: in-progress → in-review
+   Acceptance Criteria: 1 new criterion added
+   Revision: Updated 2025-11-10 (added OAuth support)
+   ```
+
+5. **If no changes and not forced:**
+   ```
+   ✓ PRD is already in sync with issue #219
+   Last synced: 2 hours ago
+
+   Use --force to sync anyway
+   ```
+
+---
+
+## Phase 3: Sync to GitHub Issue
+
+**Update issue based on PRD changes:**
+
+1. **Update issue status via labels:**
+
+   **PRD Status → GitHub Labels:**
+   - `draft` → No sync (issue shouldn't exist yet)
+   - `published` → `status: todo`
+   - `in-progress` → `status: in-progress`
+   - `in-review` → `status: in-review` (when PR exists)
+   - `implemented` → `status: done`
+   - `completed` → Close issue
+
+   ```bash
+   # Remove old status label
+   gh issue edit [number] --remove-label "status: todo"
+   # Add new status label
+   gh issue edit [number] --add-label "status: in-progress"
+   ```
+
+2. **Post update comment to issue:**
+
+   **If status changed:**
+   ```bash
+   gh issue comment [number] --body "$(cat <<'EOF'
+   ## 📊 Status Update
+
+   **Status**: published → in-progress
+   **Branch**: feat/android-219-biometric
+   **Started**: 2025-11-10
+
+   Implementation has begun.
+   EOF
+   )"
+   ```
+
+   **If PRD revised:**
+   ```bash
+   gh issue comment [number] --body "$(cat <<'EOF'
+   ## 🔄 PRD Updated
+
+   **Revision**: #2 (2025-11-10)
+   **Reason**: [reason from PRD revision history]
+
+   ### Changes
+   - ~~Old approach~~ → New approach with OAuth
+   - **NEW**: Added Google/GitHub OAuth support
+
+   **Full PRD**: `.claude/prds/android-219-biometric.md`
+   EOF
+   )"
+   ```
+
+   **If acceptance criteria changed:**
+   ```bash
+   gh issue comment [number] --body "$(cat <<'EOF'
+   ## ✅ Acceptance Criteria Updated
+
+   **Added**:
+   - [ ] OAuth providers support Google and GitHub
+
+   **Current Status**: 3/5 complete
+   EOF
+   )"
+   ```
+
+3. **Update issue body** (if major changes):
+
+   Only if: First sync OR revision count changed
+
+   ```bash
+   gh issue edit [number] --body "$(cat <<'EOF'
+   [Updated issue body with current PRD goal and ACs]
+   EOF
+   )"
+   ```
+
+4. **Handle dependencies:**
+
+   If dependencies changed:
+   ```bash
+   # Add references in issue body
+   gh issue edit [number] --body "$(cat <<'EOF'
+   ...
+
+   **Depends on**: #215, #218
+   **Blocks**: #220
+   EOF
+   )"
+   ```
+
+---
+
+## Phase 4: Update PRD Metadata
+
+**Record sync in PRD:**
+
+1. **Update sync metadata:**
+   ```markdown
+   **Last Synced**: 2025-11-10 15:30 | **Sync Hash**: a3f9c2b1
+   ```
+
+2. **Add sync history entry** (optional, for auditing):
+   ```markdown
+   ---
+
+   ## Sync History
+
+   ### 2025-11-10 15:30
+   - Status synced: in-progress
+   - Label updated: status: in-progress
+   - Comment posted: Status update
+
+   ### 2025-11-08 10:15
+   - Status synced: published
+   - Label updated: status: todo
+   - Issue created: #219
+   ```
+
+---
+
+## Phase 5: Display Summary
+
+**Show what was synced:**
 
 ```
-Decision Matrix:
+✓ Synced to GitHub Issue #219
 
-1. GitHub issue updatedAt > Last local sync timestamp
-   AND local PRD NOT modified since last sync
-   → SYNC: GitHub → Local (one-way)
+Changes applied:
+  ✓ Status: in-progress → in-review
+  ✓ Label: "status: in-review" added
+  ✓ Comment: Status update posted
+  ✓ PRD metadata: Last synced timestamp updated
 
-2. Local PRD modified > Last sync timestamp
-   AND GitHub issue NOT updated since last sync
-   → SYNC: Local → GitHub (post comment)
+Issue: https://github.com/org/repo/issues/219
 
-3. BOTH updated since last sync
-   → CONFLICT: Prompt user (show diff, let user choose)
-
-4. Neither updated since last sync
-   → NO SYNC NEEDED: Report "Already in sync"
-```
-
-**Display sync plan:**
-```
-📋 Sync Analysis: [feature-name]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Local PRD:  .claude/prds/[filename]
-            Last modified: [timestamp]
-            Last sync: [timestamp or "never"]
-
-GitHub:     [org/repo] #[number]
-            Last updated: [timestamp]
-            Status: [open/closed]
-
-Decision:   [GitHub → Local / Local → GitHub / CONFLICT / In Sync]
+Last synced: Just now
+Previous sync: 2 days ago
 ```
 
 ---
 
-## Phase 3: Resolve Conflicts (If Needed)
+## When to Use This Command
 
-**Goal**: Handle cases where both local and GitHub were modified.
+**Use `/prdx:sync` when:**
+- ✅ PRD status changes (draft → published → in-progress → etc.)
+- ✅ PRD is updated/revised (via `/prdx:update`)
+- ✅ Acceptance criteria change
+- ✅ Dependencies change
+- ✅ Want to keep issue in sync with PRD state
 
-**Only runs if CONFLICT detected in Phase 2.**
+**Don't need `/prdx:sync` for:**
+- ❌ Creating PR (use `/prdx:dev:push` - handles PR workflow)
+- ❌ Creating issue (use `/prdx:publish` - creates issue initially)
+- ❌ Closing issue (use `/prdx:close` - closes both PRD and issue)
 
-**Show differences:**
+**Flow:**
 ```
-⚠️ CONFLICT: Both local and GitHub updated since last sync
-
-Local changes:
-- Modified: [section names]
-- Last edit: [timestamp]
-
-GitHub changes:
-- Modified: [timestamp]
-- Comment activity: [count] new comments
-
-How to resolve?
-1. Keep local changes and push to GitHub (Local → GitHub)
-2. Pull GitHub changes and update local (GitHub → Local)
-3. Show detailed diff to merge manually
-4. Cancel sync
-
-Choose (1/2/3/4):
+/prdx:publish     → Creates GitHub issue from PRD
+/prdx:sync        → Syncs PRD updates to issue (as needed)
+/prdx:dev:push    → Creates PR, links to issue
+/prdx:close       → Marks complete, closes issue
 ```
 
-**If option 3 (detailed diff):**
-- Show section-by-section comparison
-- Highlight changed lines
-- Let user edit PRD directly
-- After manual merge, post summary comment to GitHub
-
 ---
 
-## Phase 4: Execute Sync (GitHub → Local)
+## Edge Cases
 
-**Goal**: Pull GitHub issue content and update local PRD.
+**No issue linked:**
+```
+❌ PRD has no linked GitHub issue
 
-**Only runs if sync direction is GitHub → Local (or user chose option 2 in conflict resolution).**
-
-**Create/find local filename:**
-
-1. If syncing from issue number only (no existing PRD):
-   - Clean issue title: remove `[Feature]`, `Feature:`, `feat:` prefixes
-   - Convert to slug: lowercase, hyphenated
-   - Add project prefix: `[project]-[slug].md`
-
-2. If syncing to existing PRD: use existing filename
-
-**Parse GitHub issue content:**
-- Extract markdown sections: `## Problem`, `## Goal`, `## Acceptance Criteria`, etc.
-- Expand `<details>` sections
-- Preserve checkbox states: `- [ ]`, `- [x]`
-- Extract issue metadata: title, labels, state, timestamps
-
-**If creating new PRD:**
-```markdown
-# [Issue Title]
-
-**Project**: [project] | **Status**: synced | **Issue**: #[number] | **Created**: [date]
-
----
-
-## Problem
-[From issue]
-
-## Goal
-[From issue]
-
-**Out of scope**: [From issue if present]
-
----
-
-## Acceptance Criteria
-[From issue - preserve checkboxes]
-
----
-
-## Approach
-[From issue]
-
----
-
-## Implementation
-[From issue implementation plan]
-
----
-
-## Notes
-
-**Synced from GitHub**: #[number] on [date]
-
----
-
-## Sync History
-- **[date]**: Initial sync from issue #[number]
+Create an issue first:
+  /prdx:publish android-219
 ```
 
-**If updating existing PRD (merge mode):**
-- Compare sections between local and GitHub
-- Add new content with `**Updated from GitHub ([date])**:` marker
-- Use strikethrough for changed content:
-  ```markdown
-  ~~[Old local version]~~ *(Updated from GitHub)*
+**Issue doesn't exist:**
+```
+⚠️ Issue #219 not found on GitHub
 
-  **From GitHub ([date])**: [New GitHub version]
-  ```
-- Update "Last Synced" timestamp in metadata
-- Append to "Sync History" section:
-  ```markdown
-  - **[date]**: Synced from GitHub #[number] (merged updates)
-  ```
-
----
-
-## Phase 5: Execute Sync (Local → GitHub)
-
-**Goal**: Push local PRD changes to GitHub issue as a comment.
-
-**Only runs if sync direction is Local → GitHub (or user chose option 1 in conflict resolution).**
-
-**Detect local changes:**
-1. Compare current PRD with last synced version (from Sync History)
-2. Identify changed sections: Problem, Goal, Acceptance Criteria, Implementation, etc.
-3. Build a summary of changes
-
-**Format GitHub comment:**
-```markdown
-🔄 **PRD Updated Locally**
-
-The local PRD for this feature has been updated. Here's a summary of changes:
-
-### Changes Made
-- **[Section name]**: [brief description of change]
-- **[Section name]**: [brief description of change]
-
-### Updated Acceptance Criteria
-[List any AC changes with checkboxes]
-
-### Updated Implementation Plan
-[List any task changes]
-
----
-
-**Local PRD**: `.claude/prds/[filename]`
-**Last synced**: [timestamp]
-
-*This comment was automatically generated by `/prdx:sync`*
+Options:
+1. Remove issue reference from PRD
+2. Create issue with /prdx:publish
+3. Update issue number manually
 ```
 
-**Post comment to GitHub:**
+**GitHub CLI not available:**
+```
+❌ GitHub CLI (gh) not found
+
+Install: brew install gh
+Or manually sync at: https://github.com/org/repo/issues/219
+```
+
+**No changes detected:**
+```
+✓ PRD is already in sync with issue #219
+
+Last synced: 2 hours ago
+No changes detected
+
+Use --force to sync anyway
+```
+
+**PRD has PR but issue status outdated:**
+```
+Syncing to issue #219...
+
+Note: PR #234 exists for this PRD
+Updating issue status to "in-review" to reflect PR state
+
+✓ Synced successfully
+```
+
+---
+
+## Integration with Other Commands
+
+**`/prdx:publish`** → Creates issue, sets initial metadata
+- First sync happens automatically
+- Issue number saved to PRD
+
+**`/prdx:update`** → Updates PRD
+- **Does NOT auto-sync** (you control when)
+- Run `/prdx:sync` after update to push changes to issue
+
+**`/prdx:dev:start`** → Changes PRD status to "in-progress"
+- **Does NOT auto-sync**
+- Run `/prdx:sync` to update issue status
+
+**`/prdx:dev:push`** → Creates PR
+- Links PR to issue (via issue number in PR description)
+- Updates **PR**, not issue directly
+- Run `/prdx:sync` to update issue status to "in-review"
+
+**`/prdx:close`** → Marks PRD complete
+- Closes both PRD and GitHub issue
+- Final sync happens automatically
+
+---
+
+## Examples
+
+**After updating PRD:**
 ```bash
-cd your-[project] && gh issue comment [number] --body "[formatted comment]"
+/prdx:update android-219
+# Made changes to PRD...
+/prdx:sync android-219
+→ Posts update comment to issue #219
 ```
 
-**Update PRD metadata:**
-- Update "Last Synced" timestamp
-- Append to "Sync History":
-  ```markdown
-  - **[date]**: Pushed local changes to GitHub #[number] (comment posted)
-  ```
-
----
-
-## Phase 6: Validate & Summarize
-
-**Goal**: Provide clear feedback on sync operation results.
-
-**Quality check and report:**
-
-**For GitHub → Local sync:**
-```
-✅ PRD Synced: GitHub → Local
-
-Source:    [org/repo] #[number]
-Local:     .claude/prds/[filename]
-Action:    [Created/Updated/Merged]
-Direction: GitHub → Local
-
-Summary:
-- Title: [name]
-- Acceptance Criteria: [count]
-- Implementation Tasks: [count]
-- GitHub Status: [open/closed]
-- Last synced: [timestamp]
-
-PRD Completeness:
-✓ Problem: [OK/Missing]
-✓ Goal: [OK/Missing]
-✓ Acceptance Criteria: [count]
-✓ Implementation: [count] tasks
-
-Next steps:
-- Review: /prdx:review [slug]
-- Implement: /prdx:implement [slug]
+**After starting implementation:**
+```bash
+/prdx:dev:start android-219
+# PRD status changed to "in-progress"
+/prdx:sync
+→ Updates issue status label
 ```
 
-**For Local → GitHub sync:**
-```
-✅ PRD Synced: Local → GitHub
+**Check if sync needed:**
+```bash
+/prdx:show android-219
+→ Shows: "Last synced: 2 days ago, changes detected"
 
-Local:     .claude/prds/[filename]
-GitHub:    [org/repo] #[number]
-Action:    Comment posted with changes
-Direction: Local → GitHub
-
-Changes pushed:
-- [Section 1]: [change description]
-- [Section 2]: [change description]
-
-Comment URL: [GitHub comment URL]
-Last synced: [timestamp]
-
-Next steps:
-- View comment: gh issue view [number] --web
-- Continue work: /prdx:implement [slug]
+/prdx:sync android-219
+→ Syncs latest changes
 ```
 
-**For "already in sync":**
-```
-✅ Already in Sync
-
-Local:  .claude/prds/[filename]
-GitHub: [org/repo] #[number]
-
-No changes detected since last sync ([timestamp]).
-Both sources are up to date.
-
-Next steps:
-- Update PRD: /prdx:update [slug]
-- Implement: /prdx:implement [slug]
-```
-
-**If manual merge was needed:**
-```
-✅ Conflict Resolved
-
-PRD has been updated based on your choice.
-Sync history recorded in PRD.
-
-⚠️ If you chose "Show detailed diff":
-   Search for "MERGED" markers in PRD for manual review.
-
-Next steps:
-- Review merged content in .claude/prds/[filename]
-- Consider syncing again after reviewing
+**Force sync (even if no changes):**
+```bash
+/prdx:sync android-219 --force
+→ Syncs anyway, useful for fixing manual edits
 ```
 
 ---
 
 ## Important Rules
 
-- **SMART AUTO-DETECTION** - compare timestamps to determine sync direction automatically
-- **PRESERVE LOCAL WORK** - never overwrite without user confirmation
-- **TRACK SYNC HISTORY** - record every sync operation with timestamps
-- **BIDIRECTIONAL SUPPORT** - handle both GitHub → Local and Local → GitHub
-- **DETECT CONFLICTS** - prompt user when both sources changed
-- **CLEAR FEEDBACK** - always show what happened and next steps
-- **VALIDATE COMPLETENESS** - warn if PRD sections are missing
+### Scope
+- **ONLY syncs to GitHub Issues** (not PRs)
+- PR management is separate (handled by `/prdx:dev:push`)
+
+### When It Runs
+- **MANUAL command** - you control when to sync
+- **NOT automatic** - other commands don't auto-sync
+- **Exception**: `/prdx:publish` and `/prdx:close` do auto-sync
+
+### What It Syncs
+- ✅ PRD status → Issue status labels
+- ✅ PRD updates → Issue comments
+- ✅ Acceptance criteria → Issue comments
+- ✅ Dependencies → Issue body
+- ❌ NOT code changes (that's PR territory)
+- ❌ NOT commits (that's git territory)
+
+### Hash-Based Detection
+- Prevents unnecessary syncs
+- Detects: status, ACs, approach, revision changes
+- Use `--force` to bypass hash check
+
+### Context Awareness
+- Remembers last PRD (can omit slug)
+- Reads `.prdx-context` file
+- Works with `/prdx:dev:start` and `/prdx:dev:push` context
 
 ---
 
-## Edge Cases
+## Comparison with Dev Commands
 
-### No Issue Number in PRD
-If user provides PRD slug but PRD has no `**Issue**: #[number]`:
-```
-❌ Cannot sync: No GitHub issue linked to this PRD
+| Command | Manages | When to Use |
+|---------|---------|-------------|
+| `/prdx:sync` | GitHub Issues | After PRD updates, status changes |
+| `/prdx:dev:push` | GitHub PRs | After implementation, create PR |
+| `/prdx:publish` | Creates issue | Initial issue creation from PRD |
+| `/prdx:close` | Closes both | Mark feature complete |
 
-This PRD hasn't been published to GitHub yet.
-
-Next steps:
-- Publish to GitHub first: /prdx:publish [slug]
-- Then sync: /prdx:sync [slug]
-```
-
-### Issue Closed on GitHub
-If GitHub issue is closed but local PRD shows "in-progress":
-```
-⚠️ Status Mismatch
-
-GitHub issue #[number] is CLOSED
-Local PRD status: in-progress
-
-Sync will proceed, but consider:
-- Updating PRD status to "implemented" or "cancelled"
-- Using /prdx:verify to check completion
-```
-
-### First Sync (No History)
-If PRD has no "Sync History" section:
-- Treat current PRD content as "local baseline"
-- Add "Last Synced: never" to detection logic
-- Any GitHub changes will trigger GitHub → Local prompt
-
-### Deleted GitHub Issue
-If issue number exists in PRD but issue is deleted on GitHub:
-```
-❌ Cannot sync: GitHub issue #[number] not found
-
-The issue may have been deleted or you lack access.
-
-Next steps:
-- Verify issue exists: gh issue view [number]
-- Remove issue link from PRD if deleted
-- Create new issue: /prdx:publish [slug]
-```
-
----
-
-## Example Usage
-
-```bash
-# Sync by PRD slug (auto-detect direction)
-/prdx:sync android-feature-bug-fix
-
-# Sync by PRD filename (auto-detect direction)
-/prdx:sync android-feature-bug-fix.md
-
-# Sync from issue number (GitHub → Local)
-/prdx:sync 216
-
-# Sync from issue URL (GitHub → Local)
-/prdx:sync https://github.com/your-org/your-android-project/issues/216
-```
-
----
-
-## Comparison with Other Commands
-
-- **`/prdx:publish`**: One-way Local → GitHub (creates new issue)
-- **`/prdx:sync`**: Bidirectional, auto-detect direction (updates existing issue/PRD)
-- **`/prdx:update`**: Local-only PRD updates (optional GitHub sync)
-
-**When to use `/prdx:sync`:**
-- After updating GitHub issue and want to pull changes locally
-- After updating local PRD and want to notify GitHub (as comment)
-- Periodically to keep PRD and issue in sync
-- When returning to a feature after time away
+**Clean separation of concerns:**
+- Issues = Planning/tracking lifecycle
+- PRs = Code review lifecycle

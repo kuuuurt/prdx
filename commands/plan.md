@@ -14,16 +14,33 @@
 
 ## Options
 
-- `--type <type>` - PRD type: `feature` (default), `bug-fix`, `refactor`, `spike`
+- `--type <type>` - Override inferred type: `feature`, `bug-fix`, `refactor`, `spike`
 - `--depends-on <issue>` - Dependencies: issue number(s) or PRD slug(s) (comma-separated)
+- `--platform <platform>` - Override detected platform: `backend`, `android`, `ios`, `web`
 
 ## Examples
 
 ```bash
+# Smart defaults - infers type and platform
 /prdx:plan "add biometric login"
-/prdx:plan "fix memory leak" --type bug-fix
-/prdx:plan "refactor auth flow" --type refactor --depends-on #215,#218
-/prdx:plan "investigate performance" --type spike
+→ Infers: feature, android (or asks if ambiguous)
+
+# Description-based type inference
+/prdx:plan "fix memory leak in auth service"
+→ Infers: bug-fix (contains "fix")
+
+/prdx:plan "refactor auth flow to use new pattern"
+→ Infers: refactor (contains "refactor")
+
+/prdx:plan "investigate performance issues"
+→ Infers: spike (contains "investigate")
+
+# Explicit override when needed
+/prdx:plan "add fix for caching" --type feature
+→ Uses: feature (overrides "fix" keyword)
+
+# With dependencies
+/prdx:plan "complete auth refactor" --depends-on #215,#218
 ```
 
 ---
@@ -46,20 +63,81 @@ Hook can:
 
 ## Phase 1: Setup & Discovery
 
-**Parse parameters and detect project:**
+**Parse parameters and detect project with smart inference:**
 
 1. **Parse command-line options**:
-   - Extract `--type` parameter (default: `feature`)
+   - Extract `--type` parameter (if provided)
    - Extract `--depends-on` parameter (parse comma-separated values)
-   - Valid types: `feature`, `bug-fix`, `refactor`, `spike`
+   - Extract `--platform` parameter (if provided)
 
-2. **Determine branch type** for conventional commits:
+2. **Infer PRD type from description** (if `--type` not provided):
+
+   Analyze the feature description for keywords:
+
+   **Bug-fix keywords** (priority: high):
+   - Contains: "fix", "bug", "error", "crash", "issue", "broken"
+   - Example: "fix memory leak" → `bug-fix`
+
+   **Refactor keywords** (priority: medium):
+   - Contains: "refactor", "simplify", "optimize", "improve", "migrate"
+   - Example: "refactor auth flow" → `refactor`
+
+   **Spike keywords** (priority: medium):
+   - Contains: "investigate", "explore", "research", "spike", "evaluate"
+   - Example: "investigate performance" → `spike`
+
+   **Default** (if no keywords match):
+   - Use `feature`
+   - Example: "add biometric login" → `feature`
+
+   **Override**: If `--type` provided, use that instead.
+
+3. **Display inferred type** and confirm if ambiguous:
+   ```
+   Inferred PRD type: bug-fix (from "fix memory leak")
+
+   Is this correct? (y/n)
+   [If no:] Select type: feature, bug-fix, refactor, spike
+   ```
+
+4. **Determine branch type** for conventional commits:
    - `feature` → branch prefix: `feat/`
    - `bug-fix` → branch prefix: `fix/`
    - `refactor` → branch prefix: `refactor/`
    - `spike` → branch prefix: `spike/` (or `chore/` if preferred)
 
-3. **Detect project structure** (critical for adaptive workflow):
+5. **Auto-detect platform** (if `--platform` not provided):
+
+   **From current directory:**
+   ```bash
+   pwd
+   ```
+   - If in `backend/` or contains TypeScript/Hono → `backend`
+   - If in `android/` or contains Kotlin/Gradle → `android`
+   - If in `ios/` or contains Swift/Xcode → `ios`
+   - If in `web/` or `frontend/` → `web`
+
+   **From description keywords:**
+   - Contains "API", "endpoint", "server", "backend" → `backend`
+   - Contains "Android", "Compose", "Activity" → `android`
+   - Contains "iOS", "SwiftUI", "View Controller" → `ios`
+   - Contains "web", "React", "frontend" → `web`
+
+   **From recent PRDs** (pattern matching):
+   - Check last 5 PRDs to find common platform
+
+   **If still ambiguous**: Ask user
+   ```
+   Which platform does this affect?
+   1. backend
+   2. android
+   3. ios
+   4. Multiple platforms
+   ```
+
+   **Override**: If `--platform` provided, use that instead.
+
+6. **Detect project structure** (critical for adaptive workflow):
 
    Check current directory structure:
 
@@ -89,18 +167,40 @@ Hook can:
 
    **Detection**: Run `ls` - if 2+ platform dirs found → Full-Stack, else → Single-Platform
 
-4. **Determine platform scope**:
+4. **Auto-search for duplicate PRDs** (before asking user):
+
+   Extract keywords from description and search existing PRDs:
+   ```bash
+   # Extract 2-3 key nouns from description
+   # Search for each keyword
+   grep -r -i "<keyword>" .claude/prds --include="*.md" --exclude-dir=templates
+   ```
+
+   If similar PRDs found (>50% keyword overlap):
+   ```
+   ⚠️ Found similar PRD:
+     - android-biometric-auth.md (Status: draft)
+       "Add biometric authentication"
+
+   Is this the same work? (y/n)
+   [If yes:] Opening existing PRD...
+   [If no:] Continuing with new PRD...
+   ```
+
+   **Skip this if:** Less than 2 existing PRDs (nothing to duplicate)
+
+5. **Determine platform scope**:
 
    **For Full-Stack projects**:
-   - Ask user which platform(s) this PRD affects
+   - Ask user which platform(s) this PRD affects (if not already detected)
    - Can be single (backend) or multiple (backend+android)
    - PRD coordinates work across platforms
 
    **For Single-Platform projects**:
-   - Platform = current project automatically
+   - Platform = detected platform automatically
    - Other platforms referenced as external only
 
-5. Create PRD slug based on project structure:
+6. Create PRD slug based on project structure:
    - **Full-Stack**: `[platform(s)]-[feature-name].md`
      - Example: `backend-user-auth.md`
      - Example: `backend-android-biometric.md` (cross-platform)
@@ -114,20 +214,27 @@ Hook can:
    - `refactor` → `.claude/prds/templates/refactor-template.md`
    - `spike` → `.claude/prds/templates/spike-template.md`
 
-6. **Ask clarifying questions** (don't proceed without answers):
-   - For all types:
-     - What problem are we solving?
-     - Who experiences this problem?
-   - For bug-fix:
-     - Steps to reproduce?
-     - Expected vs actual behavior?
-   - For refactor:
-     - Current pain points?
-     - Future work this enables?
-   - For spike:
-     - Research question to answer?
-     - Decision this will inform?
-     - Time box (hours/days)?
+7. **Ask ONLY essential clarifying questions** (streamlined):
+
+   **Only ask questions that can't be inferred:**
+
+   - If description is vague (< 5 words): Ask "What problem are we solving?"
+   - If bug-fix type + no repro mentioned: Ask "Steps to reproduce?"
+   - If spike type: Ask "Time box (hours/days)?" (required for spikes)
+
+   **Don't ask if already clear:**
+   - ✗ "Who experiences this?" → Infer from context
+   - ✗ "What problem?" → Already in description
+   - ✗ "Current pain points?" → Use agent analysis instead
+
+   **Example - Smart questions:**
+   ```
+   Description: "fix memory leak"
+   → Asks: "Steps to reproduce the memory leak?"
+   → Doesn't ask: "What problem?" (obvious from description)
+   ```
+
+   **Goal**: Minimize back-and-forth, maximize agent intelligence
 
 ---
 
