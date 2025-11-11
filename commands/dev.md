@@ -802,41 +802,103 @@ For each task in Detailed Implementation Plan:
 
 ---
 
-## Phase 7: Testing with Strategy from Plan
+## Phase 7: Efficient Testing Strategy
 
-**Execute testing using detailed plan's testing strategy:**
+**Test effectively, not exhaustively. Focus on end results.**
 
-1. **Unit tests:**
-   - Follow test files from detailed plan
+### Testing Philosophy (from testing-strategy.md skill)
+
+**Effective > Comprehensive:**
+- Test **end results**, not implementation details
+- Focus on **user-facing behavior** and **contracts**
+- Use **Given-When-Then** pattern for clarity
+- Each Acceptance Criterion → At least one test
+
+**What to Test:**
+- ✅ API endpoints (full request → response)
+- ✅ User flows (login, navigation, submission)
+- ✅ Business logic outcomes (input → result)
+- ✅ Error handling (edge cases, failures)
+- ✅ Validation (reject bad input)
+
+**What NOT to Test:**
+- ❌ Framework internals
+- ❌ Third-party libraries
+- ❌ Trivial code (getters/setters)
+- ❌ Implementation details (which functions called)
+
+### Writing Tests (Given-When-Then)
+
+**Backend Example:**
+```typescript
+test('broadcasts location to riders', async () => {
+  // Given: Authenticated driver
+  const token = generateAuthToken('driver-123')
+
+  // When: Driver sends location
+  const response = await app.request('/api/driver/location', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ lat: 37.7749, lng: -122.4194 })
+  })
+
+  // Then: Location saved and broadcast
+  expect(response.status).toBe(200)
+  expect(await getDriverLocation('driver-123')).toMatchObject({
+    lat: 37.7749, lng: -122.4194
+  })
+})
+```
+
+**Android Example:**
+```kotlin
+@Test
+fun `login succeeds with valid credentials`() = runTest {
+  // Given: Valid credentials
+  val email = "user@example.com"
+  val password = "password123"
+
+  // When: User attempts login
+  viewModel.login(email, password)
+
+  // Then: User is authenticated
+  val state = viewModel.state.value
+  assertTrue(state.isAuthenticated)
+  assertNull(state.error)
+}
+```
+
+### Test Execution
+
+1. **Run tests:**
    - Backend: `bun test`
    - Android: `./gradlew testDebugUnitTest`
-   - iOS: `xcodebuild test -scheme YourApp -destination 'platform=iOS Simulator,name=iPhone 15'`
+   - iOS: `xcodebuild test -scheme YourApp`
 
 2. **Linting/formatting:**
-   - Backend: `bun run lint`
-   - Android: `./gradlew spotlessCheck`
-   - iOS: N/A
+   - Backend: `bun run lint && bun run format`
+   - Android: `./gradlew spotlessCheck && ./gradlew spotlessApply`
 
 3. **Fix failures:**
    - If tests fail: **STOP** and fix before proceeding
-   - If linting fails: apply fixes automatically
-     - Backend: `bun run format`
-     - Android: `./gradlew spotlessApply`
+   - Focus on fixing the behavior, not achieving coverage
 
-4. **Integration tests** (if in plan):
-   - Follow flows from detailed plan
-   - Run platform-specific integration tests
-
-5. **Manual testing:**
-   - Follow checklist from detailed plan's Testing Strategy
-   - Walk through each test case
+4. **Manual testing (if needed):**
+   - Only for UI flows or integration scenarios
+   - Follow acceptance criteria checklist
    - Wait for user confirmation
 
-6. **Commit tests:**
+5. **Commit tests:**
    ```bash
    git add [test files]
-   git commit -m "test: add tests for [feature]"
+   git commit -m "test: verify [acceptance criterion]"
    ```
+
+**Coverage Target:**
+- Don't chase percentages
+- Ensure: One test per Acceptance Criterion
+- Critical paths covered
+- Edge cases handled
 
 ---
 

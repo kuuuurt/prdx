@@ -1,6 +1,40 @@
 # Testing Strategy Skill
 
-Expert skill for generating comprehensive testing strategies based on feature type and platform.
+Expert skill for generating **effective, efficient** testing strategies based on feature type and platform.
+
+## Testing Philosophy
+
+**Effective > Comprehensive**
+- Test **end results**, not implementation details
+- Focus on **user-facing behavior** and **contracts**
+- Avoid testing framework internals or trivial code
+- Use **Given-When-Then** pattern for clarity
+
+**Key Principles:**
+1. **Test the contract, not the implementation**
+   - What the function promises to do (inputs → outputs)
+   - Not how it does it internally
+
+2. **Test end-to-end behavior over units**
+   - API: Full request → response flow
+   - UI: User action → visible result
+   - Business logic: Input → outcome
+
+3. **One test per acceptance criterion**
+   - Each AC should have at least one test
+   - Test maps directly to business requirement
+
+4. **Don't chase coverage percentages**
+   - 100% coverage ≠ good tests
+   - Focus on critical paths and edge cases
+   - Skip testing getters/setters, trivial code
+
+5. **Given-When-Then pattern** (everywhere):
+   ```
+   Given: Setup/preconditions
+   When: Action/trigger
+   Then: Expected result
+   ```
 
 ## Platform-Specific Testing Approaches
 
@@ -32,20 +66,82 @@ backend-project/
 - Authentication/authorization flows
 - Error handling scenarios
 
-**Testing Patterns:**
-```typescript
-// Mock third-party services
-const mockExternalApiService = {
-  getAssets: vi.fn().mockResolvedValue([...])
-}
+**Testing Patterns (Given-When-Then):**
 
-// Test error scenarios
-test('handles service timeout gracefully', async () => {
-  mockService.fn.mockRejectedValue(new Error('Timeout'))
-  const response = await app.request('/endpoint')
-  expect(response.status).toBe(503)
+```typescript
+// ✅ GOOD: Test end-to-end API flow
+describe('POST /api/driver/location', () => {
+  test('broadcasts location to riders', async () => {
+    // Given: Authenticated driver
+    const driverId = 'driver-123'
+    const token = generateAuthToken(driverId)
+
+    // When: Driver sends location update
+    const response = await app.request('/api/driver/location', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ lat: 37.7749, lng: -122.4194 })
+    })
+
+    // Then: Location is saved and broadcast
+    expect(response.status).toBe(200)
+    expect(await getDriverLocation(driverId)).toMatchObject({
+      lat: 37.7749,
+      lng: -122.4194
+    })
+  })
+
+  test('rejects invalid coordinates', async () => {
+    // Given: Authenticated driver
+    const token = generateAuthToken('driver-123')
+
+    // When: Driver sends invalid location
+    const response = await app.request('/api/driver/location', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ lat: 999, lng: -122 })
+    })
+
+    // Then: Request rejected with validation error
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({
+      error: 'Invalid coordinates'
+    })
+  })
+})
+
+// ❌ BAD: Testing implementation details
+test('validateLocation calls latitudeValidator', () => {
+  const spy = vi.spyOn(validators, 'latitudeValidator')
+  validateLocation({ lat: 37, lng: -122 })
+  expect(spy).toHaveBeenCalled() // Who cares? Test the result!
+})
+
+// ✅ GOOD: Test the contract
+test('validateLocation accepts valid coordinates', () => {
+  // Given: Valid coordinates
+  const location = { lat: 37.7749, lng: -122.4194 }
+
+  // When: Validating
+  const result = validateLocation(location)
+
+  // Then: Validation passes
+  expect(result.isValid).toBe(true)
 })
 ```
+
+**What to Test:**
+- ✅ API endpoints (full request → response)
+- ✅ Authentication/authorization (access control)
+- ✅ Validation (reject bad input)
+- ✅ Error handling (timeouts, failures)
+- ✅ Business logic (core rules)
+
+**What NOT to Test:**
+- ❌ Framework internals (Hono's routing)
+- ❌ Third-party libraries (Zod validation)
+- ❌ Trivial code (getters/setters)
+- ❌ Implementation details (which functions are called)
 
 **Commands:**
 ```bash
@@ -80,27 +176,86 @@ android-project/
 - Repository with real data sources
 - Use Espresso + Compose Testing
 
-**UI Testing Patterns:**
+**UI Testing Patterns (Given-When-Then):**
+
 ```kotlin
+// ✅ GOOD: Test user-facing behavior
 @Test
-fun testLoginFlow() {
+fun `user can login with valid credentials`() {
+    // Given: Login screen is displayed
     composeTestRule.setContent {
-        LoginScreen(viewModel = mockViewModel)
+        LoginScreen(viewModel = viewModel)
     }
 
+    // When: User enters credentials and submits
     composeTestRule
         .onNodeWithTag("email_field")
-        .performTextInput("test@example.com")
-
+        .performTextInput("user@example.com")
     composeTestRule
-        .onNodeWithTag("submit_button")
+        .onNodeWithTag("password_field")
+        .performTextInput("password123")
+    composeTestRule
+        .onNodeWithTag("login_button")
         .performClick()
 
+    // Then: User sees home screen
     composeTestRule
-        .onNodeWithText("Success")
+        .onNodeWithText("Welcome")
         .assertIsDisplayed()
 }
+
+// ✅ GOOD: Test ViewModel behavior (end result)
+@Test
+fun `login succeeds with valid credentials`() = runTest {
+    // Given: Valid credentials
+    val email = "user@example.com"
+    val password = "password123"
+
+    // When: User attempts login
+    viewModel.login(email, password)
+
+    // Then: User is authenticated
+    val state = viewModel.state.value
+    assertTrue(state.isAuthenticated)
+    assertNull(state.error)
+}
+
+// ❌ BAD: Testing implementation details
+@Test
+fun `login calls repository login method`() {
+    val spy = spyk(repository)
+    viewModel.login("email", "pass")
+    verify { spy.login(any(), any()) } // Who cares? Test the outcome!
+}
+
+// ✅ GOOD: Test error handling
+@Test
+fun `login fails with invalid credentials`() = runTest {
+    // Given: Invalid credentials
+    coEvery { repository.login(any(), any()) } returns
+        Result.failure(Exception("Invalid credentials"))
+
+    // When: User attempts login
+    viewModel.login("wrong@example.com", "wrong")
+
+    // Then: Error is shown
+    val state = viewModel.state.value
+    assertFalse(state.isAuthenticated)
+    assertEquals("Invalid credentials", state.error)
+}
 ```
+
+**What to Test:**
+- ✅ User flows (login, navigation, submission)
+- ✅ ViewModel state changes (input → state)
+- ✅ Error handling (network failures, validation)
+- ✅ Data transformations (DTO → UI model)
+
+**What NOT to Test:**
+- ❌ Compose recomposition logic
+- ❌ Android framework internals
+- ❌ Repository method calls (test outcomes)
+- ❌ Private functions
 
 **Commands:**
 ```bash

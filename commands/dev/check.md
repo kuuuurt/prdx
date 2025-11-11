@@ -123,29 +123,54 @@ Task(
 )
 ```
 
-### 2. Testing Verification Agent
+### 2. Testing Effectiveness Agent (NOT Coverage)
 
 ```
 Task(
   subagent_type="code-reviewer",
-  prompt="Verify testing completeness for [feature].
+  prompt="Verify testing EFFECTIVENESS for [feature].
 
   PRD: [path]
   Branch: [branch-name]
 
   Use testing-strategy skill: .claude/skills/testing-strategy.md
 
-  Verify:
-  - Unit tests exist for key components
-  - Test coverage meets goals from skill
-  - Edge cases tested
-  - Error scenarios tested
-  - Integration tests if applicable
+  **Testing Philosophy:**
+  - Effective > Comprehensive
+  - Test end results, not implementation
+  - Given-When-Then pattern required
+  - One test per Acceptance Criterion (minimum)
 
-  Review actual test files.
+  **Verify:**
+  ✅ Each Acceptance Criterion has at least one test
+  ✅ Tests use Given-When-Then structure
+  ✅ Tests focus on behavior/outcomes (not implementation)
+  ✅ Critical paths covered (API flows, user journeys)
+  ✅ Error handling tested (edge cases, failures)
 
-  Return structured assessment: Test Coverage %, Missing Tests, Test Quality"
+  **DO NOT:**
+  ❌ Calculate coverage percentage (meaningless metric)
+  ❌ Require 100% coverage
+  ❌ Test framework internals or trivial code
+  ❌ Test implementation details (function calls, private methods)
+
+  **Review actual test files for:**
+  - Test naming (describes behavior, not method)
+  - Test structure (Given-When-Then comments)
+  - Assertions (verify outcomes, not internals)
+
+  Return assessment: AC Coverage Map, Test Quality, Missing Critical Tests"
 )
+```
+
+**AC Coverage Map Example:**
+```
+Acceptance Criteria → Test Mapping:
+✅ AC #1: User can login → LoginViewModelTest.kt:45
+✅ AC #2: Invalid creds rejected → LoginViewModelTest.kt:67
+⚠️ AC #3: Session persists → MISSING TEST
+✅ AC #4: Errors display → LoginScreenTest.kt:89
+✅ AC #5: Token refresh works → AuthRepositoryTest.kt:123
 ```
 
 ### 3. Security & Performance Agent
@@ -248,8 +273,14 @@ Task(
 
 - Calculate quality scores:
   - Code quality: [Agent 1 score]
-  - Test coverage: [Agent 2 percentage]
+  - Test effectiveness: [Agent 2 assessment - focus on AC coverage, not percentage]
   - Security/performance: [Agent 3 pass/fail]
+
+**Testing Assessment (from testing-strategy skill):**
+- Verify: One test per Acceptance Criterion (minimum)
+- Check: Tests use Given-When-Then pattern
+- Evaluate: Tests focus on end results, not implementation
+- Skip: Coverage percentage (not a quality metric)
 
 - Identify critical issues across all agents
 - Prioritize recommendations
