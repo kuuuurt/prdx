@@ -1,10 +1,12 @@
 | description | argument-hint |
-| Enhanced PRD planning with agent routing, skills, and multi-agent review | Feature name or brief description [--type TYPE] [--depends-on ISSUE] |
+| Create PRD with agent-powered planning - STOPS after PRD creation | Feature description [--type TYPE] [--depends-on ISSUE] [--platform PLATFORM] |
 
-# Enhanced Feature Planning (PRD2)
+# Create PRD
 
-> **Agent-powered workflow with auto-routing, skills integration, and collaborative review**
-> Leverages specialized agents, hooks, and skills for faster, smarter PRD creation
+> **Agent-powered PRD creation - PLANNING ONLY**
+> Creates business-level PRD, then STOPS. Use /prdx:dev to start implementation.
+>
+> **IMPORTANT**: This command creates the PRD file and exits. It does NOT start implementation.
 
 ## Usage
 
@@ -630,19 +632,25 @@ Hooks Executed:
 Next steps:
 - Review the PRD at [location]
 - Run /prdx:publish [slug] to publish to GitHub (optional)
-- Run /prdx:dev:start [slug] to begin implementation (creates detailed plan automatically)
+- Run /prdx:dev [slug] to begin implementation (creates detailed plan automatically)
 - Or edit PRD manually if needed
 ```
 
-**Interactive Q&A:**
-1. Ask if they want to discuss any agent feedback
-2. Offer to refine specific sections further
-3. Remind them PRD is ready for implementation
+**STOP HERE - DO NOT START IMPLEMENTATION**
+
+This command's job is complete. The PRD has been created.
+
+To start implementation, the user must explicitly run:
+```bash
+/prdx:dev [slug]
+```
 
 ---
 
 ## Important Rules
 
+- **STOP AFTER PRD CREATION** - Do NOT start implementation, do NOT continue to coding
+- **THIS IS PLANNING ONLY** - Creates PRD file and exits
 - **ASK before assuming** - clarify unclear requirements
 - **ROUTE to specialized agents** - backend-developer/android-developer/ios-developer
 - **USE skills** - leverage impl-patterns, prd-review, testing-strategy
@@ -650,9 +658,9 @@ Next steps:
 - **PARALLEL agent review** - technical, QA, security/performance simultaneously
 - **BE SPECIFIC** - reference actual files and patterns
 - **STAY FOCUSED** - 3-5 acceptance criteria max, no Notes section
-- **STRICTER content limits** - more concise than /prdx:plan
-- **ONE PHASE = ONE COMMIT** - keep work atomic
 - **UPDATE INLINE** - no review notes, direct improvements
+
+**CRITICAL**: After Phase 10 (Summary), this command is DONE. Show next steps, then STOP.
 - **NATURAL INTEGRATION** - read as if always there
 
 ---
