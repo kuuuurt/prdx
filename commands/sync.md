@@ -1,415 +1,504 @@
-| description | argument-hint |
-| Sync PRD status/updates to linked GitHub issue | Feature slug or leave empty for context |
-
-# Sync PRD to GitHub Issue
-
-> **Keep GitHub issues in sync with PRD changes**
-> Updates issue status, labels, and posts PRD updates as comments
-
-## Scope
-
-**`/prdx:sync`** manages **GitHub Issues** ↔ PRD synchronization.
-**`/prdx:dev:push`** manages **GitHub PRs** (separate concern).
-
-**Clean separation:**
-- Issues = Planning/tracking (this command)
-- PRs = Code review (dev:push command)
-
 ---
+description: "Sync PRD with current implementation state"
+argument-hint: "[slug]"
+---
+
+# /prdx:sync - Sync PRD with Implementation
+
+Update the PRD to reflect the current implementation state by analyzing commits, code changes, and test results.
 
 ## Usage
 
 ```bash
-# Sync specific PRD
-/prdx:sync android-219
-
-# Sync current PRD from context
-/prdx:sync
-
-# Force sync even if no changes detected
-/prdx:sync android-219 --force
+/prdx:sync backend-auth        # Sync specific PRD
+/prdx:sync                     # Sync PRD for current branch
+/prdx:sync --github            # Also sync to GitHub issue
 ```
 
----
+## How It Works
 
-## Phase 1: Load PRD and Context
+This command analyzes the current implementation and updates the PRD to reflect:
+- What was actually implemented (vs what was planned)
+- Acceptance criteria completion status
+- Implementation notes and technical details
+- Any deviations or additions from the original plan
 
-**Find PRD with context awareness:**
+## Workflow
 
-1. **Load context:**
-   ```bash
-   source .prdx-context 2>/dev/null || true
-   ```
+### Phase 1: Load PRD
 
-2. **Determine PRD:**
-   - If slug provided: use it
-   - If no slug + context exists: use `LAST_PRD_SLUG`
-   - If neither: list PRDs and ask user to select
+**Find PRD file:**
 
-3. **Read PRD:**
-   - Parse metadata: Issue number, status, dependencies
-   - Check if issue exists (must have `**Issue**: #[number]`)
-   - If no issue: error and suggest `/prdx:publish` first
+```bash
+# If slug provided
+if [ -n "$SLUG" ]; then
+  PRD_FILE=$(find .claude/prds -name "*${SLUG}*.md" -type f | head -1)
+fi
 
----
+# If no slug, detect from branch name
+if [ -z "$PRD_FILE" ]; then
+  BRANCH=$(git branch --show-current)
+  # Extract slug from branch: feat/backend-auth -> backend-auth
+  SLUG=$(echo "$BRANCH" | sed 's/^[^/]*\///')
+  PRD_FILE=$(find .claude/prds -name "*${SLUG}*.md" -type f | head -1)
+fi
 
-## Phase 2: Detect Changes
-
-**Compare PRD with last sync:**
-
-1. **Check sync history** (stored in PRD metadata):
-   ```markdown
-   **Last Synced**: [YYYY-MM-DD HH:MM] | **Sync Hash**: [hash]
-   ```
-
-2. **Calculate current hash:**
-   - Hash of: Goal + Acceptance Criteria + Approach + Status
-   - If hash matches last sync: no changes detected
-   - If `--force`: skip hash check
-
-3. **Detect specific changes:**
-   - Status changed? (draft → published → in-progress → etc.)
-   - Acceptance criteria added/modified?
-   - Approach updated?
-   - Dependencies changed?
-   - PRD revised? (check Revision History section)
-
-4. **Display changes:**
-   ```
-   Changes detected since last sync (2 days ago):
-
-   Status: in-progress → in-review
-   Acceptance Criteria: 1 new criterion added
-   Revision: Updated 2025-11-10 (added OAuth support)
-   ```
-
-5. **If no changes and not forced:**
-   ```
-   ✓ PRD is already in sync with issue #219
-   Last synced: 2 hours ago
-
-   Use --force to sync anyway
-   ```
-
----
-
-## Phase 3: Sync to GitHub Issue
-
-**Update issue based on PRD changes:**
-
-1. **Update issue status via labels:**
-
-   **PRD Status → GitHub Labels:**
-   - `draft` → No sync (issue shouldn't exist yet)
-   - `published` → `status: todo`
-   - `in-progress` → `status: in-progress`
-   - `in-review` → `status: in-review` (when PR exists)
-   - `implemented` → `status: done`
-   - `completed` → Close issue
-
-   ```bash
-   # Remove old status label
-   gh issue edit [number] --remove-label "status: todo"
-   # Add new status label
-   gh issue edit [number] --add-label "status: in-progress"
-   ```
-
-2. **Post update comment to issue:**
-
-   **If status changed:**
-   ```bash
-   gh issue comment [number] --body "$(cat <<'EOF'
-   ## 📊 Status Update
-
-   **Status**: published → in-progress
-   **Branch**: feat/android-219-biometric
-   **Started**: 2025-11-10
-
-   Implementation has begun.
-   EOF
-   )"
-   ```
-
-   **If PRD revised:**
-   ```bash
-   gh issue comment [number] --body "$(cat <<'EOF'
-   ## 🔄 PRD Updated
-
-   **Revision**: #2 (2025-11-10)
-   **Reason**: [reason from PRD revision history]
-
-   ### Changes
-   - ~~Old approach~~ → New approach with OAuth
-   - **NEW**: Added Google/GitHub OAuth support
-
-   **Full PRD**: `.claude/prds/android-219-biometric.md`
-   EOF
-   )"
-   ```
-
-   **If acceptance criteria changed:**
-   ```bash
-   gh issue comment [number] --body "$(cat <<'EOF'
-   ## ✅ Acceptance Criteria Updated
-
-   **Added**:
-   - [ ] OAuth providers support Google and GitHub
-
-   **Current Status**: 3/5 complete
-   EOF
-   )"
-   ```
-
-3. **Update issue body** (if major changes):
-
-   Only if: First sync OR revision count changed
-
-   ```bash
-   gh issue edit [number] --body "$(cat <<'EOF'
-   [Updated issue body with current PRD goal and ACs]
-   EOF
-   )"
-   ```
-
-4. **Handle dependencies:**
-
-   If dependencies changed:
-   ```bash
-   # Add references in issue body
-   gh issue edit [number] --body "$(cat <<'EOF'
-   ...
-
-   **Depends on**: #215, #218
-   **Blocks**: #220
-   EOF
-   )"
-   ```
-
----
-
-## Phase 4: Update PRD Metadata
-
-**Record sync in PRD:**
-
-1. **Update sync metadata:**
-   ```markdown
-   **Last Synced**: 2025-11-10 15:30 | **Sync Hash**: a3f9c2b1
-   ```
-
-2. **Add sync history entry** (optional, for auditing):
-   ```markdown
-   ---
-
-   ## Sync History
-
-   ### 2025-11-10 15:30
-   - Status synced: in-progress
-   - Label updated: status: in-progress
-   - Comment posted: Status update
-
-   ### 2025-11-08 10:15
-   - Status synced: published
-   - Label updated: status: todo
-   - Issue created: #219
-   ```
-
----
-
-## Phase 5: Display Summary
-
-**Show what was synced:**
-
-```
-✓ Synced to GitHub Issue #219
-
-Changes applied:
-  ✓ Status: in-progress → in-review
-  ✓ Label: "status: in-review" added
-  ✓ Comment: Status update posted
-  ✓ PRD metadata: Last synced timestamp updated
-
-Issue: https://github.com/org/repo/issues/219
-
-Last synced: Just now
-Previous sync: 2 days ago
+if [ -z "$PRD_FILE" ]; then
+  echo "❌ PRD not found"
+  echo ""
+  echo "Provide slug: /prdx:sync <slug>"
+  echo "Or switch to feature branch"
+  exit 1
+fi
 ```
 
+**Parse PRD:**
+
+Extract from PRD file:
+- Title
+- Type (feature, bug-fix, refactor, spike)
+- Platform
+- Status
+- Acceptance Criteria (with checkboxes)
+- Branch name
+- Existing Implementation Notes (if any)
+
+### Phase 2: Analyze Implementation
+
+**Get commits since branch divergence:**
+
+```bash
+# Get base branch
+BASE_BRANCH=$(git merge-base main HEAD)
+
+# Get all commits on this branch
+git log ${BASE_BRANCH}..HEAD --oneline
+
+# Get detailed commit messages
+git log ${BASE_BRANCH}..HEAD --format="%H|%s|%b"
+```
+
+**Analyze changed files:**
+
+```bash
+# Files changed on this branch
+git diff ${BASE_BRANCH}..HEAD --name-status
+
+# Summary of changes
+git diff ${BASE_BRANCH}..HEAD --stat
+```
+
+**Read key implementation files:**
+
+Based on the platform and changed files, read the main implementation files to understand:
+- Architecture decisions made
+- Patterns used
+- Key classes/functions created
+
+**Check test status:**
+
+```bash
+# Find and run tests (platform-specific)
+# Backend: bun test
+# Android: ./gradlew test
+# iOS: xcodebuild test
+```
+
+### Phase 3: Determine Acceptance Criteria Status
+
+For each acceptance criterion in the PRD:
+
+1. **Search code for implementation:**
+   - Look for related functions, classes, UI components
+   - Check if tests exist for the criterion
+
+2. **Determine status:**
+   - `[x]` - Implemented and tested
+   - `[ ]` - Not implemented
+   - `[~]` - Partially implemented (note what's missing)
+
+3. **Build status report:**
+
+```markdown
+## Acceptance Criteria Status
+
+- [x] User can log in with email/password
+  - Implemented in `src/auth/login.ts:42`
+  - Tested in `src/auth/__tests__/login.test.ts`
+
+- [x] Invalid credentials show error message
+  - Implemented in `src/auth/login.ts:67`
+  - Tested in `src/auth/__tests__/login.test.ts`
+
+- [ ] Password reset via email
+  - Not implemented (deferred to next sprint)
+```
+
+### Phase 4: Build Implementation Summary
+
+Create a comprehensive implementation summary:
+
+```markdown
+## Implementation Notes
+
+**Branch:** {BRANCH}
+**Implemented:** {DATE}
+**Commits:** {COMMIT_COUNT}
+
+### Architecture
+
+{Description of architectural decisions and how implementation fits into codebase}
+
+### Key Changes
+
+**Created:**
+- `path/to/new/file.ts` - {purpose}
+- `path/to/another/file.ts` - {purpose}
+
+**Modified:**
+- `path/to/existing/file.ts` - {what changed}
+
+### Testing
+
+**Test Files:**
+- `path/to/test.ts` - {COUNT} tests
+
+**Coverage:**
+- {SUMMARY of what's tested}
+
+### Deviations from Plan
+
+{List any differences between original PRD and actual implementation}
+- Original: {what was planned}
+- Actual: {what was implemented}
+- Reason: {why it changed}
+
+### Commits
+
+{List of commits with conventional commit format}
+- `abc1234` feat: add login endpoint
+- `def5678` feat: add auth middleware
+- `ghi9012` test: add login tests
+```
+
+### Phase 5: Update PRD
+
+**Update Status:**
+
+```bash
+# Change status based on implementation state
+if all_acceptance_criteria_complete; then
+  STATUS="implemented"
+elif any_acceptance_criteria_complete; then
+  STATUS="in-progress"
+else
+  STATUS="planning"
+fi
+```
+
+**Update Acceptance Criteria checkboxes:**
+
+Mark completed criteria with `[x]`.
+
+**Append/Update Implementation Notes:**
+
+If Implementation Notes section exists, update it.
+If not, append it after the main PRD content.
+
+**Write updated PRD file.**
+
+### Phase 6: GitHub Sync (Optional)
+
+If `--github` flag provided and PRD has linked issue:
+
+```bash
+# Update issue status label
+gh issue edit {NUMBER} --remove-label "status: todo"
+gh issue edit {NUMBER} --add-label "status: in-progress"
+
+# Post sync comment
+gh issue comment {NUMBER} --body "$(cat <<'EOF'
+## 📊 Implementation Sync
+
+**Status:** in-progress
+**Branch:** {BRANCH}
+**Commits:** {COUNT}
+
+### Progress
+{ACCEPTANCE_CRITERIA_STATUS}
+
+### Recent Commits
+{LAST_5_COMMITS}
+
 ---
+Synced via `/prdx:sync`
+EOF
+)"
+```
+
+### Phase 7: Display Summary
+
+```
+✅ PRD Synced!
+
+📄 PRD: {PRD_FILE}
+📊 Status: {STATUS}
+
+Acceptance Criteria:
+  ✓ {COMPLETED_COUNT}/{TOTAL_COUNT} complete
+
+Changes detected:
+  - {COMMIT_COUNT} commits analyzed
+  - {FILES_CREATED} files created
+  - {FILES_MODIFIED} files modified
+
+Updated:
+  ✓ Status: planning → in-progress
+  ✓ Acceptance criteria: 3/5 marked complete
+  ✓ Implementation notes: added/updated
+
+{If --github}
+GitHub Issue #123:
+  ✓ Label updated: status: in-progress
+  ✓ Progress comment posted
+```
+
+## Options
+
+### --github
+
+Also sync changes to linked GitHub issue:
+
+```bash
+/prdx:sync backend-auth --github
+```
+
+Updates:
+- Issue status label
+- Posts progress comment
+
+### --dry-run
+
+Show what would be updated without making changes:
+
+```bash
+/prdx:sync --dry-run
+```
+
+### --force
+
+Overwrite existing implementation notes:
+
+```bash
+/prdx:sync --force
+```
+
+Without force, new notes are appended to existing notes.
+
+## Error Handling
+
+### PRD Not Found
+
+```
+❌ PRD not found
+
+Available PRDs:
+- backend-auth (in-progress)
+- android-login (planning)
+
+Usage: /prdx:sync <slug>
+```
+
+### Not on Feature Branch
+
+```
+❌ Not on a feature branch
+
+Current branch: main
+
+Switch to feature branch:
+  git checkout feat/backend-auth
+
+Or specify PRD:
+  /prdx:sync backend-auth
+```
+
+### No Implementation Found
+
+```
+⚠️  No implementation found
+
+Branch has no commits yet.
+PRD status unchanged.
+
+Start implementation:
+  /prdx:implement backend-auth
+```
+
+### GitHub CLI Not Available
+
+```
+⚠️  GitHub CLI not found
+
+PRD updated locally.
+GitHub sync skipped.
+
+Install: brew install gh
+```
 
 ## When to Use This Command
 
 **Use `/prdx:sync` when:**
-- ✅ PRD status changes (draft → published → in-progress → etc.)
-- ✅ PRD is updated/revised (via `/prdx:update`)
-- ✅ Acceptance criteria change
-- ✅ Dependencies change
-- ✅ Want to keep issue in sync with PRD state
+- ✅ Mid-implementation checkpoint
+- ✅ Before creating PR (to update PRD)
+- ✅ After making changes outside `/prdx:implement`
+- ✅ To update acceptance criteria status
+- ✅ To document what was actually built
 
-**Don't need `/prdx:sync` for:**
-- ❌ Creating PR (use `/prdx:dev:push` - handles PR workflow)
-- ❌ Creating issue (use `/prdx:publish` - creates issue initially)
-- ❌ Closing issue (use `/prdx:close` - closes both PRD and issue)
+**Automatic sync happens in:**
+- `/prdx:implement` - Updates PRD after completion
+- `/prdx:push` - Ensures PRD is current before PR
 
-**Flow:**
-```
-/prdx:publish     → Creates GitHub issue from PRD
-/prdx:sync        → Syncs PRD updates to issue (as needed)
-/prdx:dev:push    → Creates PR, links to issue
-/prdx:close       → Marks complete, closes issue
-```
-
----
-
-## Edge Cases
-
-**No issue linked:**
-```
-❌ PRD has no linked GitHub issue
-
-Create an issue first:
-  /prdx:publish android-219
-```
-
-**Issue doesn't exist:**
-```
-⚠️ Issue #219 not found on GitHub
-
-Options:
-1. Remove issue reference from PRD
-2. Create issue with /prdx:publish
-3. Update issue number manually
-```
-
-**GitHub CLI not available:**
-```
-❌ GitHub CLI (gh) not found
-
-Install: brew install gh
-Or manually sync at: https://github.com/org/repo/issues/219
-```
-
-**No changes detected:**
-```
-✓ PRD is already in sync with issue #219
-
-Last synced: 2 hours ago
-No changes detected
-
-Use --force to sync anyway
-```
-
-**PRD has PR but issue status outdated:**
-```
-Syncing to issue #219...
-
-Note: PR #234 exists for this PRD
-Updating issue status to "in-review" to reflect PR state
-
-✓ Synced successfully
-```
-
----
-
-## Integration with Other Commands
-
-**`/prdx:publish`** → Creates issue, sets initial metadata
-- First sync happens automatically
-- Issue number saved to PRD
-
-**`/prdx:update`** → Updates PRD
-- **Does NOT auto-sync** (you control when)
-- Run `/prdx:sync` after update to push changes to issue
-
-**`/prdx:dev:start`** → Changes PRD status to "in-progress"
-- **Does NOT auto-sync**
-- Run `/prdx:sync` to update issue status
-
-**`/prdx:dev:push`** → Creates PR
-- Links PR to issue (via issue number in PR description)
-- Updates **PR**, not issue directly
-- Run `/prdx:sync` to update issue status to "in-review"
-
-**`/prdx:close`** → Marks PRD complete
-- Closes both PRD and GitHub issue
-- Final sync happens automatically
-
----
+**Manual sync for:**
+- Manual code changes
+- Implementation deviations
+- Mid-sprint status updates
 
 ## Examples
 
-**After updating PRD:**
-```bash
-/prdx:update android-219
-# Made changes to PRD...
-/prdx:sync android-219
-→ Posts update comment to issue #219
+### Basic Sync
+
+```
+User: /prdx:sync backend-auth
+
+→ Finds .claude/prds/backend-auth.md
+→ Analyzes 8 commits on feat/backend-auth
+→ Checks acceptance criteria against code
+→ Updates PRD with implementation notes
+
+✅ PRD Synced!
+
+📄 PRD: .claude/prds/backend-auth.md
+📊 Status: in-progress
+
+Acceptance Criteria:
+  ✓ 4/5 complete
+
+Updated:
+  ✓ Acceptance criteria marked
+  ✓ Implementation notes added
 ```
 
-**After starting implementation:**
-```bash
-/prdx:dev:start android-219
-# PRD status changed to "in-progress"
-/prdx:sync
-→ Updates issue status label
+### Sync from Current Branch
+
+```
+User: /prdx:sync
+
+→ Detects branch: feat/android-biometric
+→ Finds matching PRD
+→ Analyzes implementation
+
+✅ PRD Synced!
+
+📄 PRD: .claude/prds/android-biometric.md
+📊 Status: implemented
+
+Acceptance Criteria:
+  ✓ 5/5 complete
+
+All criteria met!
 ```
 
-**Check if sync needed:**
-```bash
-/prdx:show android-219
-→ Shows: "Last synced: 2 days ago, changes detected"
+### Sync with GitHub
 
-/prdx:sync android-219
-→ Syncs latest changes
+```
+User: /prdx:sync backend-auth --github
+
+→ Updates PRD locally
+→ Syncs to GitHub issue #42
+
+✅ PRD Synced!
+
+📄 PRD: .claude/prds/backend-auth.md
+📊 Status: in-progress
+
+GitHub Issue #42:
+  ✓ Label: status: in-progress
+  ✓ Progress comment posted
+  🔗 https://github.com/org/repo/issues/42
 ```
 
-**Force sync (even if no changes):**
-```bash
-/prdx:sync android-219 --force
-→ Syncs anyway, useful for fixing manual edits
+### Dry Run
+
+```
+User: /prdx:sync --dry-run
+
+Proposed changes:
+
+PRD: .claude/prds/backend-auth.md
+Status: planning → in-progress
+
+Acceptance Criteria:
+  [x] User can log in (was [ ])
+  [x] Error messages shown (was [ ])
+  [ ] Password reset (unchanged)
+
+Implementation Notes:
+  + Branch: feat/backend-auth
+  + Implemented: 2025-11-28
+  + 8 commits analyzed
+  + 5 files created
+  + 3 files modified
+
+Run without --dry-run to apply changes.
 ```
 
----
+## Integration with Other Commands
 
-## Important Rules
+| Command | Sync Behavior |
+|---------|---------------|
+| `/prdx:plan` | Creates PRD (no sync needed) |
+| `/prdx:implement` | Auto-syncs after completion |
+| `/prdx:sync` | Manual sync anytime |
+| `/prdx:push` | Reads synced PRD for PR description |
+| `/prdx:close` | Final sync + close |
 
-### Scope
-- **ONLY syncs to GitHub Issues** (not PRs)
-- PR management is separate (handled by `/prdx:dev:push`)
+**Typical flow:**
 
-### When It Runs
-- **MANUAL command** - you control when to sync
-- **NOT automatic** - other commands don't auto-sync
-- **Exception**: `/prdx:publish` and `/prdx:close` do auto-sync
+```
+/prdx:plan "add auth"     → Creates PRD
+/prdx:implement auth      → Auto-syncs at end
+# Manual changes...
+/prdx:sync auth           → Update PRD with manual changes
+/prdx:push auth           → Create PR from synced PRD
+```
 
-### What It Syncs
-- ✅ PRD status → Issue status labels
-- ✅ PRD updates → Issue comments
-- ✅ Acceptance criteria → Issue comments
-- ✅ Dependencies → Issue body
-- ❌ NOT code changes (that's PR territory)
-- ❌ NOT commits (that's git territory)
+## Implementation Notes
 
-### Hash-Based Detection
-- Prevents unnecessary syncs
-- Detects: status, ACs, approach, revision changes
-- Use `--force` to bypass hash check
+### Commit Analysis
 
-### Context Awareness
-- Remembers last PRD (can omit slug)
-- Reads `.prdx-context` file
-- Works with `/prdx:dev:start` and `/prdx:dev:push` context
+Commits are analyzed to understand:
+- **Type**: feat, fix, refactor (from conventional commits)
+- **Scope**: What area of code changed
+- **Description**: What the change does
 
----
+This information populates the Implementation Notes section.
 
-## Comparison with Dev Commands
+### Acceptance Criteria Matching
 
-| Command | Manages | When to Use |
-|---------|---------|-------------|
-| `/prdx:sync` | GitHub Issues | After PRD updates, status changes |
-| `/prdx:dev:push` | GitHub PRs | After implementation, create PR |
-| `/prdx:publish` | Creates issue | Initial issue creation from PRD |
-| `/prdx:close` | Closes both | Mark feature complete |
+The sync process attempts to match acceptance criteria to code by:
 
-**Clean separation of concerns:**
-- Issues = Planning/tracking lifecycle
-- PRs = Code review lifecycle
+1. **Keyword extraction**: Pull key terms from each criterion
+2. **Code search**: Find related functions, classes, tests
+3. **Test verification**: Check if tests exist for the criterion
+
+If uncertain, marks as `[ ]` with a note to verify manually.
+
+### Preserving Manual Edits
+
+By default, sync appends to existing Implementation Notes rather than overwriting. Use `--force` to replace entirely.
+
+This allows:
+- Manual additions to be preserved
+- Multiple sync operations without data loss
+- Human refinement of auto-generated notes

@@ -1,33 +1,34 @@
 # PRDX
 
-> Complete PRD workflow experience for Claude Code
+> PRD workflow for Claude Code leveraging native tooling
 
-PRDX is a comprehensive Product Requirements Document (PRD) workflow system for Claude Code that helps you manage feature development from planning through implementation to deployment.
+PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) workflow using native Plan agents, platform-specific agents, hooks, and skills.
 
 ## Features
 
-✨ **Complete PRD Workflow**
-- Interactive PRD creation with guided wizard
-- Feature planning with multi-agent collaboration
-- Implementation tracking with verification
-- GitHub integration for issue management
-- Status dashboard and search capabilities
-- Dependency management between PRDs
+✨ **Leverages Claude Code Native Tools**
+- **Plan agent** for codebase exploration and planning
+- **Platform agents** for implementation
+- **Hooks** for validation gates
+- **Skills** as knowledge bases
+- **TodoWrite** for task tracking
+- Thin wrapper commands that orchestrate
 
 🚀 **Multi-Platform Development Support**
 - Backend development (TypeScript, Hono, BFF patterns)
 - Android development (Kotlin, Jetpack Compose, Clean Architecture)
 - iOS development (Swift, SwiftUI, MVVM)
 
-🤖 **AI Agents Included**
+🤖 **Platform-Specific Agents**
 - **backend-developer**: TypeScript/Hono expert
 - **android-developer**: Kotlin/Compose expert
 - **ios-developer**: Swift/SwiftUI expert
 
 📦 **What's Inside**
-- **15 PRD Commands**: Complete workflow automation
-- **3 PRD Skills**: Specialized knowledge bases
-- **3 AI Agents**: Platform-specific development experts
+- **Thin commands**: Trigger agents, handle files, run hooks
+- **3 validation hooks**: Pre-plan, pre-implement, post-implement
+- **3 PRD skills**: Specialized knowledge bases (impl-patterns, testing-strategy, prd-review)
+- **3 platform agents**: Implementation experts
 
 ## Installation
 
@@ -82,7 +83,7 @@ cp -r prdx/agents/* .claude/agents/
 
 ## Quick Start
 
-### 1. Add Marketplace & Install
+### 1. Install Plugin
 
 ```bash
 # Add the PRDX marketplace
@@ -92,49 +93,194 @@ cp -r prdx/agents/* .claude/agents/
 /plugin install prdx@prdx
 ```
 
-### 2. Create Your First PRD
+### 2. Create Plan
 
-```
-/prdx:wizard
-```
-
-The wizard will guide you through creating a complete PRD with:
-- Feature overview and motivation
-- Technical specifications
-- Implementation checklist
-- Dependencies and blockers
-
-### 3. Plan Implementation
-
-```
-/prdx:plan <feature-id>
+```bash
+/prdx:plan "add biometric authentication to Android app"
 ```
 
-AI agents will analyze your codebase and create a business-level PRD with high-level phases.
+**What happens:**
+1. Pre-plan hook validates environment
+2. Platform detected: android
+3. Plan agent explores codebase
+4. Plan agent creates comprehensive plan
+5. Plan displayed in conversation
 
-### 4. Start Development
-
+**Iterate naturally:**
 ```
-/prdx:dev:start <feature-id>
-```
+You: "Can you use BiometricPrompt API instead?"
+→ Plan agent revises approach
+→ Updated plan displayed
 
-Implements features from the detailed plan. If no detailed plan exists, it will automatically create one with file paths, API contracts, and code patterns before starting implementation.
-
-### 5. Verify Implementation
-
-```
-/prdx:dev:check <feature-id>
-```
-
-Agents will review your implementation for quality.
-
-### 6. Create Pull Request
-
-```
-/prdx:dev:push <feature-id>
+You: "looks good"
+→ PRD written to .claude/prds/android-biometric-auth.md
 ```
 
-Automatically creates a PR with full context.
+### 3. Implement Feature
+
+```bash
+/prdx:implement android-biometric-auth
+```
+
+**What happens:**
+1. Pre-implement hook validates PRD
+2. Git branch created: `feat/android-biometric-auth`
+3. Platform agent invoked (prdx:android-developer)
+4. Agent uses TodoWrite to track tasks
+5. Agent implements with TDD
+6. Agent creates conventional commits
+7. Post-implement hook updates PRD status
+
+### 4. Create Pull Request
+
+```bash
+/prdx:push android-biometric-auth
+```
+
+Creates PR with comprehensive description from PRD.
+
+## Configuration
+
+PRDX can be customized using a `prdx.json` configuration file in your project root or `.claude/` directory.
+
+### Quick Configuration
+
+**Easiest: Use a preset** (one command setup):
+
+```bash
+/prdx:config minimal     # Conventional commits, no co-author/links
+/prdx:config standard    # Conventional commits with full attribution (default)
+/prdx:config simple      # Simple commits (no "feat:" prefix) with attribution
+```
+
+**Interactive: Guided setup** (asks you questions):
+
+```bash
+/prdx:config             # Answer 4 simple questions, done!
+```
+
+**Advanced: Granular control**:
+
+```bash
+/prdx:config show                         # View current settings
+/prdx:config set commits.format simple    # Change specific setting
+/prdx:config get commits.coAuthor.enabled # Check a setting
+```
+
+### Configuration File
+
+Create `prdx.json` in your project root:
+
+```json
+{
+  "version": "1.0",
+  "commits": {
+    "coAuthor": {
+      "enabled": true,
+      "name": "Claude",
+      "email": "noreply@anthropic.com"
+    },
+    "extendedDescription": {
+      "enabled": true,
+      "includeClaudeCodeLink": true
+    },
+    "format": "conventional"
+  },
+  "pullRequest": {
+    "defaultBase": "main",
+    "autoAssign": true
+  }
+}
+```
+
+### Commit Configuration
+
+Control how commits are formatted when platform agents implement features.
+
+**`commits.format`** - Commit message format
+- `"conventional"` (default) - Uses conventional commits (e.g., `feat: add feature`)
+- `"simple"` - Plain descriptions (e.g., `add feature`)
+
+**`commits.coAuthor.enabled`** - Include co-author attribution (default: `true`)
+
+**`commits.coAuthor.name`** - Co-author name (default: `"Claude"`)
+
+**`commits.coAuthor.email`** - Co-author email (default: `"noreply@anthropic.com"`)
+
+**`commits.extendedDescription.enabled`** - Include extended commit descriptions (default: `true`)
+
+**`commits.extendedDescription.includeClaudeCodeLink`** - Add Claude Code link in commits (default: `true`)
+
+### Commit Examples
+
+**Conventional with all options enabled:**
+```
+feat: add biometric authentication endpoints
+
+Implement POST /api/auth/biometric/register and POST /api/auth/biometric/verify
+endpoints with Zod validation and proper error handling.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+**Simple with extended description disabled:**
+```json
+{
+  "commits": {
+    "format": "simple",
+    "extendedDescription": {
+      "enabled": false
+    }
+  }
+}
+```
+
+Results in:
+```
+add biometric authentication endpoints
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+```
+
+**Minimal commits (no co-author, no link):**
+```json
+{
+  "commits": {
+    "coAuthor": {
+      "enabled": false
+    },
+    "extendedDescription": {
+      "includeClaudeCodeLink": false
+    }
+  }
+}
+```
+
+Results in:
+```
+feat: add biometric authentication endpoints
+
+Implement POST /api/auth/biometric/register and POST /api/auth/biometric/verify
+endpoints with Zod validation and proper error handling.
+```
+
+### Pull Request Configuration
+
+**`pullRequest.defaultBase`** - Default base branch for PRs (default: `"main"`)
+
+**`pullRequest.autoAssign`** - Automatically assign PR to current user (default: `true`)
+
+### Configuration Locations
+
+PRDX looks for configuration in these locations (in order):
+1. `./prdx.json` (project root)
+2. `./.claude/prdx.json` (Claude Code directory)
+
+If no configuration file is found, default values are used.
 
 ## Available Commands
 
@@ -142,29 +288,24 @@ Automatically creates a PR with full context.
 
 | Command | Description |
 |---------|-------------|
-| `/prdx:wizard` | Interactive PRD creation |
-| `/prdx:plan <feature-id>` | Business-level PRD planning |
-| `/prdx:dev:start <feature-id>` | Begin implementation (auto-creates detailed plan) |
-| `/prdx:dev:check <feature-id>` | Verify quality |
-| `/prdx:dev:push <feature-id>` | Create PR |
-
-### GitHub Integration
-
-| Command | Description |
-|---------|-------------|
-| `/prdx:publish <feature-id>` | Create GitHub issue |
-| `/prdx:sync <feature-id>` | Sync with GitHub |
+| `/prdx:plan <description>` | Create plan (triggers Plan agent) |
+| `/prdx:implement <slug>` | Implement feature (triggers platform agent) |
+| `/prdx:push <slug>` | Create pull request |
 
 ### Management
 
 | Command | Description |
 |---------|-------------|
-| `/prdx:list` | List all PRDs |
-| `/prdx:search <query>` | Search PRDs |
-| `/prdx:update <feature-id>` | Update PRD |
-| `/prdx:close <feature-id>` | Close PRD |
-| `/prdx:status` | Status dashboard |
-| `/prdx:deps <feature-id>` | Manage dependencies |
+| `/prdx:show [slug\|keyword]` | View/list/search PRDs |
+| `/prdx:close <slug>` | Close completed PRD |
+| `/prdx:config [show\|init\|set\|get]` | Configure PRDX settings |
+
+### GitHub Integration
+
+| Command | Description |
+|---------|-------------|
+| `/prdx:publish <slug>` | Create GitHub issue from PRD |
+| `/prdx:sync <slug>` | Sync PRD with GitHub issue |
 
 ### Help
 
@@ -177,36 +318,45 @@ Automatically creates a PR with full context.
 Here's a complete feature development workflow:
 
 ```bash
-# 1. Create PRD (business requirements)
-/prdx:wizard
-# → Fill in: feature-id, title, description, platform
-# → Creates PRD with high-level implementation phases
+# 1. Create plan (Plan agent explores and plans)
+/prdx:plan "add OAuth2 authentication with Google and GitHub"
+# → Pre-plan hook validates environment
+# → Platform detected: backend
+# → Plan agent explores codebase
+# → Plan agent creates comprehensive plan
+# → Plan displayed in conversation
 
-# 2. Plan with AI agents (business-level)
-/prdx:plan user-authentication-v2
-# → Agents analyze and create business-level PRD
-# → Includes WHAT needs to be done, not HOW
+# 2. Iterate naturally
+"Can you add support for Azure AD too?"
+# → Plan agent revises plan
+# → Displays updated plan
 
-# 3. Publish to GitHub (optional)
-/prdx:publish user-authentication-v2
+"looks good"
+# → PRD written to .claude/prds/backend-oauth2-auth.md
+
+# 3. Implement feature (Platform agent implements)
+/prdx:implement backend-oauth2-auth
+# → Pre-implement hook validates PRD
+# → Branch created: feat/backend-oauth2-auth
+# → prdx:backend-developer agent invoked
+# → Agent uses TodoWrite to track tasks
+# → Agent implements with TDD
+# → Agent creates conventional commits
+# → Post-implement hook updates PRD status
+
+# 4. Publish to GitHub (optional)
+/prdx:publish backend-oauth2-auth
 # → Creates GitHub issue for team visibility
 
-# 4. Start implementation
-/prdx:dev:start user-authentication-v2
-# → Creates detailed technical plan automatically (file paths, API contracts, patterns)
-# → Implements feature following the detailed plan
+# 5. Create pull request
+/prdx:push backend-oauth2-auth
+# → Creates PR with description from PRD
+# → Links to GitHub issue if exists
+# → Updates PRD with PR metadata
 
-# 5. Verify as you go
-/prdx:dev:check user-authentication-v2
-# → Agents review code quality and architecture
-
-# 6. Create pull request
-/prdx:dev:push user-authentication-v2
-# → Automated PR with full context
-
-# 7. After merge, close PRD
-/prdx:close user-authentication-v2
-# → Mark as completed
+# 6. After merge, close PRD
+/prdx:close backend-oauth2-auth
+# → Marks PRD as completed
 ```
 
 ## PRD File Structure
@@ -216,19 +366,19 @@ PRDs are stored in `.claude/prds/` directory:
 ```
 .claude/prds/
 ├── backend-user-auth.md
-├── mobile-push-notifications.md
-└── frontend-dashboard-v2.md
+├── android-push-notifications.md
+└── ios-dashboard-v2.md
 ```
 
 Each PRD contains:
-- **Overview**: Feature description and motivation
-- **Technical Approach**: High-level architecture decisions
-- **Implementation**: High-level phases (WHAT needs to be done)
-- **Detailed Implementation Plan**: Technical breakdown with file paths (created automatically by `/prdx:dev:start`)
-- **Acceptance Criteria**: Testable requirements
-- **Dependencies**: Related PRDs and blockers
-- **Status**: Current state (draft/published/in-progress/implemented/completed)
-- **GitHub Link**: Issue reference (if published)
+- **Goal**: What and why (1-2 sentences)
+- **Acceptance Criteria**: Testable outcomes with test mappings
+- **Approach**: Architecture, key changes, and risks
+- **Implementation Tasks**: Phase-by-phase breakdown
+- **Testing Strategy**: Unit, integration, and manual tests
+- **Implementation Notes**: Added after implementation completes
+- **Pull Request**: PR metadata after `/prdx:push`
+- **Status**: planning → in-progress → implemented → review → completed
 
 ## Customization
 
@@ -270,14 +420,10 @@ If you only need backend development:
 
 ```bash
 # Remove mobile agents
-rm .claude/agents/android-developer.md
-rm .claude/agents/ios-developer.md
+rm agents/android-developer.md
+rm agents/ios-developer.md
 
-# Update commands to only use backend-developer
-# Edit these files and remove mobile platform routing:
-# - .claude/commands/prd/plan.md
-# - .claude/commands/prd/dev-start.md
-# - .claude/commands/prd/dev-check.md
+# Commands will automatically adapt to only detect backend platform
 ```
 
 ## Requirements
@@ -304,23 +450,23 @@ gh auth login
 
 ## Best Practices
 
-### 1. Start with the Wizard
-Always use `/prdx:wizard` to create PRDs with consistent structure.
+### 1. Let Plan Agent Explore
+Always use `/prdx:plan` to let the Plan agent explore your codebase thoroughly.
 
-### 2. Plan Before Coding
-Run `/prdx:plan` to get multi-agent insights before starting implementation.
+### 2. Iterate Naturally
+During planning, just talk naturally - no special commands for revisions.
 
-### 3. Verify Often
-Use `/prdx:dev:check` during development, not just at the end.
+### 3. Use Clear Approval
+Say "looks good", "approve", or "lgtm" when plan is ready.
 
-### 4. Keep PRDs Updated
-Update status, blockers, and progress regularly as you work.
+### 4. Leverage Hooks
+Hooks provide validation gates - fix issues they report before proceeding.
 
-### 5. Link Dependencies
-Use `/prdx:deps` to track relationships between features.
+### 5. Review TodoWrite
+During implementation, watch TodoWrite for real-time task progress.
 
 ### 6. Close When Done
-Always run `/prdx:close` to properly complete PRDs and track metrics.
+Run `/prdx:close <slug>` to mark PRDs as completed.
 
 ## Troubleshooting
 
@@ -361,35 +507,32 @@ gh repo view
 
 ```
 prdx/
-├── plugin.json           # Claude Code plugin manifest
-├── marketplace.json      # Private marketplace config
-├── README.md            # This file
-├── install.sh           # Installation script
-├── .claudeignore        # Files to ignore
-├── commands/            # 14 PRD workflow commands
-│   ├── wizard.md
-│   ├── plan.md
-│   ├── list.md
-│   ├── search.md
-│   ├── update.md
-│   ├── close.md
-│   ├── publish.md
-│   ├── sync.md
-│   ├── status.md
-│   ├── deps.md
-│   ├── help.md
-│   └── dev/
-│       ├── start.md     # Auto-creates detailed plan inline
-│       ├── check.md
-│       └── push.md
-├── skills/              # 3 specialized skills
-│   ├── prd-review.md
-│   ├── impl-patterns.md
-│   └── testing-strategy.md
-└── agents/              # 3 AI agents
-    ├── backend-developer.md
-    ├── android-developer.md
-    └── ios-developer.md
+├── .claude-plugin/          # Plugin metadata
+│   ├── plugin.json
+│   └── marketplace.json
+├── commands/                # Thin wrapper commands
+│   ├── plan.md              # Triggers Plan agent
+│   ├── implement.md         # Triggers platform agent
+│   ├── show.md              # View/list/search PRDs
+│   ├── push.md              # Create pull request
+│   ├── close.md             # Close completed PRD
+│   ├── publish.md           # Create GitHub issue
+│   ├── sync.md              # Sync with GitHub
+│   └── help.md              # Documentation
+├── hooks/prdx/              # Validation hooks
+│   ├── pre-plan.sh          # Pre-planning validation
+│   ├── pre-implement.sh     # Pre-implementation validation
+│   └── post-implement.sh    # Post-implementation actions
+├── skills/                  # Knowledge bases (read by agents)
+│   ├── prd-review.md        # Review checklist
+│   ├── impl-patterns.md     # Implementation patterns
+│   └── testing-strategy.md  # Testing approaches
+├── agents/                  # Platform-specific agents
+│   ├── backend-developer.md
+│   ├── android-developer.md
+│   └── ios-developer.md
+├── README.md
+└── install.sh
 ```
 
 ## Contributing
@@ -414,12 +557,29 @@ For issues or questions:
 
 ## Changelog
 
+### v0.3.0 (2025-01-13) - Native Tooling
+- **BREAKING**: Complete redesign to leverage Claude Code native features
+- **NEW**: `/prdx:plan` - Thin wrapper that triggers Plan agent
+- **NEW**: `/prdx:implement` - Thin wrapper that triggers platform agent
+- **NEW**: Validation hooks (pre-plan, pre-implement, post-implement)
+- **REMOVED**: Custom codebase exploration (use Plan agent)
+- **REMOVED**: Custom multi-agent orchestration
+- **REMOVED**: Context files and state management
+- **REMOVED**: Two-level planning system
+- **REMOVED**: Custom task tracking (use TodoWrite)
+- **REMOVED**: TDD review checkpoints
+- **REMOVED**: Metrics tracking
+- **REMOVED**: Templates
+- **PHILOSOPHY**: Delegate to native Claude Code tools instead of custom implementations
+- **COMMANDS**: Thin wrappers that orchestrate agents, hooks, and file I/O
+- **AGENTS**: Platform agents do implementation, Plan agent does exploration
+- **HOOKS**: Bash scripts for validation gates
+- **SKILLS**: Passive knowledge bases read by agents
+
 ### v0.2.0 (2025-01-10)
-- **CHANGED**: `/prdx:plan` now creates business-level PRDs only (high-level phases, WHAT not HOW)
-- **CHANGED**: `/prdx:dev:start` auto-creates detailed technical plans inline when needed
+- **CHANGED**: `/prdx:plan` creates business-level PRDs only
+- **CHANGED**: `/prdx:dev` auto-creates detailed technical plans
 - Separated business planning from technical planning
-- Detailed plans include file paths, API contracts, code patterns, and testing strategy
-- Improved workflow: simpler command structure, same powerful features
 
 ### v0.1.0 (2024-11-10)
 - Initial release
@@ -427,9 +587,6 @@ For issues or questions:
 - 3 specialized skills
 - 3 AI agents (backend, Android, iOS)
 - GitHub integration
-- Status tracking and search
-- Dependency management
-- Claude Code marketplace support
 
 ---
 

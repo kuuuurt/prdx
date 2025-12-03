@@ -1,36 +1,28 @@
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
+# PRDX plugin .gitignore
+# This file defines what should be ignored when the plugin itself is in version control
 
-# Thumbnails
-._*
-
-# Files that might appear in the root of a volume
-.DocumentRevisions-V100
-.fseventsd
-.Spotlight-V100
-.TemporaryItems
-.Trashes
-.VolumeIcon.ico
-.com.apple.timemachine.donotpresent
-
-# Directories potentially created on remote AFP share
-.AppleDB
-.AppleDesktop
-Network Trash Folder
-Temporary Items
-.apdisk
-
-# Editor directories and files
+# IDE and editor files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.DS_Store
 
-# Git
-.git/
+# Temporary files
+*.tmp
+*.bak
+*.log
 
-# Claude Code local settings
-.claude/
+# Node modules (if any)
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Local metrics (these should never be committed to plugin repo)
+.prdx/
+
+# User-specific context files
+.claude/.prdx-context

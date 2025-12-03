@@ -207,7 +207,7 @@ Platforms: backend (1), android (1), ios (1)
 
 Actions:
   /prdx:show <slug>        View detailed status
-  /prdx:dev:start <slug>   Start working on one
+  /prdx:dev <slug>   Start working on one
 ```
 
 5. **If no results:**
@@ -321,11 +321,11 @@ Branch: feat/android-optimize-loginviewmodel
 NEXT ACTIONS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Recommended:
-  1. ✨ Continue work: /prdx:dev:start
+  1. ✨ Continue work: /prdx:dev
   2. 📝 Review plan: Read .claude/prds/android-optimize-loginviewmodel.md
 
 Quick commands:
-  /prdx:dev:start       Continue implementation
+  /prdx:dev       Continue implementation
   /prdx:update          Update PRD
   /prdx:show            Back to list
 

@@ -17,15 +17,24 @@
 
 ## Testing
 
-✅ [X] tests passing | ✅ Coverage: [Y]% | [⚠️ Manual: Specific scenario to test]
+- ✅ **[X new/updated tests]**: [What they cover]
 
 ## Review Focus
 
-- [ ] [Specific file or logic to review]
-- [ ] [Edge case or security concern to verify]
+- [ ] **[File.ext]**: [Specific function/logic to check]
+- [ ] **[File.ext]**: [Edge case to verify]
+
+## Known Issues
+
+_[Optional - only if there are temporary solutions]_
 
 ---
-Closes #[issue-number] | [Verification passed ✅ / ⚠️ Warning details]
+
+Closes #[issue-number]
+
+---
+
+🤖 _Generated with [Claude Code](https://claude.com/claude-code)_
 
 ---
 
@@ -42,20 +51,31 @@ Closes #[issue-number] | [Verification passed ✅ / ⚠️ Warning details]
 - Use prefixes: New, Updated, Fixed, Removed
 - Be specific but concise: "New: `BiometricAuthService` handles fingerprint/face ID"
 
-**Testing Section** (1 line):
-- Show numbers and manual test requirements only
-- Format: "✅ X tests | ✅ Y% coverage | ⚠️ Manual: Z"
-- If manual test needed, specify what and why
+**Testing Section** (1-2 lines max):
+- **ONLY tests added/updated in THIS PR**
+- NO unrelated warnings, deployment notes, or monitoring
+- Format: "✅ X new/updated tests: [what they cover]"
+- Keep it tight and relevant
 
-**Review Focus** (2-3 checkboxes):
-- Guide reviewers to critical areas
-- Specific files, edge cases, or security concerns
-- Actionable items reviewers can verify
+**Review Focus** (2-3 checkboxes max):
+- **ONLY code-level review items**
+- Be specific: file names, function names, logic to check
+- NO vague items, NO external actions, NO deployment steps
+- Examples:
+  - ✅ "**service.ts**: Check null handling in `processOrder()`"
+  - ❌ "Verify feature works" (vague)
+  - ❌ "Monitor logs in production" (not code review)
+  - ❌ "Check Datadog dashboard" (deployment, not review)
 
-**Footer** (1 line):
-- Link to issue
-- Show verification status from auto-check
-- Format: "Closes #123 | Verification passed ✅"
+**Known Issues** (Optional):
+- **ONLY if there are temporary solutions**
+- Keep brief: "[Issue] - [Plan]"
+- Skip this section if none
+
+**Footer** (2 lines):
+- Link to issue: "Closes #123"
+- Claude Code attribution: "🤖 Generated with Claude Code"
+- **NEVER mention PRD** - PRDs are internal planning docs, not for PR descriptions
 
 ---
 
@@ -76,16 +96,20 @@ Adds real-time location tracking API for drivers to enable live map updates in r
 
 ## Testing
 
-✅ 15 tests passing | ✅ 89% coverage | ⚠️ Manual: Test WebSocket reconnection on network drop
+- ✅ **15 new tests**: WebSocket handling, location validation, pub/sub
 
 ## Review Focus
 
-- [ ] Verify rate limiting prevents location spam (max 1/sec per driver)
-- [ ] Check Redis pub/sub scales to 10k+ concurrent drivers
-- [ ] Validate location data sanitization (no PII leakage)
+- [ ] **`LocationService.ts`**: Rate limiting in `handleLocationUpdate()`
+- [ ] **`location.routes.ts`**: Coordinate validation and sanitization
 
 ---
-Closes #234 | Verification passed ✅
+
+Closes #234
+
+---
+
+🤖 _Generated with [Claude Code](https://claude.com/claude-code)_
 ```
 
 ### Mobile Bug Fix
@@ -102,15 +126,24 @@ Fixes crash when users rotate device during biometric prompt on Android 12+.
 
 ## Testing
 
-✅ 8 regression tests | ✅ Manual: Tested on Pixel 6 (Android 12 & 13)
+- ✅ **8 regression tests**: Fragment lifecycle and state management
 
 ## Review Focus
 
-- [ ] Verify no memory leaks in Fragment lifecycle
-- [ ] Check prompt works after multiple rotations
+- [ ] **`LoginFragment.kt`**: Lifecycle handling in `onConfigurationChanged()`
+- [ ] **`LoginFragment.kt`**: Cleanup in `onDestroy()`
+
+## Known Issues
+
+- Android 11 rotation warning suppressed - UX approved (#457)
 
 ---
-Closes #456 | ⚠️ Manual testing required
+
+Closes #456
+
+---
+
+🤖 _Generated with [Claude Code](https://claude.com/claude-code)_
 ```
 
 ### Refactor
@@ -128,15 +161,20 @@ Simplifies LoginViewModel by removing Use Case layer and calling Auth0Client dir
 
 ## Testing
 
-✅ 24 tests passing | ✅ 91% coverage | ✅ No manual test needed
+- ✅ **12 updated tests**: Adapted to direct Auth0Client usage
 
 ## Review Focus
 
-- [ ] Verify error handling matches previous behavior
-- [ ] Check Login flow still works end-to-end
+- [ ] **`LoginViewModel.kt`**: Direct `Auth0Client` calls in `login()`
+- [ ] **Error handling**: Verify `mapAuth0Error()` matches previous behavior
 
 ---
-Closes #789 | Verification passed ✅
+
+Closes #789
+
+---
+
+🤖 _Generated with [Claude Code](https://claude.com/claude-code)_
 ```
 
 ---
@@ -167,6 +205,20 @@ the requirements outlined in the PRD...
 ```markdown
 - New: LocationService handles real-time updates
 - Updated: Driver model tracks location
+```
+
+❌ **Don't give vague Review Focus**:
+```markdown
+- [ ] Verify the feature works correctly
+- [ ] Check for edge cases
+- [ ] Test error handling
+```
+
+✅ **Do provide specific code-level guidance**:
+```markdown
+- [ ] **`AuthService.ts`**: Review token refresh logic in `refreshToken()` method
+- [ ] **Edge case**: Check null handling in `getUserProfile()` when user data is missing
+- [ ] **Error handling**: Verify 401/403 responses map correctly in `handleAuthError()`
 ```
 
 ---

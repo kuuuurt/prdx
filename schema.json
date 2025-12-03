@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PRDX Configuration",
+  "description": "Configuration file for PRDX workflow settings",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Configuration version",
+      "default": "1.0"
+    },
+    "commits": {
+      "type": "object",
+      "description": "Git commit configuration",
+      "properties": {
+        "coAuthor": {
+          "type": "object",
+          "description": "Co-author settings for commits",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable co-author attribution",
+              "default": true
+            },
+            "name": {
+              "type": "string",
+              "description": "Co-author name",
+              "default": "Claude"
+            },
+            "email": {
+              "type": "string",
+              "description": "Co-author email",
+              "default": "noreply@anthropic.com"
+            }
+          },
+          "required": ["enabled"],
+          "additionalProperties": false
+        },
+        "extendedDescription": {
+          "type": "object",
+          "description": "Extended commit description settings",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable extended commit descriptions",
+              "default": true
+            },
+            "includeClaudeCodeLink": {
+              "type": "boolean",
+              "description": "Include Claude Code generation link in commit message",
+              "default": true
+            }
+          },
+          "required": ["enabled"],
+          "additionalProperties": false
+        },
+        "format": {
+          "type": "string",
+          "description": "Commit message format",
+          "enum": ["conventional", "simple"],
+          "default": "conventional"
+        }
+      },
+      "required": ["coAuthor", "extendedDescription", "format"],
+      "additionalProperties": false
+    },
+    "pullRequest": {
+      "type": "object",
+      "description": "Pull request configuration",
+      "properties": {
+        "defaultBase": {
+          "type": "string",
+          "description": "Default base branch for PRs",
+          "default": "main"
+        },
+        "autoAssign": {
+          "type": "boolean",
+          "description": "Automatically assign PR to current user",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["version", "commits"],
+  "additionalProperties": false
+}
