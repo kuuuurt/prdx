@@ -1,92 +1,81 @@
-| description | argument-hint |
-| Complete PRD workflow: plan → publish → implement → push | Feature description or existing PRD slug |
+---
+description: "Complete PRD workflow: plan → publish → implement → push"
+argument-hint: "[feature description or PRD slug]"
+---
 
-# PRDX Workflow
+# /prdx - Complete Feature Workflow
 
 > **One command to rule them all.**
 > Orchestrates the complete feature development workflow with decision points.
 
+## Workflow
+
+Execute the following phases based on the argument provided:
+
+### Step 1: Determine Entry Point
+
+**If the argument matches an existing PRD** (check `.claude/prds/`):
+- Read PRD and check its status
+- Resume from the appropriate phase:
+  - `planning` → Continue planning (Phase 2)
+  - `published` → Implement (Phase 3)
+  - `in-progress` → Continue implementation (Phase 3)
+  - `implemented` → Create PR (Phase 4)
+  - `review` → Create PR (Phase 4)
+  - `completed` → Inform user the PRD is done
+
+**If the argument is a feature description** (not an existing PRD):
+- Proceed to Phase 2 (planning)
+
+**If no argument provided**:
+- List existing PRDs with their status using: `ls -la .claude/prds/*.md 2>/dev/null`
+- Ask: "Start a new feature or continue an existing PRD?"
+
 ---
 
-## Phase 1: Determine Entry Point
+### Step 2: Planning
 
-**Check the argument:**
-
-1. If argument matches existing PRD (`.claude/prds/*[arg]*.md`):
-   - Read PRD and check status
-   - Skip to appropriate phase based on status:
-     - `planning` → Phase 2 (continue planning)
-     - `published` → Phase 4 (implement)
-     - `in-progress` → Phase 4 (continue implementation)
-     - `implemented` → Phase 5 (push)
-     - `review` → Phase 5 (push)
-     - `completed` → Inform user PRD is done
-
-2. If argument is a feature description (not existing PRD):
-   - Proceed to Phase 2 (planning)
-
-3. If no argument:
-   - List existing PRDs with status
-   - Ask: "Start new feature or continue existing?"
-   - Route accordingly
-
----
-
-## Phase 2: Planning
-
-**Run planning workflow:**
+Run the planning command with the feature description:
 
 ```
 /prdx:plan [description]
 ```
 
-Wait for plan completion and user approval.
+Wait for planning to complete and user to approve the PRD.
 
-**After PRD is created, ask:**
+**After PRD is created, use AskUserQuestion to ask:**
+- Option 1: "Publish to GitHub" (creates issue for team visibility)
+- Option 2: "Implement now" (start coding immediately)
+- Option 3: "Stop here" (review PRD later)
 
-```
-PRD created: .claude/prds/[slug].md
-
-What would you like to do next?
-1. Publish to GitHub (creates issue for team visibility)
-2. Implement now (start coding immediately)
-3. Stop here (review PRD later)
-```
-
-- If **Publish** → Phase 3
-- If **Implement** → Phase 4
-- If **Stop** → End workflow, show next steps
+Route based on choice:
+- Publish → Phase 3a (then ask about implementation)
+- Implement → Phase 3
+- Stop → End workflow, tell user they can resume with `/prdx [slug]`
 
 ---
 
-## Phase 3: Publish
+### Step 2a: Publish (Optional)
 
-**Run publish workflow:**
+If user chose to publish:
 
 ```
 /prdx:publish [slug]
 ```
 
-Wait for issue creation.
+After issue is created, use AskUserQuestion:
+- Option 1: "Yes, start implementation"
+- Option 2: "No, I'll implement later"
 
-**After issue is created, ask:**
-
-```
-GitHub issue created: #[number]
-
-Ready to implement?
-1. Yes, start implementation
-2. No, I'll implement later
-```
-
-- If **Yes** → Phase 4
-- If **No** → End workflow, show next steps
+Route based on choice:
+- Yes → Phase 3
+- No → End workflow
 
 ---
 
-## Phase 4: Implementation
+### Step 3: Implementation
 
-**Run implementation workflow:**
+Run the implementation command:
 
 ```
 /prdx:implement [slug]
@@ -94,36 +83,31 @@ Ready to implement?
 
 Wait for implementation to complete.
 
-**After implementation, ask:**
+**After implementation, use AskUserQuestion:**
+- Option 1: "Yes, create PR now"
+- Option 2: "No, I need to review first"
 
-```
-Implementation complete!
-
-Ready to create pull request?
-1. Yes, create PR now
-2. No, I need to review first
-```
-
-- If **Yes** → Phase 5
-- If **No** → End workflow, show next steps
+Route based on choice:
+- Yes → Phase 4
+- No → End workflow, tell user they can resume with `/prdx [slug]`
 
 ---
 
-## Phase 5: Push
+### Step 4: Create Pull Request
 
-**Run push workflow:**
+Run the push command:
 
 ```
 /prdx:push [slug]
 ```
 
-**After PR creation:**
+**After PR is created, display completion message:**
 
 ```
 🎉 Feature complete!
 
 PRD: .claude/prds/[slug].md
-Issue: #[issue-number]
+Issue: #[issue-number] (if published)
 PR: #[pr-number]
 
 The feature is ready for review.
@@ -131,7 +115,7 @@ The feature is ready for review.
 
 ---
 
-## Decision Point Guidelines
+## Important Guidelines
 
 **Use AskUserQuestion tool** at each decision point with clear options.
 
@@ -141,47 +125,11 @@ The feature is ready for review.
 - What comes next
 
 **Respect user choice:**
-- Never auto-proceed without asking
-- "Stop here" is always valid
-- Show how to resume later
+- Never auto-proceed to the next phase without asking
+- "Stop here" is always a valid option
+- Always show how to resume later with `/prdx [slug]`
 
----
-
-## Resuming Workflow
-
-When user runs `/prdx [existing-slug]`:
-
-1. Read PRD status
-2. Show current state:
-   ```
-   Found PRD: [title]
-   Status: [status]
-
-   Resuming from: [phase]
-   ```
-3. Continue from appropriate phase
-
----
-
-## Error Handling
-
-**If any phase fails:**
-
-1. Show clear error message
-2. Don't auto-proceed to next phase
-3. Offer options:
-   ```
-   [Phase] encountered an issue: [error]
-
-   Options:
-   1. Retry this step
-   2. Stop and fix manually
-   3. Skip to next step (if possible)
-   ```
-
----
-
-## Example Flow
-
-```
-User: /prdx add biometric login
+**Error handling:**
+- If any phase fails, show clear error message
+- Don't auto-proceed after errors
+- Offer: retry, stop, or skip options
