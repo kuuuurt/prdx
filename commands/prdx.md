@@ -43,15 +43,25 @@ Run the planning command with the feature description:
 /prdx:plan [description]
 ```
 
-Wait for planning to complete and user to approve the PRD.
+**IMPORTANT: The planner agent will use AskUserQuestion to get explicit PRD approval.**
 
-**After PRD is created, use AskUserQuestion to ask:**
+Wait for `/prdx:plan` to complete. The agent will:
+1. Explore the codebase
+2. Create a PRD draft
+3. Ask user to approve via AskUserQuestion (Approve / Request changes / Start over)
+4. Only return when user explicitly selects "Approve PRD"
+
+**Do NOT proceed until the planner returns with "✅ PRD Approved" in its output.**
+
+If the planner returns without approval (user chose "Start over" or abandoned), stop the workflow.
+
+**After PRD is approved and saved, use AskUserQuestion to ask:**
 - Option 1: "Publish to GitHub" (creates issue for team visibility)
 - Option 2: "Implement now" (start coding immediately)
 - Option 3: "Stop here" (review PRD later)
 
 Route based on choice:
-- Publish → Phase 3a (then ask about implementation)
+- Publish → Phase 2a (then ask about implementation)
 - Implement → Phase 3
 - Stop → End workflow, tell user they can resume with `/prdx [slug]`
 

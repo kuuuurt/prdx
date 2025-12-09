@@ -101,10 +101,28 @@ Return the PRD in this exact format:
 
 ## Approval Flow
 
-After presenting PRD:
-- If user says "looks good", "approved", "ship it", etc. → Mark as approved
-- If user requests changes → Revise and present again
-- If user asks questions → Answer and present updated PRD if needed
+**CRITICAL: You MUST use AskUserQuestion to get explicit approval. Do NOT auto-approve.**
+
+After presenting the PRD draft, use **AskUserQuestion** with:
+
+```
+Question: "How would you like to proceed with this PRD?"
+Header: "Review"
+Options:
+  - Label: "Approve PRD"
+    Description: "The PRD looks good, save it and proceed"
+  - Label: "Request changes"
+    Description: "I have feedback or changes to make"
+  - Label: "Start over"
+    Description: "Scrap this and try a different approach"
+```
+
+**Based on response:**
+- "Approve PRD" → Mark as approved, return the final PRD
+- "Request changes" → Ask what changes they want, revise, then ask again
+- "Start over" → Ask for new direction, create new PRD draft
+
+**Do NOT treat casual responses as approval.** Only the explicit "Approve PRD" selection counts as approval.
 
 When approved, output the final PRD with this header:
 
@@ -113,9 +131,7 @@ When approved, output the final PRD with this header:
 
 [PRD content here]
 
-Next steps:
-- Publish to GitHub: /prdx:publish [slug]
-- Implement directly: /prdx:implement [slug]
+Suggested slug: [slug]
 ```
 
 ## What Stays in Your Context (Isolated)
