@@ -46,7 +46,8 @@ Return the PRD in this exact format:
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
-**Platform:** backend | android | ios
+**Platform:** backend | android | ios | mobile
+**Platforms:** android, ios (only include for mobile - list target platforms)
 **Status:** planning
 **Created:** [DATE]
 

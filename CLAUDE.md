@@ -67,7 +67,22 @@ prdx/
 Plan → [Ask: Publish?] → Publish → [Ask: Implement?] → Implement → [Ask: Push?] → PR
 ```
 
+**For mobile features targeting both platforms:**
+```
+/prdx "add biometric authentication"
+↓
+Plan (asks: Android & iOS, Android only, or iOS only?)
+↓
+[Ask: Publish?] → Publish
+↓
+[Ask: Implement?] → Implement Android → [Ask: Continue to iOS?] → Implement iOS
+↓
+[Ask: Push?] → PR
+```
+
 The `/prdx` command orchestrates the entire workflow with decision points at each phase.
+
+**Multi-platform mobile implementation is sequential** to learn from the first platform before implementing the second.
 
 ### Individual Commands (Context-Isolated)
 
@@ -93,13 +108,17 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
 
 3. Implement Feature
    /prdx:implement {slug}
+   /prdx:implement {slug} android  (for multi-platform: Android only)
+   /prdx:implement {slug} ios      (for multi-platform: iOS only)
    ↓
    - Pre-implement hook validates PRD
    - Git branch created/checked out
-   - prdx:dev-planner agent (ISOLATED) creates dev plan
-   - Returns only dev plan (~3KB)
-   - Platform agent (ISOLATED) executes dev plan
-   - Returns only implementation summary (~1KB)
+   - For each target platform (sequentially):
+     - prdx:dev-planner agent (ISOLATED) creates dev plan
+     - Returns only dev plan (~3KB)
+     - Platform agent (ISOLATED) executes dev plan
+     - Returns only implementation summary (~1KB)
+     - Learnings passed to next platform
    - Post-implement hook updates PRD status
 
 4. Create Pull Request
@@ -383,7 +402,8 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
-**Platform:** backend | android | ios
+**Platform:** backend | android | ios | mobile
+**Platforms:** android, ios (only for mobile - lists target platforms)
 **Status:** planning | in-progress | implemented | review | completed
 **Created:** [DATE]
 **Branch:** [BRANCH_NAME]
@@ -426,12 +446,20 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 - [Dependency or constraint]
 
 ---
-## Implementation Notes
+## Implementation Notes (android)
 
 **Branch:** [BRANCH]
 **Implemented:** [DATE]
 
-[Added by platform agent after implementation]
+[Added by Android agent after implementation]
+
+---
+## Implementation Notes (ios)
+
+**Branch:** [BRANCH]
+**Implemented:** [DATE]
+
+[Added by iOS agent after implementation - only for multi-platform mobile PRDs]
 
 ---
 ## Pull Request

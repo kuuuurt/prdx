@@ -61,12 +61,13 @@ Auto-detect platform from:
 - "backend", "API", "endpoint" → backend
 - "Android", "Kotlin", "Compose" → android
 - "iOS", "Swift", "SwiftUI" → ios
+- "mobile", "app" (without platform specifics) → mobile (needs platform selection)
 
 **2. Directory structure:**
 ```bash
-if [ -d "backend" ]; then PLATFORM="backend"; fi
-if [ -d "android" ]; then PLATFORM="android"; fi
-if [ -d "ios" ]; then PLATFORM="ios"; fi
+if [ -d "backend" ]; then HAS_BACKEND=true; fi
+if [ -d "android" ]; then HAS_ANDROID=true; fi
+if [ -d "ios" ]; then HAS_IOS=true; fi
 ```
 
 **3. Config files:**
@@ -74,7 +75,30 @@ if [ -d "ios" ]; then PLATFORM="ios"; fi
 - `build.gradle.kts` → android
 - `Package.swift` → ios
 
-If ambiguous, ask user to clarify.
+**4. Mobile Platform Selection:**
+
+If the detected platform is `mobile` OR the codebase has both android and ios directories AND the description doesn't specify a single platform:
+
+Use **AskUserQuestion** to ask which platforms this PRD should target:
+
+```
+Question: "Which platforms should this PRD cover?"
+Header: "Platforms"
+Options:
+  - Label: "Android & iOS (Recommended)"
+    Description: "Apply to both platforms - implement sequentially to learn from first platform"
+  - Label: "Android only"
+    Description: "Platform-specific feature or fix for Android"
+  - Label: "iOS only"
+    Description: "Platform-specific feature or fix for iOS"
+```
+
+Based on answer:
+- "Android & iOS" → PLATFORM="mobile", PLATFORMS=["android", "ios"]
+- "Android only" → PLATFORM="android", PLATFORMS=["android"]
+- "iOS only" → PLATFORM="ios", PLATFORMS=["ios"]
+
+If ambiguous (single platform project), default to that platform.
 
 ### Phase 3: Invoke Planner Agent
 
@@ -86,12 +110,18 @@ subagent_type: "prdx:planner"
 prompt: "Create a PRD for: {DESCRIPTION}
 
 **Platform:** {PLATFORM}
+**Platforms:** {PLATFORMS} (only for mobile - e.g., ["android", "ios"] or ["android"])
 
 Explore the codebase, assess feasibility, and create a business-focused PRD.
 Iterate with the user until they approve the plan.
 
 When approved, return the final PRD document."
 ```
+
+**For mobile PRDs (PLATFORM="mobile"):**
+- Pass both PLATFORM and PLATFORMS to the agent
+- Agent will include `Platforms:` field in PRD header
+- Implementation will run sequentially per platform
 
 **Agent runs in isolated context:**
 - Explores codebase (file contents stay in agent's context)

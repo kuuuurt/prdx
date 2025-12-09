@@ -16,10 +16,12 @@ Execute the following phases based on the argument provided:
 
 **If the argument matches an existing PRD** (check `.claude/prds/`):
 - Read PRD and check its status
+- For multi-platform mobile PRDs, also check which platforms have been implemented (look for `## Implementation Notes (android)` and `## Implementation Notes (ios)` sections)
 - Resume from the appropriate phase:
   - `planning` → Continue planning (Phase 2)
   - `published` → Implement (Phase 3)
   - `in-progress` → Continue implementation (Phase 3)
+    - For multi-platform: Check which platforms are done, resume with remaining platform
   - `implemented` → Create PR (Phase 4)
   - `review` → Create PR (Phase 4)
   - `completed` → Inform user the PRD is done
@@ -75,15 +77,42 @@ Route based on choice:
 
 ### Step 3: Implementation
 
-Run the implementation command:
+**Check if this is a multi-platform mobile PRD:**
 
+Read the PRD and check for `**Platforms:**` field with multiple platforms (e.g., "android, ios").
+
+**For single-platform PRDs:**
 ```
 /prdx:implement [slug]
 ```
+Wait for implementation to complete, then proceed to PR decision.
 
-Wait for implementation to complete.
+**For multi-platform mobile PRDs:**
 
-**After implementation, use AskUserQuestion:**
+Implementation runs **sequentially** per platform to learn from the first implementation.
+
+1. **First Platform (Android):**
+   - Display: "Starting Android implementation..."
+   - Run: `/prdx:implement [slug] android`
+   - Wait for completion
+
+2. **Between Platforms - Ask User:**
+   Use AskUserQuestion:
+   - Option 1: "Continue to iOS" (Recommended)
+   - Option 2: "Stop here, I'll continue iOS later"
+   - Option 3: "Skip iOS, Android only"
+
+   Route based on choice:
+   - Continue → Proceed to iOS
+   - Stop → End workflow, tell user to resume with `/prdx [slug]`
+   - Skip → Update PRD to remove iOS from Platforms, proceed to PR decision
+
+3. **Second Platform (iOS):**
+   - Display: "Starting iOS implementation (applying learnings from Android)..."
+   - Run: `/prdx:implement [slug] ios`
+   - Wait for completion
+
+**After all platform implementations complete, use AskUserQuestion:**
 - Option 1: "Yes, create PR now"
 - Option 2: "No, I need to review first"
 
