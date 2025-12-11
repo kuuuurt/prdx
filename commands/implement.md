@@ -52,7 +52,7 @@ This command orchestrates two agents in **isolated contexts**:
 
 1. Use the Read tool to check for config file in this order:
    - `prdx.json` (project root)
-   - `.prdx/config.json`
+   - `.prdx/prdx.json`
 
 2. If config file exists, extract these values:
    - `commits.format` → "conventional" or "simple"

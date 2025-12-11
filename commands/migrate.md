@@ -11,7 +11,7 @@ Migrates PRDX files from the old `.claude/` location to the new `.prdx/` folder.
 | Old Location | New Location |
 |--------------|--------------|
 | `.claude/prds/` | `.prdx/prds/` |
-| `.claude/prdx.json` | `.prdx/config.json` |
+| `.claude/prdx.json` | `.prdx/prdx.json` |
 
 ## Usage
 
@@ -52,7 +52,7 @@ Before migrating, check if new locations already have files:
 ```bash
 # Check for existing .prdx directory
 NEW_PRDS_EXISTS=$([ -d ".prdx/prds" ] && echo "yes" || echo "no")
-NEW_CONFIG_EXISTS=$([ -f ".prdx/config.json" ] && echo "yes" || echo "no")
+NEW_CONFIG_EXISTS=$([ -f ".prdx/prdx.json" ] && echo "yes" || echo "no")
 ```
 
 If conflicts exist, use **AskUserQuestion**:
@@ -94,7 +94,7 @@ fi
 If `.claude/prdx.json` exists:
 
 ```bash
-cp .claude/prdx.json .prdx/config.json
+cp .claude/prdx.json .prdx/prdx.json
 ```
 
 ### Step 6: Update .gitignore
@@ -139,7 +139,7 @@ rm -f .claude/prdx.json
 
 Migrated:
   📁 {PRD_COUNT} PRDs → .prdx/prds/
-  ⚙️  Config → .prdx/config.json
+  ⚙️  Config → .prdx/prdx.json
 
 {If cleanup was done:}
 Removed:

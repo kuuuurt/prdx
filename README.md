@@ -278,7 +278,7 @@ endpoints with Zod validation and proper error handling.
 
 PRDX looks for configuration in these locations (in order):
 1. `./prdx.json` (project root)
-2. `./.prdx/config.json` (Claude Code directory)
+2. `./.prdx/prdx.json` (PRDX directory)
 
 If no configuration file is found, default values are used.
 

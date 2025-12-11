@@ -36,8 +36,8 @@ Load PRDX configuration:
 CONFIG_FILE=""
 if [ -f "prdx.json" ]; then
   CONFIG_FILE="prdx.json"
-elif [ -f ".prdx/config.json" ]; then
-  CONFIG_FILE=".prdx/config.json"
+elif [ -f ".prdx/prdx.json" ]; then
+  CONFIG_FILE=".prdx/prdx.json"
 fi
 
 # Parse config or use defaults
