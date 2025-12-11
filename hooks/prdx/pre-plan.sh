@@ -11,21 +11,21 @@ if ! git rev-parse --git-dir > /dev/null 2>&1; then
     exit 1
 fi
 
-# Ensure .claude/prds directory exists
-mkdir -p .claude/prds
+# Ensure .prdx/prds directory exists
+mkdir -p .prdx/prds
 
 # Check if PRD directory is in .gitignore
-if ! grep -q "^\.claude/prds/" .gitignore 2>/dev/null; then
-    echo "⚠️  .claude/prds/ not in .gitignore"
+if ! grep -q "^\.prdx/prds/" .gitignore 2>/dev/null; then
+    echo "⚠️  .prdx/prds/ not in .gitignore"
     echo "PRD files should not be committed to git"
     echo ""
     echo "Add this line to .gitignore:"
-    echo ".claude/prds/"
+    echo ".prdx/prds/"
     echo ""
     read -p "Add to .gitignore automatically? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo ".claude/prds/" >> .gitignore
+        echo ".prdx/prds/" >> .gitignore
         echo "✓ Added to .gitignore"
     fi
 fi

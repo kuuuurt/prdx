@@ -12,7 +12,7 @@ if [ -z "$PRD_SLUG" ]; then
 fi
 
 # Find PRD file
-PRD_FILE=$(find .claude/prds -name "*${PRD_SLUG}*.md" -type f | head -1)
+PRD_FILE=$(find .prdx/prds -name "*${PRD_SLUG}*.md" -type f | head -1)
 
 if [ -z "$PRD_FILE" ]; then
     echo "⚠️  PRD not found: $PRD_SLUG"

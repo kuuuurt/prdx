@@ -11,7 +11,7 @@ You are a PR creation expert for Claude Code. Your role is to create comprehensi
 
 ### 1. Read PRD
 
-Load the PRD file from `.claude/prds/{slug}.md` and extract:
+Load the PRD file from `.prdx/prds/{slug}.md` and extract:
 - Title and goal
 - Acceptance criteria
 - Approach summary

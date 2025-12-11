@@ -52,7 +52,7 @@ This command orchestrates two agents in **isolated contexts**:
 
 1. Use the Read tool to check for config file in this order:
    - `prdx.json` (project root)
-   - `.claude/prdx.json`
+   - `.prdx/config.json`
 
 2. If config file exists, extract these values:
    - `commits.format` → "conventional" or "simple"
@@ -76,7 +76,7 @@ This command orchestrates two agents in **isolated contexts**:
 
 1. Find PRD file matching the slug:
    ```bash
-   ls .claude/prds/*{slug}*.md
+   ls .prdx/prds/*{slug}*.md
    ```
 
 2. If not found, show error and list available PRDs
@@ -433,7 +433,7 @@ Next steps:
 Usage: /prdx:implement <slug>
 
 Available PRDs:
-{List PRDs from .claude/prds/}
+{List PRDs from .prdx/prds/}
 ```
 
 ### PRD Not Found

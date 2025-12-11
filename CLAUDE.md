@@ -97,7 +97,7 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
    - Agent creates comprehensive PRD
    - Returns only PRD document (~2KB)
    - User iterates until approval
-   - PRD file written to .claude/prds/{slug}.md
+   - PRD file written to .prdx/prds/{slug}.md
 
 2. Publish to GitHub (optional)
    /prdx:publish {slug}
@@ -366,7 +366,7 @@ Skills are read by agents during execution:
 
 **Validates:**
 - Git repository exists
-- `.claude/prds/` directory exists
+- `.prdx/prds/` directory exists
 - PRDs are in `.gitignore`
 
 **On failure:** Stops planning

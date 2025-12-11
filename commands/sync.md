@@ -32,7 +32,7 @@ This command analyzes the current implementation and updates the PRD to reflect:
 ```bash
 # If slug provided
 if [ -n "$SLUG" ]; then
-  PRD_FILE=$(find .claude/prds -name "*${SLUG}*.md" -type f | head -1)
+  PRD_FILE=$(find .prdx/prds -name "*${SLUG}*.md" -type f | head -1)
 fi
 
 # If no slug, detect from branch name
@@ -40,7 +40,7 @@ if [ -z "$PRD_FILE" ]; then
   BRANCH=$(git branch --show-current)
   # Extract slug from branch: feat/backend-auth -> backend-auth
   SLUG=$(echo "$BRANCH" | sed 's/^[^/]*\///')
-  PRD_FILE=$(find .claude/prds -name "*${SLUG}*.md" -type f | head -1)
+  PRD_FILE=$(find .prdx/prds -name "*${SLUG}*.md" -type f | head -1)
 fi
 
 if [ -z "$PRD_FILE" ]; then
@@ -371,14 +371,14 @@ Install: brew install gh
 ```
 User: /prdx:sync backend-auth
 
-→ Finds .claude/prds/backend-auth.md
+→ Finds .prdx/prds/backend-auth.md
 → Analyzes 8 commits on feat/backend-auth
 → Checks acceptance criteria against code
 → Updates PRD with implementation notes
 
 ✅ PRD Synced!
 
-📄 PRD: .claude/prds/backend-auth.md
+📄 PRD: .prdx/prds/backend-auth.md
 📊 Status: in-progress
 
 Acceptance Criteria:
@@ -400,7 +400,7 @@ User: /prdx:sync
 
 ✅ PRD Synced!
 
-📄 PRD: .claude/prds/android-biometric.md
+📄 PRD: .prdx/prds/android-biometric.md
 📊 Status: implemented
 
 Acceptance Criteria:
@@ -419,7 +419,7 @@ User: /prdx:sync backend-auth --github
 
 ✅ PRD Synced!
 
-📄 PRD: .claude/prds/backend-auth.md
+📄 PRD: .prdx/prds/backend-auth.md
 📊 Status: in-progress
 
 GitHub Issue #42:
@@ -435,7 +435,7 @@ User: /prdx:sync --dry-run
 
 Proposed changes:
 
-PRD: .claude/prds/backend-auth.md
+PRD: .prdx/prds/backend-auth.md
 Status: planning → in-progress
 
 Acceptance Criteria:

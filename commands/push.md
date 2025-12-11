@@ -32,7 +32,7 @@ This command is a **thin wrapper** that:
 
 **If slug provided:**
 ```bash
-ls .claude/prds/*[slug]*.md
+ls .prdx/prds/*[slug]*.md
 ```
 
 **If not provided:**
@@ -101,7 +101,7 @@ After agent returns:
 ```
 Pull Request Created!
 
-PRD: .claude/prds/{SLUG}.md
+PRD: .prdx/prds/{SLUG}.md
 PR: #{PR_NUMBER}
 URL: {PR_URL}
 
@@ -194,7 +194,7 @@ User: /prdx:push backend-auth
 
 Pull Request Created!
 
-PRD: .claude/prds/backend-auth.md
+PRD: .prdx/prds/backend-auth.md
 PR: #42
 URL: https://github.com/user/repo/pull/42
 

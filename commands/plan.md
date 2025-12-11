@@ -50,7 +50,7 @@ fi
 
 Hook validates:
 - Git repository exists
-- `.claude/prds/` directory exists
+- `.prdx/prds/` directory exists
 - PRDs are in `.gitignore`
 
 ### Phase 2: Platform Detection
@@ -146,7 +146,7 @@ fi
 
 **Write PRD:**
 ```bash
-PRD_FILE=".claude/prds/${SLUG}.md"
+PRD_FILE=".prdx/prds/${SLUG}.md"
 echo "{PRD_CONTENT}" > "$PRD_FILE"
 ```
 
@@ -154,7 +154,7 @@ echo "{PRD_CONTENT}" > "$PRD_FILE"
 ```
 PRD created and saved
 
-PRD: .claude/prds/{SLUG}.md
+PRD: .prdx/prds/{SLUG}.md
 Platform: {PLATFORM}
 Status: planning
 
@@ -247,11 +247,11 @@ User: /prdx:plan "add biometric login to Android app"
 → Agent displays for user review
 → User: "looks good"
 → Agent returns approved PRD
-→ PRD written to .claude/prds/android-biometric-login.md
+→ PRD written to .prdx/prds/android-biometric-login.md
 
 PRD created and saved
 
-PRD: .claude/prds/android-biometric-login.md
+PRD: .prdx/prds/android-biometric-login.md
 Platform: android
 Status: planning
 

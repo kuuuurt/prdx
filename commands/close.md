@@ -24,7 +24,7 @@ You are helping the user close a PRD after all implementation work is complete.
 **Find and verify the PRD:**
 
 1. **Find PRD file:**
-   - If slug provided: `ls .claude/prds/*[slug]*.md`
+   - If slug provided: `ls .prdx/prds/*[slug]*.md`
    - If multiple matches, prompt user to select
    - If not found, show error and suggest using `/prdx:list`
 
@@ -195,7 +195,7 @@ Timeline:
   Duration:   [N days]
 
 Links:
-  PRD:   .claude/prds/[filename]
+  PRD:   .prdx/prds/[filename]
   Issue: #[number] [closed ✓ / still open]
   PR:    #[number] (merged ✓)
 

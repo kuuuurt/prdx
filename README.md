@@ -113,7 +113,7 @@ You: "Can you use BiometricPrompt API instead?"
 → Updated plan displayed
 
 You: "looks good"
-→ PRD written to .claude/prds/android-biometric-auth.md
+→ PRD written to .prdx/prds/android-biometric-auth.md
 ```
 
 ### 3. Implement Feature
@@ -278,7 +278,7 @@ endpoints with Zod validation and proper error handling.
 
 PRDX looks for configuration in these locations (in order):
 1. `./prdx.json` (project root)
-2. `./.claude/prdx.json` (Claude Code directory)
+2. `./.prdx/config.json` (Claude Code directory)
 
 If no configuration file is found, default values are used.
 
@@ -332,7 +332,7 @@ Here's a complete feature development workflow:
 # → Displays updated plan
 
 "looks good"
-# → PRD written to .claude/prds/backend-oauth2-auth.md
+# → PRD written to .prdx/prds/backend-oauth2-auth.md
 
 # 3. Implement feature (Platform agent implements)
 /prdx:implement backend-oauth2-auth
@@ -361,10 +361,10 @@ Here's a complete feature development workflow:
 
 ## PRD File Structure
 
-PRDs are stored in `.claude/prds/` directory:
+PRDs are stored in `.prdx/prds/` directory:
 
 ```
-.claude/prds/
+.prdx/prds/
 ├── backend-user-auth.md
 ├── android-push-notifications.md
 └── ios-dashboard-v2.md
@@ -553,7 +553,7 @@ MIT License - Feel free to use and modify for your projects.
 For issues or questions:
 - Check `/prdx:help` for detailed command documentation
 - Review the [GitHub Issues](https://github.com/kuuuurt/prdx/issues)
-- Read PRD examples in `.claude/prds/`
+- Read PRD examples in `.prdx/prds/`
 
 ## Changelog
 

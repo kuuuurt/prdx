@@ -14,7 +14,7 @@ Execute the following phases based on the argument provided:
 
 ### Step 1: Determine Entry Point
 
-**If the argument matches an existing PRD** (check `.claude/prds/`):
+**If the argument matches an existing PRD** (check `.prdx/prds/`):
 - Read PRD and check its status
 - For multi-platform mobile PRDs, also check which platforms have been implemented (look for `## Implementation Notes (android)` and `## Implementation Notes (ios)` sections)
 - Resume from the appropriate phase:
@@ -30,7 +30,7 @@ Execute the following phases based on the argument provided:
 - Proceed to Phase 2 (planning)
 
 **If no argument provided**:
-- List existing PRDs with their status using: `ls -la .claude/prds/*.md 2>/dev/null`
+- List existing PRDs with their status using: `ls -la .prdx/prds/*.md 2>/dev/null`
 - Ask: "Start a new feature or continue an existing PRD?"
 
 ---
@@ -145,7 +145,7 @@ Run the push command:
 ```
 🎉 Feature complete!
 
-PRD: .claude/prds/[slug].md
+PRD: .prdx/prds/[slug].md
 Issue: #[issue-number] (if published)
 PR: #[pr-number]
 

@@ -14,7 +14,7 @@ argument-hint: "[slug] [--issue #123]"
 
 **Find the PRD:**
 
-1. If slug provided: `ls .claude/prds/*[slug]*.md`
+1. If slug provided: `ls .prdx/prds/*[slug]*.md`
 2. If not: list all PRDs and ask user to select
 3. **DO NOT PROCEED** without valid PRD
 
@@ -190,7 +190,7 @@ If "Create new":
 
 3. Rename file:
    ```bash
-   mv .claude/prds/[old-filename].md .claude/prds/[platform]-[issue-number].md
+   mv .prdx/prds/[old-filename].md .prdx/prds/[platform]-[issue-number].md
    ```
 
 4. Display success:
@@ -202,8 +202,8 @@ If "Create new":
    Action: [Created new issue / Linked to existing issue]
 
    PRD renamed:
-   - From: .claude/prds/[old-filename].md
-   - To:   .claude/prds/[platform]-[issue-number].md
+   - From: .prdx/prds/[old-filename].md
+   - To:   .prdx/prds/[platform]-[issue-number].md
 
    Next steps:
    - View issue: gh issue view [number] --web

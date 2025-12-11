@@ -74,14 +74,14 @@ Find or create configuration file:
 CONFIG_FILE=""
 if [ -f "prdx.json" ]; then
   CONFIG_FILE="prdx.json"
-elif [ -f ".claude/prdx.json" ]; then
-  CONFIG_FILE=".claude/prdx.json"
+elif [ -f ".prdx/config.json" ]; then
+  CONFIG_FILE=".prdx/config.json"
 fi
 
 # For init mode, decide location
 if [ "$MODE" = "init" ]; then
   if [ -d ".claude" ]; then
-    CONFIG_FILE=".claude/prdx.json"
+    CONFIG_FILE=".prdx/config.json"
   else
     CONFIG_FILE="prdx.json"
   fi
@@ -101,7 +101,7 @@ fi
 # For other modes, use existing or create default location
 if [ -z "$CONFIG_FILE" ] && [ "$MODE" != "init" ]; then
   if [ -d ".claude" ]; then
-    CONFIG_FILE=".claude/prdx.json"
+    CONFIG_FILE=".prdx/config.json"
   else
     CONFIG_FILE="prdx.json"
   fi
@@ -588,7 +588,7 @@ User: /prdx:config minimal
 
 Conventional commits with no co-author or extended descriptions
 
-Configuration saved to: .claude/prdx.json
+Configuration saved to: .prdx/config.json
 
 Example commit:
 
@@ -609,7 +609,7 @@ User: /prdx:config standard
 
 Conventional commits with co-author and extended descriptions
 
-Configuration saved to: .claude/prdx.json
+Configuration saved to: .prdx/config.json
 
 Example commit:
 
@@ -636,7 +636,7 @@ User: /prdx:config simple
 
 Simple commit format (no type prefix) with co-author and descriptions
 
-Configuration saved to: .claude/prdx.json
+Configuration saved to: .prdx/config.json
 
 Example commit:
 
@@ -661,7 +661,7 @@ User: /prdx:config show
 
 📋 Current Configuration
 
-File: .claude/prdx.json
+File: .prdx/config.json
 
 Commits:
   Format: conventional
@@ -683,7 +683,7 @@ To edit: /prdx:config
 ```
 User: /prdx:config init
 
-✅ Configuration file created: .claude/prdx.json
+✅ Configuration file created: .prdx/config.json
 
 To view: /prdx:config show
 To edit: /prdx:config
@@ -706,7 +706,7 @@ User: /prdx:config
 
 [Interactive questions via AskUserQuestion]
 
-✅ Configuration saved to .claude/prdx.json
+✅ Configuration saved to .prdx/config.json
 
 Your settings:
   Commit format: conventional
@@ -738,7 +738,7 @@ Install:
   macOS: brew install jq
   Linux: apt-get install jq
 
-Alternative: Edit manually: .claude/prdx.json
+Alternative: Edit manually: .prdx/config.json
 ```
 
 ### Invalid Setting Path
