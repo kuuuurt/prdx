@@ -76,10 +76,10 @@ Claude Code will automatically load the plugin.
 
 ### One Command Workflow
 
-Use `/prdx` for the complete workflow - it orchestrates everything with decision points:
+Use `/prdx:prdx` for the complete workflow - it orchestrates everything with decision points:
 
 ```bash
-/prdx "add biometric authentication to Android app"
+/prdx:prdx "add biometric authentication to Android app"
 ```
 
 This single command will:
@@ -89,7 +89,7 @@ This single command will:
 4. **Ask** → Create PR now?
 5. **Push** → Creates PR with comprehensive description
 
-You can stop at any decision point and resume later with `/prdx <slug>`.
+You can stop at any decision point and resume later with `/prdx:prdx <slug>`.
 
 ### Individual Commands
 
@@ -108,7 +108,7 @@ For more control, use individual commands:
 
 | Command | Description |
 |---------|-------------|
-| **`/prdx [description\|slug]`** | **Complete workflow orchestrator (recommended)** |
+| **`/prdx:prdx [description\|slug]`** | **Complete workflow orchestrator (recommended)** |
 | `/prdx:plan <description>` | Create PRD (triggers planner agent) |
 | `/prdx:implement <slug>` | Implement feature (triggers dev-planner + platform agent) |
 | `/prdx:push <slug>` | Create pull request (triggers pr-author agent) |
