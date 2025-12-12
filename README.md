@@ -74,43 +74,33 @@ Claude Code will automatically load the plugin.
 
 ## Quick Start
 
-### 1. Configure (Optional)
+### One Command Workflow
+
+Use `/prdx` for the complete workflow - it orchestrates everything with decision points:
 
 ```bash
-/prdx:config standard    # Use default settings
+/prdx "add biometric authentication to Android app"
 ```
 
-### 2. Plan a Feature
+This single command will:
+1. **Plan** → Planner agent explores codebase, creates PRD, asks for approval
+2. **Ask** → Publish to GitHub? Implement now? Stop here?
+3. **Implement** → Dev-planner creates technical plan, platform agent implements with TDD
+4. **Ask** → Create PR now?
+5. **Push** → Creates PR with comprehensive description
+
+You can stop at any decision point and resume later with `/prdx <slug>`.
+
+### Individual Commands
+
+For more control, use individual commands:
 
 ```bash
-/prdx:plan "add biometric authentication to Android app"
+/prdx:config standard                    # Configure settings (optional)
+/prdx:plan "add biometric auth"          # Create PRD
+/prdx:implement android-biometric-auth   # Implement feature
+/prdx:push android-biometric-auth        # Create PR
 ```
-
-The planner agent will:
-1. Explore your codebase
-2. Create a PRD draft
-3. Ask for your approval via AskUserQuestion
-4. Save the PRD with a designated branch name
-
-### 3. Implement
-
-```bash
-/prdx:implement android-biometric-auth
-```
-
-The implementation flow:
-1. Checks out the PRD's designated branch
-2. Dev-planner agent creates detailed technical plan
-3. Platform agent implements with TDD
-4. Creates conventional commits
-
-### 4. Create Pull Request
-
-```bash
-/prdx:push android-biometric-auth
-```
-
-Validates you're on the correct branch and creates the PR.
 
 ## Available Commands
 
@@ -118,7 +108,7 @@ Validates you're on the correct branch and creates the PR.
 
 | Command | Description |
 |---------|-------------|
-| `/prdx [description\|slug]` | Complete workflow orchestrator |
+| **`/prdx [description\|slug]`** | **Complete workflow orchestrator (recommended)** |
 | `/prdx:plan <description>` | Create PRD (triggers planner agent) |
 | `/prdx:implement <slug>` | Implement feature (triggers dev-planner + platform agent) |
 | `/prdx:push <slug>` | Create pull request (triggers pr-author agent) |
