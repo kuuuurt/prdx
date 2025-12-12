@@ -125,18 +125,23 @@ If hook fails (non-zero exit), stop and show the error.
 
 1. Get current branch: `git branch --show-current`
 2. Determine default branch (main or master)
-3. Generate branch name if not in PRD:
-   - feature → `feat/{slug}`
-   - bug-fix → `fix/{slug}`
-   - refactor → `refactor/{slug}`
-   - spike → `chore/{slug}`
+3. **Read branch from PRD** - The PRD's `**Branch:**` field contains the designated branch
+   - If Branch field is missing, error: "PRD missing Branch field. Re-run /prdx:plan to regenerate."
 
 4. If on default branch, checkout/create the feature branch:
    ```bash
-   git checkout -b {branch} 2>/dev/null || git checkout {branch}
+   git checkout -b {BRANCH_FROM_PRD} 2>/dev/null || git checkout {BRANCH_FROM_PRD}
    ```
 
-5. Update PRD with branch name if it was generated
+5. If already on a different feature branch, warn user:
+   ```
+   ⚠️  Currently on branch '{CURRENT}' but PRD expects '{BRANCH_FROM_PRD}'
+
+   Each PRD corresponds to exactly one branch.
+   Switch to the correct branch? (y/n)
+   ```
+
+**Important:** Each PRD = 1 branch = 1 PR. Do not create new branches for existing PRDs.
 
 ### Step 5: Platform Implementation Loop
 

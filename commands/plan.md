@@ -115,13 +115,21 @@ prompt: "Create a PRD for: {DESCRIPTION}
 Explore the codebase, assess feasibility, and create a business-focused PRD.
 Iterate with the user until they approve the plan.
 
-When approved, return the final PRD document."
+When approved, return the final PRD document with Branch field included."
 ```
 
 **For mobile PRDs (PLATFORM="mobile"):**
 - Pass both PLATFORM and PLATFORMS to the agent
 - Agent will include `Platforms:` field in PRD header
 - Implementation will run sequentially per platform
+
+**Branch naming (included in PRD by agent):**
+- feature → `feat/{slug}`
+- bug-fix → `fix/{slug}`
+- refactor → `refactor/{slug}`
+- spike → `chore/{slug}`
+
+Each PRD gets exactly one branch. This branch is used for all implementation and the eventual PR.
 
 **Agent runs in isolated context:**
 - Explores codebase (file contents stay in agent's context)

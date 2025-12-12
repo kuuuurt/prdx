@@ -49,10 +49,28 @@ Which PRD? (enter number or slug)
 
 ```bash
 # Get current branch
-BRANCH=$(git branch --show-current)
+CURRENT_BRANCH=$(git branch --show-current)
+
+# Read expected branch from PRD
+EXPECTED_BRANCH=$(grep "^\*\*Branch:\*\*" "$PRD_FILE" | sed 's/\*\*Branch:\*\* //')
+
+# Validate branch matches PRD
+if [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ]; then
+  echo "⚠️  Branch mismatch"
+  echo ""
+  echo "Current branch: $CURRENT_BRANCH"
+  echo "PRD expects:    $EXPECTED_BRANCH"
+  echo ""
+  echo "Each PRD = 1 branch = 1 PR"
+  echo ""
+  echo "Options:"
+  echo "1. Switch to correct branch: git checkout $EXPECTED_BRANCH"
+  echo "2. Cancel and verify you're working on the right PRD"
+  exit 1
+fi
 
 # Check not on main
-if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
   echo "Cannot create PR from default branch"
   exit 1
 fi
@@ -65,8 +83,10 @@ if [ -z "$COMMITS" ]; then
 fi
 
 # Push if needed
-git push -u origin "$BRANCH"
+git push -u origin "$CURRENT_BRANCH"
 ```
+
+**Important:** Each PRD corresponds to exactly one branch and one PR. The push command validates that you're on the correct branch before creating the PR.
 
 ### Phase 3: Invoke PR Author Agent
 

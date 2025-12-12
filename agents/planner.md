@@ -50,6 +50,7 @@ Return the PRD in this exact format:
 **Platforms:** android, ios (only include for mobile - list target platforms)
 **Status:** planning
 **Created:** [DATE]
+**Branch:** [BRANCH_NAME]
 
 ## Problem
 
@@ -132,7 +133,16 @@ When approved, output the final PRD with this header:
 [PRD content here]
 
 Suggested slug: [slug]
+Suggested branch: [branch]
 ```
+
+**Branch naming convention:**
+- feature → `feat/{slug}`
+- bug-fix → `fix/{slug}`
+- refactor → `refactor/{slug}`
+- spike → `chore/{slug}`
+
+Include the branch name in the PRD's `**Branch:**` field.
 
 ## What Stays in Your Context (Isolated)
 

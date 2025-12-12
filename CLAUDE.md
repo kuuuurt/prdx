@@ -82,6 +82,8 @@ Plan (asks: Android & iOS, Android only, or iOS only?)
 
 The `/prdx` command orchestrates the entire workflow with decision points at each phase.
 
+**1 PRD = 1 Branch = 1 PR:** Each PRD gets a unique branch name at planning time. All implementation happens on that branch, and the PR is created from it.
+
 **Multi-platform mobile implementation is sequential** to learn from the first platform before implementing the second.
 
 ### Individual Commands (Context-Isolated)
@@ -94,10 +96,11 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
    ↓
    - Pre-plan hook validates environment
    - prdx:planner agent (ISOLATED) explores codebase
-   - Agent creates comprehensive PRD
+   - Agent creates comprehensive PRD with Branch field
    - Returns only PRD document (~2KB)
    - User iterates until approval
    - PRD file written to .prdx/prds/{slug}.md
+   - Branch name set: feat/{slug} (or fix/, refactor/, chore/)
 
 2. Publish to GitHub (optional)
    /prdx:publish {slug}
@@ -112,7 +115,7 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
    /prdx:implement {slug} ios      (for multi-platform: iOS only)
    ↓
    - Pre-implement hook validates PRD
-   - Git branch created/checked out
+   - Checks out PRD's designated branch (from Branch field)
    - For each target platform (sequentially):
      - prdx:dev-planner agent (ISOLATED) creates dev plan
      - Returns only dev plan (~3KB)
@@ -124,9 +127,10 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
 4. Create Pull Request
    /prdx:push {slug}
    ↓
-   - Validates implementation state
+   - Validates current branch matches PRD's Branch field
    - prdx:pr-author agent (ISOLATED) creates PR
    - Returns only PR URL and number (~100B)
+   - Each PRD gets exactly one PR
 ```
 
 **Why Context Isolation?**
