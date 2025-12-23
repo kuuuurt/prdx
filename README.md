@@ -130,6 +130,12 @@ For more control, use individual commands:
 | `/prdx:publish <slug>` | Create GitHub issue from PRD |
 | `/prdx:sync <slug>` | Sync PRD with GitHub issue |
 
+### Code Quality
+
+| Command | Description |
+|---------|-------------|
+| `/prdx:optimize [files]` | Simplify code (defaults to changed files on branch) |
+
 ### Help
 
 | Command | Description |

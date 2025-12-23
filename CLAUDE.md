@@ -38,6 +38,7 @@ prdx/
 │   ├── close.md             # Close PRD
 │   ├── publish.md           # Create GitHub issue
 │   ├── sync.md              # Sync with GitHub
+│   ├── optimize.md          # Code cleanup/simplification
 │   └── help.md              # Documentation
 ├── hooks/prdx/              # Validation hooks
 │   ├── pre-plan.sh          # Pre-planning validation
@@ -241,6 +242,7 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
 - `/prdx:close` - Update PRD status to completed
 - `/prdx:publish` - Create GitHub issue from PRD
 - `/prdx:sync` - Sync PRD with GitHub issue
+- `/prdx:optimize` - Simplify code (remove comments, inline single-use vars/functions)
 
 All are thin wrappers around bash/git/gh CLI.
 

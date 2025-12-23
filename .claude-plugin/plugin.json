@@ -1,6 +1,6 @@
 {
   "name": "prdx",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Streamlined PRD workflow with agent-powered planning, context-aware implementation, and local metrics",
   "author": {
     "name": "Kurt",
