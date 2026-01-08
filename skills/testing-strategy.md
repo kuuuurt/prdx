@@ -1,6 +1,6 @@
 # Testing Strategy Skill
 
-Expert skill for generating **effective, efficient** testing strategies based on feature type and platform.
+Expert skill for generating **effective, efficient** testing strategies based on feature type and platform. Agents should **discover the actual test framework from the codebase** and adapt accordingly.
 
 ## Testing Philosophy
 
@@ -38,26 +38,19 @@ Expert skill for generating **effective, efficient** testing strategies based on
 
 ## Platform-Specific Testing Approaches
 
-### Backend (TypeScript + Hono + Bun)
+### Backend
 
-**Test Structure:**
-```
-backend-project/
-├── src/
-│   ├── routes/
-│   │   └── __tests__/
-│   ├── services/
-│   │   └── __tests__/
-│   └── utils/
-│       └── __tests__/
-```
+**Discover test framework from:** `package.json`, `requirements.txt`, etc.
+- Node.js: Jest, Vitest, Bun test, Mocha
+- Python: pytest, unittest
+- Go: testing package
+- Java/Kotlin: JUnit
 
 **Unit Tests:**
 - Business logic in services
 - Utility functions
-- Validation schemas (Zod)
+- Validation logic
 - Data transformations
-- Use Bun's native test runner
 
 **Integration Tests:**
 - API endpoint flows (request → response)
@@ -66,120 +59,75 @@ backend-project/
 - Authentication/authorization flows
 - Error handling scenarios
 
-**Testing Patterns (Given-When-Then):**
+**Testing Pattern (Given-When-Then):**
 
-```typescript
-// ✅ GOOD: Test end-to-end API flow
-describe('POST /api/driver/location', () => {
-  test('broadcasts location to riders', async () => {
-    // Given: Authenticated driver
-    const driverId = 'driver-123'
-    const token = generateAuthToken(driverId)
+```
+// Test end-to-end API flow
+describe('POST /api/resource', () => {
+  test('creates resource with valid data', async () => {
+    // Given: Authenticated user with valid input
+    const token = generateAuthToken(userId)
+    const input = { name: 'Test', value: 123 }
 
-    // When: Driver sends location update
-    const response = await app.request('/api/driver/location', {
+    // When: Request is made
+    const response = await app.request('/api/resource', {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ lat: 37.7749, lng: -122.4194 })
+      body: JSON.stringify(input)
     })
 
-    // Then: Location is saved and broadcast
-    expect(response.status).toBe(200)
-    expect(await getDriverLocation(driverId)).toMatchObject({
-      lat: 37.7749,
-      lng: -122.4194
+    // Then: Resource is created
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      id: expect.any(String),
+      name: 'Test'
     })
   })
 
-  test('rejects invalid coordinates', async () => {
-    // Given: Authenticated driver
-    const token = generateAuthToken('driver-123')
-
-    // When: Driver sends invalid location
-    const response = await app.request('/api/driver/location', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ lat: 999, lng: -122 })
-    })
-
+  test('rejects invalid data', async () => {
+    // Given: Invalid input
+    // When: Request is made
     // Then: Request rejected with validation error
     expect(response.status).toBe(400)
-    expect(await response.json()).toMatchObject({
-      error: 'Invalid coordinates'
-    })
   })
-})
-
-// ❌ BAD: Testing implementation details
-test('validateLocation calls latitudeValidator', () => {
-  const spy = vi.spyOn(validators, 'latitudeValidator')
-  validateLocation({ lat: 37, lng: -122 })
-  expect(spy).toHaveBeenCalled() // Who cares? Test the result!
-})
-
-// ✅ GOOD: Test the contract
-test('validateLocation accepts valid coordinates', () => {
-  // Given: Valid coordinates
-  const location = { lat: 37.7749, lng: -122.4194 }
-
-  // When: Validating
-  const result = validateLocation(location)
-
-  // Then: Validation passes
-  expect(result.isValid).toBe(true)
 })
 ```
 
 **What to Test:**
-- ✅ API endpoints (full request → response)
-- ✅ Authentication/authorization (access control)
-- ✅ Validation (reject bad input)
-- ✅ Error handling (timeouts, failures)
-- ✅ Business logic (core rules)
+- API endpoints (full request → response)
+- Authentication/authorization (access control)
+- Validation (reject bad input)
+- Error handling (timeouts, failures)
+- Business logic (core rules)
 
 **What NOT to Test:**
-- ❌ Framework internals (Hono's routing)
-- ❌ Third-party libraries (Zod validation)
-- ❌ Trivial code (getters/setters)
-- ❌ Implementation details (which functions are called)
+- Framework internals
+- Third-party library code
+- Trivial code (getters/setters)
+- Implementation details (which internal functions are called)
 
-**Commands:**
-```bash
-bun test                    # Run all tests
-bun test --watch           # Watch mode
-bun test --coverage        # With coverage
-bun test routes/users      # Specific test
-```
+### Android (Kotlin + Compose)
 
-### Android (Kotlin + Jetpack Compose)
-
-**Test Structure:**
-```
-android-project/
-├── app/src/
-│   ├── test/              # Unit tests
-│   ├── androidTest/       # Instrumentation tests
-│   └── sharedTest/        # Shared test utilities
-```
+**Test framework:** JUnit4/5 + Compose Testing (native)
+- Discover mocking library from build.gradle: MockK, Mockito
+- Discover flow testing: Turbine
 
 **Unit Tests:**
 - ViewModel logic
 - Repository implementations
 - Data transformations
 - Business rules
-- Use JUnit 4/5 + MockK
 
 **Instrumentation Tests:**
 - Compose UI components
 - Navigation flows
-- Database operations (Room)
+- Database operations (if applicable)
 - Repository with real data sources
-- Use Espresso + Compose Testing
 
-**UI Testing Patterns (Given-When-Then):**
+**UI Testing Pattern (Given-When-Then):**
 
 ```kotlin
-// ✅ GOOD: Test user-facing behavior
+// Test user-facing behavior
 @Test
 fun `user can login with valid credentials`() {
     // Given: Login screen is displayed
@@ -204,7 +152,7 @@ fun `user can login with valid credentials`() {
         .assertIsDisplayed()
 }
 
-// ✅ GOOD: Test ViewModel behavior (end result)
+// Test ViewModel behavior (end result)
 @Test
 fun `login succeeds with valid credentials`() = runTest {
     // Given: Valid credentials
@@ -220,97 +168,78 @@ fun `login succeeds with valid credentials`() = runTest {
     assertNull(state.error)
 }
 
-// ❌ BAD: Testing implementation details
-@Test
-fun `login calls repository login method`() {
-    val spy = spyk(repository)
-    viewModel.login("email", "pass")
-    verify { spy.login(any(), any()) } // Who cares? Test the outcome!
-}
-
-// ✅ GOOD: Test error handling
+// Test error handling
 @Test
 fun `login fails with invalid credentials`() = runTest {
-    // Given: Invalid credentials
-    coEvery { repository.login(any(), any()) } returns
-        Result.failure(Exception("Invalid credentials"))
-
+    // Given: Invalid credentials (mock failure)
     // When: User attempts login
-    viewModel.login("wrong@example.com", "wrong")
-
     // Then: Error is shown
-    val state = viewModel.state.value
-    assertFalse(state.isAuthenticated)
-    assertEquals("Invalid credentials", state.error)
 }
 ```
 
 **What to Test:**
-- ✅ User flows (login, navigation, submission)
-- ✅ ViewModel state changes (input → state)
-- ✅ Error handling (network failures, validation)
-- ✅ Data transformations (DTO → UI model)
+- User flows (login, navigation, submission)
+- ViewModel state changes (input → state)
+- Error handling (network failures, validation)
+- Data transformations (DTO → UI model)
 
 **What NOT to Test:**
-- ❌ Compose recomposition logic
-- ❌ Android framework internals
-- ❌ Repository method calls (test outcomes)
-- ❌ Private functions
-
-**Commands:**
-```bash
-./gradlew test                          # Unit tests
-./gradlew testDebugUnitTest            # Debug unit tests
-./gradlew connectedDebugAndroidTest    # Instrumentation tests
-./gradlew createDebugCoverageReport    # Coverage report
-```
+- Compose recomposition logic
+- Android framework internals
+- Repository method calls (test outcomes instead)
+- Private functions
 
 ### iOS (Swift + SwiftUI)
 
-**Test Structure:**
-```
-ios-project/
-├── Tests/
-│   ├── UnitTests/
-│   ├── ViewModelTests/
-│   └── IntegrationTests/
-├── UITests/
-│   └── Screenshots/
-```
+**Test framework:** XCTest (native)
+- Discover UI testing approach from project
 
 **Unit Tests:**
 - ViewModel logic
 - Business rules
 - Data transformations
 - Repository implementations
-- Use XCTest
 
 **UI Tests:**
 - Critical user flows
 - Navigation scenarios
 - Error state handling
-- Screenshot generation
-- Use XCTest UI Testing
+- Screenshot generation (optional)
 
-**Testing Patterns:**
+**Testing Pattern:**
 ```swift
-func testLoginFlow() async throws {
-    let viewModel = LoginViewModel(
-        authService: MockAuthService()
-    )
+func testLoginSuccess() async throws {
+    // Given: Mock service returns success
+    let mockService = MockAuthService()
+    mockService.loginResult = .success(User(id: "1", name: "Test"))
 
+    let viewModel = LoginViewModel(authService: mockService)
+
+    // When: User attempts login
     await viewModel.login(email: "test@example.com", password: "pass")
 
+    // Then: User is authenticated
     XCTAssertTrue(viewModel.isAuthenticated)
     XCTAssertNil(viewModel.error)
 }
+
+func testLoginFailure() async throws {
+    // Given: Mock service returns error
+    // When: User attempts login
+    // Then: Error is displayed
+}
 ```
 
-**Commands:**
-```bash
-xcodebuild test -scheme YourApp -destination 'platform=iOS Simulator,name=iPhone 15'
-xcodebuild test -scheme YourAppUITests # UI tests with screenshots
-```
+**What to Test:**
+- ViewModel state changes
+- Service method results
+- Error handling
+- User flows (login, navigation)
+
+**What NOT to Test:**
+- SwiftUI view rendering
+- Framework behavior
+- Trivial code
 
 ## Feature-Type Testing Strategies
 
@@ -344,16 +273,6 @@ xcodebuild test -scheme YourAppUITests # UI tests with screenshots
    - Error states display properly
    - Loading states display properly
 
-3. **Screenshot Tests**:
-   - Light/dark mode
-   - Different screen sizes
-   - Empty states
-   - Error states
-   - Loaded states
-
-**Backend Tests Required** (if new API):
-- See "New API Endpoint" strategy
-
 ### Data Layer Changes
 
 **Tests Required:**
@@ -361,7 +280,6 @@ xcodebuild test -scheme YourAppUITests # UI tests with screenshots
 2. **Repository Tests**: CRUD operations work
 3. **Data Integrity**: Constraints enforced
 4. **Backward Compatibility**: Old data handled gracefully
-5. **Performance**: Queries are efficient
 
 ### Authentication/Authorization
 
@@ -374,12 +292,10 @@ xcodebuild test -scheme YourAppUITests # UI tests with screenshots
 2. **Permissions**:
    - Role-based access enforced
    - Unauthorized access blocked
-   - Permission changes reflected
 
 3. **Security**:
    - Tokens not logged
-   - Secure storage (Keychain/KeyStore)
-   - MITM protection
+   - Secure storage used
 
 ### Third-Party Integration
 
@@ -388,7 +304,6 @@ xcodebuild test -scheme YourAppUITests # UI tests with screenshots
 2. **Error Handling**: Service timeout/failure handled
 3. **Data Transformation**: API response → internal model
 4. **Retry Logic**: Failures trigger retries appropriately
-5. **Fallback**: Degraded functionality when service unavailable
 
 ## Test Coverage Goals
 
@@ -399,13 +314,13 @@ xcodebuild test -scheme YourAppUITests # UI tests with screenshots
 
 ### Android
 - **Unit Tests**: >70% coverage for ViewModels/Repositories
-- **UI Tests**: Critical user flows (login, booking, payment)
-- **Screenshot Tests**: Key screens in all states
+- **UI Tests**: Critical user flows
+- **Screenshot Tests**: Key screens (optional)
 
 ### iOS
 - **Unit Tests**: >70% coverage for ViewModels/business logic
 - **UI Tests**: Critical user flows
-- **Snapshot Tests**: Key screens
+- **Snapshot Tests**: Key screens (optional)
 
 ## Testing Checklist Template
 
@@ -427,40 +342,24 @@ When creating a testing strategy for a PRD, include:
 - [ ] [Critical flow]: [Step-by-step verification]
 - [ ] [Edge case]: [Manual verification needed]
 
-### Performance Tests (If Applicable)
-- [ ] [Scenario]: [Performance baseline/threshold]
-
 ## Commands Reference
 
-### Backend
-```bash
-bun test                          # All tests
-bun test --coverage               # With coverage
-bun test --watch                  # Watch mode
-bun test <pattern>                # Specific tests
-```
+**Discover test commands from project configuration:**
+- Check `package.json` scripts for backend
+- Check `build.gradle` tasks for Android
+- Check Xcode scheme for iOS
 
-### Android
-```bash
-./gradlew test                              # Unit tests
-./gradlew connectedDebugAndroidTest         # Instrumentation tests
-./gradlew createDebugCoverageReport         # Coverage
-./gradlew testDebugUnitTest --tests "*.LoginViewModelTest"
-```
-
-### iOS
-```bash
-xcodebuild test -scheme YourApp -destination 'platform=iOS Simulator,name=iPhone 15'
-xcodebuild test -only-testing:YourAppTests/LoginViewModelTests
-xcodebuild test -scheme YourAppUITests  # UI + screenshots
-```
+**Common patterns:**
+- Backend: `npm test`, `yarn test`, `bun test`, `pytest`, `go test`
+- Android: `./gradlew test`, `./gradlew connectedAndroidTest`
+- iOS: `xcodebuild test -scheme YourApp`
 
 ## Usage in PRD Workflow
 
 This skill is used to:
 1. Generate Testing phase in PRD Implementation section
-2. Provide test scenarios during /prd:dev:start implementation
-3. Validate test coverage during /prd:dev:check
+2. Provide test scenarios during /prdx:implement
+3. Validate test coverage during implementation
 4. Suggest additional test cases based on feature complexity
 
 ## Output Format
@@ -477,7 +376,7 @@ When generating a testing strategy, provide:
 - [Specific coverage percentage for each layer]
 
 **Commands:**
-- [Platform-specific commands to run tests]
+- [Platform-specific commands discovered from project]
 
 **Risks:**
 - [Testing challenges or areas needing extra attention]

@@ -134,42 +134,85 @@ Analyze the changes and generate an appropriate commit message:
 3. Determine the type (feat, fix, refactor, etc.)
 4. Write a concise summary
 
-**Display proposed message:**
+**Display proposed message based on config:**
 
 ```
 📝 Proposed commit:
 
 {TYPE}: {SUBJECT}
+```
 
-{EXTENDED_DESCRIPTION if enabled}
+**Then ONLY add these sections if their corresponding setting is enabled:**
 
-{CLAUDE_LINK if enabled}
+- If `EXTENDED_DESC_ENABLED` is `true`: Add blank line + extended description
+- If `CLAUDE_LINK_ENABLED` is `true`: Add blank line + Claude Code link
+- If `COAUTHOR_ENABLED` is `true`: Add blank line + Co-Authored-By line
 
-{CO_AUTHOR if enabled}
+**Example proposal when extendedDescription is DISABLED:**
+```
+📝 Proposed commit:
+
+feat: add user authentication
+
+Proceed? (y/n/edit)
+```
+
+**Example proposal when extendedDescription is ENABLED:**
+```
+📝 Proposed commit:
+
+feat: add user authentication
+
+Implement authentication endpoints with JWT token generation
+and password hashing using bcrypt.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
 
 Proceed? (y/n/edit)
 ```
 
 ### Phase 4: Build Commit Message
 
-Build the commit message based on configuration:
+**CRITICAL: Build the commit message STRICTLY based on the configuration values loaded in Phase 1.**
 
-**Line 1 (Subject):**
-- If `conventional`: `{type}: {description}`
-- If `simple`: `{description}`
+**STRICT RULES - READ CAREFULLY:**
 
-**Extended Description (if enabled):**
+1. **If `EXTENDED_DESC_ENABLED` is `false`:**
+   - The commit message is ONLY the subject line
+   - DO NOT add any description after the subject
+   - DO NOT add blank lines after the subject (unless needed for trailers below)
+   - The commit should be concise, single-purpose
+
+2. **If `CLAUDE_LINK_ENABLED` is `false`:**
+   - DO NOT include the Claude Code link line
+   - DO NOT include the 🤖 emoji line at all
+
+3. **If `COAUTHOR_ENABLED` is `false`:**
+   - DO NOT include the Co-Authored-By line
+
+**Build the message in this order:**
+
+**Line 1 (Subject) - ALWAYS REQUIRED:**
+- If `COMMIT_FORMAT` is `conventional`: `{type}: {description}`
+- If `COMMIT_FORMAT` is `simple`: `{description}`
+
+**Extended Description - ONLY if `EXTENDED_DESC_ENABLED` is `true`:**
 - Blank line
 - Detailed explanation of the changes
 - What and why (not how)
+- **SKIP ENTIRELY if `EXTENDED_DESC_ENABLED` is `false`**
 
-**Claude Code Link (if enabled):**
+**Claude Code Link - ONLY if `CLAUDE_LINK_ENABLED` is `true`:**
 - Blank line
 - `🤖 Generated with [Claude Code](https://claude.com/claude-code)`
+- **SKIP ENTIRELY if `CLAUDE_LINK_ENABLED` is `false`**
 
-**Co-Author (if enabled):**
+**Co-Author - ONLY if `COAUTHOR_ENABLED` is `true`:**
 - Blank line
 - `Co-Authored-By: {name} <{email}>`
+- **SKIP ENTIRELY if `COAUTHOR_ENABLED` is `false`**
 
 ### Phase 5: Create Commit
 
@@ -182,7 +225,7 @@ EOF
 )"
 ```
 
-**Example with all options enabled (conventional):**
+**Example with all options enabled (conventional format, extendedDescription=true):**
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -198,7 +241,27 @@ EOF
 )"
 ```
 
-**Example with minimal options (simple format, no extras):**
+**Example with extendedDescription DISABLED (conventional format):**
+
+```bash
+git commit -m "$(cat <<'EOF'
+feat: add user authentication
+EOF
+)"
+```
+
+**Example with extendedDescription DISABLED but co-author enabled (conventional format):**
+
+```bash
+git commit -m "$(cat <<'EOF'
+feat: add user authentication
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+)"
+```
+
+**Example with simple format and extendedDescription DISABLED:**
 
 ```bash
 git commit -m "$(cat <<'EOF'
@@ -206,6 +269,8 @@ add user authentication
 EOF
 )"
 ```
+
+**IMPORTANT: When `extendedDescription.enabled` is `false`, there should be NO multi-line explanation of changes. The subject line IS the entire commit message (plus optional trailers like co-author).**
 
 ### Phase 6: Display Result
 
@@ -401,11 +466,12 @@ Insertions: +45
 Deletions: -0
 ```
 
-### Auto-Generated Message
+### Auto-Generated Message (with extendedDescription ENABLED)
 
 ```
 User: /prdx:commit
 
+→ Loads prdx.json: extendedDescription.enabled = true
 → Analyzes staged changes
 → Determines: new auth module files
 → Proposes: "feat: add authentication module"
@@ -427,6 +493,29 @@ User: y
 
 ✅ Commit created!
 ```
+
+### Auto-Generated Message (with extendedDescription DISABLED)
+
+```
+User: /prdx:commit
+
+→ Loads prdx.json: extendedDescription.enabled = false
+→ Analyzes staged changes
+→ Determines: new auth module files
+→ Proposes: "feat: add authentication module"
+
+📝 Proposed commit:
+
+feat: add authentication module
+
+Proceed? (y/n/edit)
+
+User: y
+
+✅ Commit created!
+```
+
+**Note:** When extendedDescription is disabled, the commit is just the subject line. NO extended description is added.
 
 ### Commit All Changes
 
