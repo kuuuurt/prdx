@@ -3,6 +3,18 @@ description: "Implement feature by delegating to platform-specific agent"
 argument-hint: "[slug]"
 ---
 
+## Pre-Computed Context
+
+```bash
+echo "=== Git Context ==="
+echo "Branch: $(git branch --show-current)"
+echo "Default: $(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')"
+git status --short
+echo ""
+echo "=== Available PRDs ==="
+ls -1 .prdx/prds/*.md 2>/dev/null | xargs -I{} basename {} .md || echo "No PRDs found"
+```
+
 # /prdx:implement - Implement Feature
 
 Two-phase implementation: **Dev Planning** (prdx:dev-planner) → **Development** (Platform agent)
@@ -224,6 +236,13 @@ Then add based on config:
    - Lines 3+: Extended description explaining WHAT changed and WHY
 ```
 
+**If extendedDescription.enabled is FALSE:**
+```
+   - DO NOT add any extended description
+   - The subject line is the ENTIRE commit message (except for optional trailers)
+   - There should be NO blank line followed by explanation text
+```
+
 **If includeClaudeCodeLink is true:**
 ```
    - Empty line
@@ -236,7 +255,9 @@ Then add based on config:
    - Co-Authored-By: {coAuthor.name} <{coAuthor.email}>
 ```
 
-**Add an example commit** showing the exact format based on config. For example, with all options enabled (conventional format):
+**Add an example commit** showing the exact format based on config.
+
+**Example with all options ENABLED (conventional format):**
 
 ```
    **Example commit (FOLLOW THIS FORMAT EXACTLY):**
@@ -254,6 +275,39 @@ Then add based on config:
    EOF
    )"
    ```
+```
+
+**Example with extendedDescription DISABLED (conventional format):**
+
+```
+   **Example commit (FOLLOW THIS FORMAT EXACTLY):**
+
+   ```bash
+   git commit -m "$(cat <<'EOF'
+   feat: add user authentication
+   EOF
+   )"
+   ```
+
+   NOTE: When extendedDescription is disabled, the commit is ONLY the subject line.
+   Do NOT add any description paragraph.
+```
+
+**Example with extendedDescription DISABLED but coAuthor ENABLED:**
+
+```
+   **Example commit (FOLLOW THIS FORMAT EXACTLY):**
+
+   ```bash
+   git commit -m "$(cat <<'EOF'
+   feat: add user authentication
+
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   EOF
+   )"
+   ```
+
+   NOTE: Only trailers (Co-Authored-By) appear, NO description paragraph.
 ```
 
 #### Step 5c: Invoke Platform Agent
@@ -403,11 +457,13 @@ fi
 
 📄 PRD: {PRD_FILE}
 🌿 Branch: {BRANCH}
+📋 Status: review
 ✅ Tests: All passing
 
 Next steps:
-1. Review the implementation
-2. Create PR: /prdx:push {slug}
+1. Test the implementation
+2. If bugs found: describe them and I'll fix them
+3. When ready: /prdx:push {slug}
 ```
 
 **For multi-platform mobile PRDs:**
@@ -416,14 +472,16 @@ Next steps:
 
 📄 PRD: {PRD_FILE}
 🌿 Branch: {BRANCH}
+📋 Status: review
 
 Platforms completed:
   ✅ Android - {ANDROID_SUMMARY}
   ✅ iOS - {IOS_SUMMARY}
 
 Next steps:
-1. Review the implementation for both platforms
-2. Create PR: /prdx:push {slug}
+1. Test the implementation on both platforms
+2. If bugs found: describe them and I'll fix them
+3. When ready: /prdx:push {slug}
 ```
 
 ---
@@ -466,9 +524,9 @@ Fix the issues and try again.
 
 | Platform | Agent | Specialization |
 |----------|-------|----------------|
-| backend | prdx:backend-developer | TypeScript, Hono, Bun, OpenAPI |
-| android | prdx:android-developer | Kotlin, Compose, MVVM, Hilt |
-| ios | prdx:ios-developer | Swift, SwiftUI, MVVM, async/await |
+| backend | prdx:backend-developer | APIs, services, validation (discovers framework from codebase) |
+| android | prdx:android-developer | Kotlin, Compose, MVVM (discovers DI/persistence from codebase) |
+| ios | prdx:ios-developer | Swift, SwiftUI, MVVM (discovers dependencies from codebase) |
 
 ---
 

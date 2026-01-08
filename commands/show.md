@@ -51,7 +51,7 @@
    - If no match → SEARCH mode
 
 2. **Parse filters:**
-   - Extract `--status` value (draft, published, in-progress, in-review, implemented, completed)
+   - Extract `--status` value (draft, published, in-progress, review, implemented, completed)
    - Extract `--platform` value (backend, android, ios, web)
 
 3. **Determine mode:**
@@ -101,7 +101,7 @@ BACKEND (3)
 
 ANDROID (5)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  in-review   Production Observability (#218 → PR #230)
+  review      Production Observability (#218 → PR #230)
               Created: 2025-11-04 | 2 reviews pending
 
   draft       Optimize LoginViewModel
@@ -335,7 +335,7 @@ Quick commands:
 7. **Adapt display based on status:**
    - **draft**: Show planning info, suggest publish or start
    - **in-progress**: Show detailed tasks, git status, next steps
-   - **in-review**: Emphasize PR status, reviews needed
+   - **review**: Emphasize testing status, user confirms before PR
    - **completed**: Show summary, timeline, what's unblocked
 
 ---

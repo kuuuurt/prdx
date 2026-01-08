@@ -19,8 +19,8 @@ if [ -z "$PRD_FILE" ]; then
     exit 0  # Don't fail, just warn
 fi
 
-# Update status to implemented
-sed -i.bak 's/^\*\*Status:\*\* .*/\*\*Status:\*\* implemented/' "$PRD_FILE"
+# Update status to review (user must confirm before pushing)
+sed -i.bak 's/^\*\*Status:\*\* .*/\*\*Status:\*\* review/' "$PRD_FILE"
 rm "${PRD_FILE}.bak"
 
 # Add implementation timestamp if not present
@@ -35,5 +35,6 @@ if ! grep -q "^**Implemented:**" "$PRD_FILE"; then
     fi
 fi
 
-echo "✓ Updated PRD status to 'implemented'"
+echo "✓ Updated PRD status to 'review'"
+echo "  Test the implementation, then run /prdx:push to create PR"
 exit 0

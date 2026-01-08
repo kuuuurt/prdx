@@ -21,10 +21,12 @@ The agent runs in an **isolated context** to minimize main conversation context 
 
 This command is a **thin wrapper** that:
 1. Finds and validates the PRD file
-2. Validates git state (branch, commits, pushed)
-3. Invokes `prdx:pr-author` agent (isolated context)
-4. Agent creates PR and updates PRD
-5. Returns only PR URL and number
+2. **Confirms implementation is ready** (if status is `review`)
+3. Validates git state (branch, commits, pushed)
+4. Updates PRD status to `implemented`
+5. Invokes `prdx:pr-author` agent (isolated context)
+6. Agent creates PR and updates PRD
+7. Returns only PR URL and number
 
 ## Workflow
 
@@ -36,14 +38,37 @@ ls .prdx/prds/*[slug]*.md
 ```
 
 **If not provided:**
-List all PRDs with status "implemented" or "in-progress":
+List all PRDs with status "review" or "implemented":
 ```
 PRDs ready for PR:
-1. backend-auth (implemented)
-2. android-biometric (in-progress)
+1. backend-auth (review)
+2. android-biometric (implemented)
 
 Which PRD? (enter number or slug)
 ```
+
+### Phase 1a: Confirm Ready for PR
+
+**If PRD status is `review`:**
+
+Use AskUserQuestion to confirm the implementation is ready:
+
+- Option 1: "Yes, implementation is ready" (Recommended)
+- Option 2: "No, I found issues to fix"
+
+**If user confirms ready:**
+- Update PRD status to `implemented`:
+  ```bash
+  sed -i '' 's/^\*\*Status:\*\* review/\*\*Status:\*\* implemented/' "$PRD_FILE"
+  ```
+- Continue to Phase 2
+
+**If user found issues:**
+- Tell user to describe the issues for fixing
+- End workflow (they can resume with `/prdx [slug]` after fixing)
+
+**If PRD status is already `implemented`:**
+- Skip confirmation, proceed to Phase 2
 
 ### Phase 2: Validate Git State
 
@@ -130,6 +155,7 @@ Next steps:
 2. Request reviewers
 3. Address feedback
 4. Merge when approved
+5. Close PRD: /prdx:close {SLUG}
 
 To view PR: gh pr view {PR_NUMBER} --web
 ```
@@ -205,6 +231,9 @@ This keeps the main conversation context minimal.
 ```
 User: /prdx:push backend-auth
 
+→ Finds PRD: .prdx/prds/backend-auth.md
+→ Status is "review" - confirms implementation is ready
+→ User confirms → Status updated to "implemented"
 → Validates git state
 → prdx:pr-author agent invoked (isolated context)
 → Agent reads PRD, analyzes commits

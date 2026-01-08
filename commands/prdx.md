@@ -22,8 +22,8 @@ Execute the following phases based on the argument provided:
   - `published` → Implement (Phase 3)
   - `in-progress` → Continue implementation (Phase 3)
     - For multi-platform: Check which platforms are done, resume with remaining platform
+  - `review` → Ask user: Fix issues OR Create PR (Phase 3a)
   - `implemented` → Create PR (Phase 4)
-  - `review` → Create PR (Phase 4)
   - `completed` → Inform user the PRD is done
 
 **If the argument is a feature description** (not an existing PRD):
@@ -129,6 +129,29 @@ Implementation runs **sequentially** per platform to learn from the first implem
 Route based on choice:
 - Yes → Phase 4
 - No → End workflow, tell user they can resume with `/prdx [slug]`
+
+---
+
+### Step 3a: Review Status Decision
+
+**When PRD status is `review`:**
+
+The implementation is complete but user hasn't confirmed it's ready for PR. Use AskUserQuestion:
+
+- Option 1: "Create PR" (Recommended) - Implementation looks good, ready for review
+- Option 2: "Fix issues" - Found bugs or need changes
+- Option 3: "View implementation summary" - Review what was done
+
+**Route based on choice:**
+- Create PR → Phase 4
+- Fix issues → Tell user to describe the issues. Claude will fix them in the current conversation (no need to re-run full implement). After fixes are committed, ask again.
+- View summary → Show the implementation notes from the PRD, then ask again
+
+**Important:** When user chooses "Fix issues", do NOT re-run `/prdx:implement`. Instead:
+1. Ask user to describe the bugs/issues
+2. Fix them directly in the conversation
+3. Commit the fixes
+4. Ask the review decision again
 
 ---
 

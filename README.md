@@ -86,8 +86,9 @@ This single command will:
 1. **Plan** → Planner agent explores codebase, creates PRD, asks for approval
 2. **Ask** → Publish to GitHub? Implement now? Stop here?
 3. **Implement** → Dev-planner creates technical plan, platform agent implements with TDD
-4. **Ask** → Create PR now?
-5. **Push** → Creates PR with comprehensive description
+4. **Review** → User tests, can request bug fixes if needed
+5. **Ask** → Ready for PR? Need to fix issues?
+6. **Push** → Creates PR with comprehensive description
 
 You can stop at any decision point and resume later with `/prdx:prdx <slug>`.
 
@@ -210,10 +211,17 @@ PRDX looks for configuration in order:
 # → Dev-planner creates technical plan
 # → Platform agent implements with TDD
 # → Creates commits
+# → Status: review
 
-# 3. Create PR
+# 3. Review & Fix (if needed)
+# → Test the implementation
+# → If bugs found, describe them - Claude fixes them
+# → Status remains "review" until ready
+
+# 4. Create PR
 /prdx:push backend-oauth2-auth
-# → Validates branch matches PRD
+# → Confirms implementation is ready
+# → Status: implemented
 # → Creates PR with comprehensive description
 ```
 
@@ -226,7 +234,7 @@ PRDs are stored in `.prdx/prds/`:
 
 **Type:** feature | bug-fix | refactor | spike
 **Platform:** backend | android | ios | mobile
-**Status:** planning | in-progress | implemented | completed
+**Status:** planning | in-progress | review | implemented | completed
 **Created:** 2025-01-13
 **Branch:** feat/feature-slug
 

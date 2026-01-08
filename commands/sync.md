@@ -188,7 +188,7 @@ Create a comprehensive implementation summary:
 ```bash
 # Change status based on implementation state
 if all_acceptance_criteria_complete; then
-  STATUS="implemented"
+  STATUS="review"
 elif any_acceptance_criteria_complete; then
   STATUS="in-progress"
 else

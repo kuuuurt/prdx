@@ -65,7 +65,7 @@ prdx/
 ```
 /prdx "add biometric authentication"
 ↓
-Plan → [Ask: Publish?] → Publish → [Ask: Implement?] → Implement → [Ask: Push?] → PR
+Plan → [Ask: Publish?] → Publish → [Ask: Implement?] → Implement → Review → [Ask: Ready?] → PR
 ```
 
 **For mobile features targeting both platforms:**
@@ -78,7 +78,9 @@ Plan (asks: Android & iOS, Android only, or iOS only?)
 ↓
 [Ask: Implement?] → Implement Android → [Ask: Continue to iOS?] → Implement iOS
 ↓
-[Ask: Push?] → PR
+Review (test, fix bugs if needed)
+↓
+[Ask: Ready?] → PR
 ```
 
 The `/prdx` command orchestrates the entire workflow with decision points at each phase.
@@ -123,11 +125,21 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
      - Platform agent (ISOLATED) executes dev plan
      - Returns only implementation summary (~1KB)
      - Learnings passed to next platform
-   - Post-implement hook updates PRD status
+   - Post-implement hook sets PRD status to `review`
 
-4. Create Pull Request
+4. Review Implementation
+   (Status: review)
+   ↓
+   - User tests the implementation
+   - If bugs found: describe issues, Claude fixes them
+   - Status remains `review` until user confirms ready
+   - Resume with /prdx {slug} to get fix/push options
+
+5. Create Pull Request
    /prdx:push {slug}
    ↓
+   - Confirms implementation is ready (if status is `review`)
+   - Updates status to `implemented`
    - Validates current branch matches PRD's Branch field
    - prdx:pr-author agent (ISOLATED) creates PR
    - Returns only PR URL and number (~100B)
@@ -160,7 +172,7 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
 **Hooks for Validation:**
 - `pre-plan.sh` - Validates git repo, .gitignore
 - `pre-implement.sh` - Validates PRD completeness, branch state
-- `post-implement.sh` - Updates PRD status and metadata
+- `post-implement.sh` - Sets status to `review`, adds metadata
 
 **Platform Agents for Execution:**
 - Each agent specializes in one platform
@@ -276,24 +288,24 @@ All agents run in **isolated contexts** to minimize main conversation size.
 ### Platform Agents
 
 **1. prdx:backend-developer**
-- TypeScript/Hono expert
-- API development with OpenAPI
-- Zod validation
-- Cloud Run patterns
+- Framework-agnostic backend expert
+- Discovers stack from codebase (package.json, etc.)
+- API development, validation, services
+- Adapts to project's framework and patterns
 - **Returns:** Implementation summary (~1KB)
 
 **2. prdx:android-developer**
-- Kotlin/Jetpack Compose expert
-- MVVM architecture
-- Repository pattern + Hilt DI
-- Material Design 3
+- Kotlin + Jetpack Compose expert
+- Discovers DI/persistence from build.gradle
+- MVVM architecture, StateFlow
+- Adapts to project's libraries
 - **Returns:** Implementation summary (~1KB)
 
 **3. prdx:ios-developer**
-- Swift/SwiftUI expert
-- MVVM with ObservableObject
-- NavigationStack patterns
-- Async/await + Combine
+- Swift + SwiftUI expert
+- Discovers dependencies from Package.swift/Podfile
+- MVVM, async/await, NavigationStack
+- Adapts to project's libraries
 - **Returns:** Implementation summary (~1KB)
 
 **What platform agents do:**
@@ -394,7 +406,7 @@ Skills are read by agents during execution:
 **Runs after:** `/prdx:implement`
 
 **Updates:**
-- PRD status to "implemented"
+- PRD status to "review" (user must confirm before PR creation)
 - Implementation timestamp
 - Metadata
 
@@ -410,7 +422,7 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 **Type:** feature | bug-fix | refactor | spike
 **Platform:** backend | android | ios | mobile
 **Platforms:** android, ios (only for mobile - lists target platforms)
-**Status:** planning | in-progress | implemented | review | completed
+**Status:** planning | in-progress | review | implemented | completed
 **Created:** [DATE]
 **Branch:** [BRANCH_NAME]
 
@@ -480,8 +492,10 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 - `/prdx:implement` uses Plan agent for detailed dev planning first
 - Platform agent then executes the dev plan
 - Implementation notes added after development
+- After implementation, status becomes `review` (not `implemented`)
+- User tests and can request bug fixes while in `review` status
+- `/prdx:push` confirms readiness, sets status to `implemented`, then creates PR
 - PR metadata added by `/prdx:push`
-- Status updates by hooks
 
 ## Development Guidelines
 
