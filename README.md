@@ -4,225 +4,272 @@
 
 PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) workflow using native Plan agents, platform-specific agents, hooks, and skills.
 
-## Features
+## The Workflow
 
-**Leverages Claude Code Native Tools**
-- **Plan agent** for codebase exploration and planning
-- **Platform agents** for implementation
-- **Hooks** for validation gates
-- **Skills** as knowledge bases
-- **TodoWrite** for task tracking
-- Thin wrapper commands that orchestrate
-
-**Multi-Platform Development Support**
-- Backend development (TypeScript, Hono, BFF patterns)
-- Android development (Kotlin, Jetpack Compose, Clean Architecture)
-- iOS development (Swift, SwiftUI, MVVM)
-
-**1 PRD = 1 Branch = 1 PR**
-- Each PRD gets a unique branch at planning time
-- All implementation happens on that branch
-- One pull request per PRD
-
-**What's Inside**
-- 12 commands for the complete workflow
-- 6 specialized agents (planner, dev-planner, pr-author, 3 platform agents)
-- 3 validation hooks (pre-plan, pre-implement, post-implement)
-- 3 skills (impl-patterns, testing-strategy, prd-review)
-
-## Installation
-
-### Option 1: Local Marketplace (Recommended for Development)
-
-Clone the repo and add it as a local marketplace:
-
-```bash
-# Clone the repository
-git clone https://github.com/kuuuurt/prdx.git ~/prdx
-
-# In Claude Code, add the local marketplace
-/plugin marketplace add ~/prdx
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              /prdx "feature"                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  1. PLAN                                                                    │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  prdx:planner agent (isolated context)                                │  │
+│  │  • Explores codebase architecture                                     │  │
+│  │  • Assesses feasibility                                               │  │
+│  │  • Creates PRD with branch name                                       │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                              ▼                                              │
+│                    ┌─────────────────┐                                      │
+│                    │  Approve PRD?   │                                      │
+│                    └────────┬────────┘                                      │
+│                             │ yes                                           │
+│                             ▼                                               │
+│               Status: planning ──────────────────────────────► .prdx/prds/  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                         ┌────────────┴────────────┐
+                         ▼                         ▼
+                   [Publish?]               [Implement?]
+                         │                         │
+                         ▼                         │
+              ┌──────────────────┐                 │
+              │ GitHub Issue #N  │                 │
+              └──────────────────┘                 │
+                         │                         │
+                         └────────────┬────────────┘
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  2. IMPLEMENT                                                               │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  prdx:dev-planner agent (isolated context)                            │  │
+│  │  • Reads skills (impl-patterns, testing-strategy)                     │  │
+│  │  • Creates detailed technical plan                                    │  │
+│  │  • Maps tests to acceptance criteria                                  │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                              ▼                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  Platform agent (isolated context)                                    │  │
+│  │  • prdx:backend-developer  OR                                         │  │
+│  │  • prdx:android-developer  OR                                         │  │
+│  │  • prdx:ios-developer                                                 │  │
+│  │                                                                       │  │
+│  │  Executes dev plan with TDD:                                          │  │
+│  │  1. Write failing test                                                │  │
+│  │  2. Implement to pass                                                 │  │
+│  │  3. Commit                                                            │  │
+│  │  4. Repeat                                                            │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                              ▼                                              │
+│               Status: in-progress → review                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  3. REVIEW                                                                  │
+│                                                                             │
+│     ┌─────────────────────────────────────────────────────────────────┐     │
+│     │                     User tests implementation                   │     │
+│     └─────────────────────────────────────────────────────────────────┘     │
+│                                      │                                      │
+│              ┌───────────────────────┴───────────────────────┐              │
+│              ▼                                               ▼              │
+│     ┌─────────────────┐                             ┌─────────────────┐     │
+│     │   Bugs found    │                             │   Looks good    │     │
+│     └────────┬────────┘                             └────────┬────────┘     │
+│              │                                               │              │
+│              ▼                                               │              │
+│     ┌─────────────────┐                                      │              │
+│     │  Describe bugs  │                                      │              │
+│     │  Claude fixes   │◄─────────────────┐                   │              │
+│     │  Commit fixes   │                  │                   │              │
+│     └────────┬────────┘                  │                   │              │
+│              │                           │                   │              │
+│              └───────► Test again ───────┘                   │              │
+│                                                              │              │
+│                              Status: review                  │              │
+└──────────────────────────────────────────────────────────────┼──────────────┘
+                                                               │
+                                                               ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  4. PUSH                                                                    │
+│                                                                             │
+│     ┌─────────────────────────────────────────────────────────────────┐     │
+│     │               "Is implementation ready?" ──► Yes                │     │
+│     └─────────────────────────────────────────────────────────────────┘     │
+│                              ▼                                              │
+│               Status: review → implemented                                  │
+│                              ▼                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  prdx:pr-author agent (isolated context)                              │  │
+│  │  • Analyzes commits                                                   │  │
+│  │  • Creates comprehensive PR description                               │  │
+│  │  • Executes: gh pr create                                             │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                              ▼                                              │
+│                    Pull Request #N created                                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  5. CLOSE (after PR merge)                                                  │
+│                                                                             │
+│     /prdx:close <slug>                                                      │
+│                              ▼                                              │
+│               Status: implemented → completed                               │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Then install the plugin:
+## Status Flow
 
-```bash
-/plugin install prdx-local@prdx
+```
+planning ──► in-progress ──► review ──► implemented ──► completed
+    │             │            │              │              │
+    │             │            │              │              │
+    ▼             ▼            ▼              ▼              ▼
+PRD created   Coding...   User tests    PR created    PR merged
+                          Fix bugs      Ready to      All done!
+                          if needed     merge
 ```
 
-### Option 2: Install from GitHub Marketplace
+## Why Context Isolation?
 
-```bash
-# Add the PRDX marketplace
-/plugin marketplace add kuuuurt/prdx
+Each agent runs in its own context, keeping the main conversation lightweight:
 
-# Install the plugin
-/plugin install prdx@prdx
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Main Conversation (stays small)                                            │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  • PRD document (~2KB)                                                  ││
+│  │  • Dev plan summary (~3KB)                                              ││
+│  │  • Implementation summary (~1KB)                                        ││
+│  │  • PR URL (~100B)                                                       ││
+│  │  ────────────────────────────                                           ││
+│  │  Total: ~6KB                                                            ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Agent Contexts (isolated, discarded after use)                             │
+│                                                                             │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
+│  │ prdx:planner     │  │ prdx:dev-planner │  │ Platform agent   │          │
+│  │                  │  │                  │  │                  │          │
+│  │ • All explored   │  │ • Skills content │  │ • All source     │          │
+│  │   files          │  │ • Codebase       │  │   files read     │          │
+│  │ • Architecture   │  │   patterns       │  │ • Test files     │          │
+│  │   analysis       │  │ • Task breakdown │  │ • Build output   │          │
+│  │                  │  │                  │  │                  │          │
+│  │ Returns: PRD     │  │ Returns: Plan    │  │ Returns: Summary │          │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘          │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Option 3: Symlink to Plugins Directory
+## 1 PRD = 1 Branch = 1 PR
 
-```bash
-# Clone the repository
-git clone https://github.com/kuuuurt/prdx.git
-
-# Link to Claude Code plugins directory
-ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 ```
-
-Claude Code will automatically load the plugin.
+┌────────────────────────────────────────────────────────────────────────────┐
+│  PRD: android-biometric-auth                                               │
+│  Branch: feat/android-biometric-auth                                       │
+│  PR: #42                                                                   │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                            │
+│  main ─────●─────────────────────────────────────────────────●──────────   │
+│            │                                                 │             │
+│            │  feat/android-biometric-auth                    │             │
+│            └────●────●────●────●────●────●────●─────────────►│             │
+│                 │    │    │    │    │    │    │       PR #42 │             │
+│                 │    │    │    │    │    │    │              │             │
+│              commit commit  ... commits  ...  fix         merge            │
+│              (TDD)  (TDD)       (TDD)        (review)                      │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+```
 
 ## Quick Start
 
 ### One Command Workflow
 
-Use `/prdx:prdx` for the complete workflow - it orchestrates everything with decision points:
-
 ```bash
 /prdx:prdx "add biometric authentication to Android app"
 ```
 
-This single command will:
-1. **Plan** → Planner agent explores codebase, creates PRD, asks for approval
-2. **Ask** → Publish to GitHub? Implement now? Stop here?
-3. **Implement** → Dev-planner creates technical plan, platform agent implements with TDD
-4. **Review** → User tests, can request bug fixes if needed
-5. **Ask** → Ready for PR? Need to fix issues?
-6. **Push** → Creates PR with comprehensive description
-
-You can stop at any decision point and resume later with `/prdx:prdx <slug>`.
+This orchestrates the entire workflow with decision points at each phase.
+Stop anytime and resume with `/prdx:prdx <slug>`.
 
 ### Individual Commands
 
-For more control, use individual commands:
-
 ```bash
-/prdx:config standard                    # Configure settings (optional)
 /prdx:plan "add biometric auth"          # Create PRD
 /prdx:implement android-biometric-auth   # Implement feature
 /prdx:push android-biometric-auth        # Create PR
+/prdx:close android-biometric-auth       # Mark complete
 ```
 
-## Available Commands
+## Installation
+
+### Option 1: GitHub Marketplace
+
+```bash
+/plugin marketplace add kuuuurt/prdx
+/plugin install prdx@prdx
+```
+
+### Option 2: Local Development
+
+```bash
+git clone https://github.com/kuuuurt/prdx.git ~/prdx
+/plugin marketplace add ~/prdx
+/plugin install prdx-local@prdx
+```
+
+### Option 3: Symlink
+
+```bash
+git clone https://github.com/kuuuurt/prdx.git
+ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
+```
+
+## Commands
 
 ### Main Workflow
 
 | Command | Description |
 |---------|-------------|
-| **`/prdx:prdx [description\|slug]`** | **Complete workflow orchestrator (recommended)** |
-| `/prdx:plan <description>` | Create PRD (triggers planner agent) |
-| `/prdx:implement <slug>` | Implement feature (triggers dev-planner + platform agent) |
-| `/prdx:push <slug>` | Create pull request (triggers pr-author agent) |
-| `/prdx:commit [message]` | Create commit with configured format |
+| **`/prdx:prdx`** | **Complete workflow orchestrator (recommended)** |
+| `/prdx:plan` | Create PRD |
+| `/prdx:implement` | Implement feature |
+| `/prdx:push` | Create pull request |
+| `/prdx:close` | Mark PRD complete |
 
-### Configuration & Management
-
-| Command | Description |
-|---------|-------------|
-| `/prdx:config [preset\|show\|set\|get]` | Configure PRDX settings |
-| `/prdx:show [slug]` | View/list PRDs |
-| `/prdx:close <slug>` | Close completed PRD |
-| `/prdx:migrate` | Migrate from .claude to .prdx folder |
-
-### GitHub Integration
+### Management
 
 | Command | Description |
 |---------|-------------|
-| `/prdx:publish <slug>` | Create GitHub issue from PRD |
-| `/prdx:sync <slug>` | Sync PRD with GitHub issue |
-
-### Code Quality
-
-| Command | Description |
-|---------|-------------|
-| `/prdx:optimize [files]` | Simplify code (defaults to changed files on branch) |
-
-### Help
-
-| Command | Description |
-|---------|-------------|
-| `/prdx:help` | Show documentation |
+| `/prdx:show` | View/list PRDs |
+| `/prdx:config` | Configure settings |
+| `/prdx:publish` | Create GitHub issue |
+| `/prdx:sync` | Sync with GitHub |
+| `/prdx:optimize` | Simplify code |
+| `/prdx:commit` | Create commit |
 
 ## Agents
 
-| Agent | Purpose |
-|-------|---------|
-| `prdx:planner` | Explores codebase, creates business-focused PRDs |
-| `prdx:dev-planner` | Creates detailed technical implementation plans |
-| `prdx:pr-author` | Creates comprehensive PR descriptions |
-| `prdx:backend-developer` | TypeScript/Hono implementation expert |
-| `prdx:android-developer` | Kotlin/Compose implementation expert |
-| `prdx:ios-developer` | Swift/SwiftUI implementation expert |
-
-## Configuration
-
-### Quick Setup
-
-```bash
-/prdx:config minimal     # Conventional commits, no co-author/links
-/prdx:config standard    # Full attribution (default)
-/prdx:config simple      # Simple commits with attribution
 ```
-
-### Configuration File
-
-Create `prdx.json` in project root or `.prdx/prdx.json`:
-
-```json
-{
-  "version": "1.0",
-  "commits": {
-    "format": "conventional",
-    "coAuthor": {
-      "enabled": true,
-      "name": "Claude",
-      "email": "noreply@anthropic.com"
-    },
-    "extendedDescription": {
-      "enabled": true,
-      "includeClaudeCodeLink": true
-    }
-  },
-  "pullRequest": {
-    "defaultBase": "main",
-    "autoAssign": true
-  }
-}
-```
-
-### Configuration Locations
-
-PRDX looks for configuration in order:
-1. `./prdx.json` (project root)
-2. `./.prdx/prdx.json` (PRDX directory)
-
-## Workflow Example
-
-```bash
-# 1. Plan feature
-/prdx:plan "add OAuth2 authentication"
-# → Planner explores codebase
-# → Creates PRD with Branch: feat/backend-oauth2-auth
-# → Asks for approval
-
-# 2. Implement
-/prdx:implement backend-oauth2-auth
-# → Checks out feat/backend-oauth2-auth
-# → Dev-planner creates technical plan
-# → Platform agent implements with TDD
-# → Creates commits
-# → Status: review
-
-# 3. Review & Fix (if needed)
-# → Test the implementation
-# → If bugs found, describe them - Claude fixes them
-# → Status remains "review" until ready
-
-# 4. Create PR
-/prdx:push backend-oauth2-auth
-# → Confirms implementation is ready
-# → Status: implemented
-# → Creates PR with comprehensive description
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Workflow Agents                                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  prdx:planner      │ Explores codebase, creates business-focused PRDs      │
+│  prdx:dev-planner  │ Creates detailed technical implementation plans       │
+│  prdx:pr-author    │ Creates comprehensive PR descriptions                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Platform Agents (framework-agnostic, discovers stack from codebase)       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  prdx:backend-developer  │ Backend implementation (any framework)          │
+│  prdx:android-developer  │ Android implementation (Kotlin/Compose)         │
+│  prdx:ios-developer      │ iOS implementation (Swift/SwiftUI)              │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## PRD Structure
@@ -235,7 +282,6 @@ PRDs are stored in `.prdx/prds/`:
 **Type:** feature | bug-fix | refactor | spike
 **Platform:** backend | android | ios | mobile
 **Status:** planning | in-progress | review | implemented | completed
-**Created:** 2025-01-13
 **Branch:** feat/feature-slug
 
 ## Problem
@@ -244,62 +290,38 @@ PRDs are stored in `.prdx/prds/`:
 ## Goal
 [What outcome do we want?]
 
-## User Stories
-- As a [user], I want to [action] so that [benefit]
-
 ## Acceptance Criteria
 - [ ] [Testable outcome]
 
-## Scope
-### Included / ### Excluded
-
 ## Approach
 [High-level strategy]
-
-## Risks & Considerations
 ```
 
-## Package Contents
+## Configuration
 
+```bash
+/prdx:config minimal     # Conventional commits, no extras
+/prdx:config standard    # Full attribution (default)
+/prdx:config simple      # Simple commits with attribution
 ```
-prdx/
-├── .claude-plugin/          # Plugin metadata
-├── commands/                # Workflow commands
-│   ├── prdx.md              # Main orchestrator
-│   ├── plan.md              # Planning
-│   ├── implement.md         # Implementation
-│   ├── push.md              # PR creation
-│   ├── commit.md            # Commit helper
-│   ├── config.md            # Configuration
-│   ├── show.md              # View PRDs
-│   ├── close.md             # Close PRD
-│   ├── publish.md           # GitHub issue
-│   ├── sync.md              # GitHub sync
-│   ├── migrate.md           # Migration tool
-│   └── help.md              # Documentation
-├── agents/                  # Specialized agents
-│   ├── planner.md           # PRD creation
-│   ├── dev-planner.md       # Technical planning
-│   ├── pr-author.md         # PR creation
-│   ├── backend-developer.md
-│   ├── android-developer.md
-│   └── ios-developer.md
-├── hooks/prdx/              # Validation hooks
-│   ├── pre-plan.sh
-│   ├── pre-implement.sh
-│   └── post-implement.sh
-├── skills/                  # Knowledge bases
-│   ├── impl-patterns.md
-│   ├── testing-strategy.md
-│   └── prd-review.md
-└── README.md
+
+Or create `prdx.json`:
+
+```json
+{
+  "commits": {
+    "format": "conventional",
+    "coAuthor": { "enabled": true },
+    "extendedDescription": { "enabled": true }
+  }
+}
 ```
 
 ## Requirements
 
 - **Claude Code** (claude.ai/code)
 - **Git repository**
-- **GitHub CLI** (`gh`) - Optional, for publish/sync commands
+- **GitHub CLI** (`gh`) - Optional, for GitHub integration
 
 ## License
 
@@ -307,6 +329,4 @@ MIT License
 
 ---
 
-**Made with care by Kurt**
-
-[GitHub](https://github.com/kuuuurt/prdx)
+**Made with care by Kurt** · [GitHub](https://github.com/kuuuurt/prdx)
