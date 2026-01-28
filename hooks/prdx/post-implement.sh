@@ -7,15 +7,15 @@ set -e
 PRD_SLUG="$1"
 
 if [ -z "$PRD_SLUG" ]; then
-    echo "❌ No PRD slug provided"
+    echo "No PRD slug provided"
     exit 1
 fi
 
-# Find PRD file
-PRD_FILE=$(find .prdx/prds -name "*${PRD_SLUG}*.md" -type f | head -1)
+# Find PRD file (prdx-* naming convention)
+PRD_FILE=$(ls ~/.claude/plans/prdx-*${PRD_SLUG}*.md 2>/dev/null | head -1)
 
 if [ -z "$PRD_FILE" ]; then
-    echo "⚠️  PRD not found: $PRD_SLUG"
+    echo "PRD not found: $PRD_SLUG"
     exit 0  # Don't fail, just warn
 fi
 
@@ -35,6 +35,6 @@ if ! grep -q "^**Implemented:**" "$PRD_FILE"; then
     fi
 fi
 
-echo "✓ Updated PRD status to 'review'"
-echo "  Test the implementation, then run /prdx:push to create PR"
+echo "Updated PRD status to 'review'"
+echo "Test the implementation, then run /prdx:push to create PR"
 exit 0

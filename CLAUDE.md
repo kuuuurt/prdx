@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document) workflow leveraging Claude Code's native tooling. It uses Plan agents, platform-specific agents, hooks, and skills to create a simple but powerful development workflow.
+PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document) workflow leveraging Claude Code's **native plan mode**. Plans are saved automatically by Claude to `~/.claude/plans/` and serve as the single source of truth for feature development.
 
 ## Core Philosophy
 
-**Leverage Native Claude Code Tools:**
-- **Plan agent** handles all codebase exploration and planning
+**Leverage Native Claude Code Features:**
+- **Plan mode** handles codebase exploration and PRD creation (plans auto-saved)
 - **Platform agents** (backend/android/ios) handle implementation
 - **Hooks** provide validation gates
 - **Skills** provide knowledge bases
@@ -17,10 +17,80 @@ PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document)
 - Commands are **thin wrappers** that orchestrate
 
 **No Custom Orchestration:**
-- Don't reinvent codebase exploration (use Plan agent)
+- Don't reinvent plan storage (use native plan mode)
 - Don't create custom task tracking (use TodoWrite)
 - Don't write custom validation (use hooks)
-- Let agents do the work, commands just trigger them
+- Let Claude's native features do the work
+
+## Plan Mode Configuration
+
+PRDX uses Claude's default plans directory (`~/.claude/plans/`).
+
+**Naming convention:** `prdx-{slug}.md` to distinguish PRDX plans from regular plans.
+
+## PRD Format (Plan Mode Template)
+
+**IMPORTANT:** When entering plan mode for PRDX workflows, use this exact format for plans:
+
+```markdown
+# [Title]
+
+**Type:** feature | bug-fix | refactor | spike
+**Platform:** backend | android | ios | mobile
+**Platforms:** android, ios (only for mobile - list target platforms)
+**Status:** planning | published | in-progress | review | implemented | completed
+**Created:** [YYYY-MM-DD]
+**Branch:** feat/[slug] | fix/[slug] | refactor/[slug] | chore/[slug]
+
+## Problem
+
+[What pain point or opportunity exists? Why does this matter?]
+
+## Goal
+
+[What outcome do we want? Express in terms of user/business benefit.]
+
+## User Stories
+
+- As a [user type], I want to [action] so that [benefit]
+
+## Acceptance Criteria
+
+- [ ] [User-observable outcome - testable]
+- [ ] [User-observable outcome - testable]
+
+## Scope
+
+### Included
+- [What this PRD covers]
+
+### Excluded
+- [What this PRD explicitly does NOT cover]
+
+## Approach
+
+[High-level strategy - general direction, NOT detailed dev tasks]
+
+## Risks & Considerations
+
+- [Technical/business risks and constraints]
+```
+
+**Branch naming convention:**
+- `feature` type → `feat/{slug}`
+- `bug-fix` type → `fix/{slug}`
+- `refactor` type → `refactor/{slug}`
+- `spike` type → `chore/{slug}`
+
+**Status workflow:**
+1. `planning` - Initial state, plan being created
+2. `published` - GitHub issue created (optional)
+3. `in-progress` - Implementation started
+4. `review` - Implementation done, awaiting user testing
+5. `implemented` - User confirmed ready, PR created
+6. `completed` - PR merged
+
+**To update status:** Edit the `**Status:**` line in the plan file directly.
 
 ## Repository Structure
 
@@ -30,8 +100,8 @@ prdx/
 │   ├── plugin.json
 │   └── marketplace.json
 ├── commands/                # Thin wrapper commands
-│   ├── prdx.md              # Main orchestrator (full workflow)
-│   ├── plan.md              # Triggers Plan agent
+│   ├── prdx.md              # Main entry point (/prdx:prdx)
+│   ├── plan.md              # Uses native plan mode
 │   ├── implement.md         # Triggers platform agent
 │   ├── show.md              # View/list/search PRDs
 │   ├── push.md              # Create PR
@@ -49,10 +119,9 @@ prdx/
 │   ├── impl-patterns.md     # Implementation patterns
 │   └── testing-strategy.md  # Testing approaches
 ├── agents/                  # Specialized agents
-│   ├── planner.md           # PRD creation (isolated context)
 │   ├── dev-planner.md       # Technical planning (isolated context)
 │   ├── pr-author.md         # PR creation (isolated context)
-│   ├── backend-developer.md # TypeScript/Hono expert
+│   ├── backend-developer.md # Backend expert (discovers stack)
 │   ├── android-developer.md # Kotlin/Compose expert
 │   └── ios-developer.md     # Swift/SwiftUI expert
 └── install.sh               # Installation script
@@ -63,104 +132,95 @@ prdx/
 ### Complete Feature Development (One Command)
 
 ```
-/prdx "add biometric authentication"
+/prdx:prdx "add biometric authentication"
 ↓
-Plan → [Ask: Publish?] → Publish → [Ask: Implement?] → Implement → Review → [Ask: Ready?] → PR
+Plan Mode → PRD saved → [Publish?] → Publish → [Implement?] → Implement → Review → [Ready?] → PR
 ```
 
 **For mobile features targeting both platforms:**
 ```
-/prdx "add biometric authentication"
+/prdx:prdx "add biometric authentication"
 ↓
-Plan (asks: Android & iOS, Android only, or iOS only?)
+Plan Mode (asks: Android & iOS, Android only, or iOS only?)
 ↓
-[Ask: Publish?] → Publish
+PRD saved to ~/.claude/plans/
 ↓
-[Ask: Implement?] → Implement Android → [Ask: Continue to iOS?] → Implement iOS
+[Publish?] → Publish (optional)
+↓
+[Implement?] → Implement Android → [Continue to iOS?] → Implement iOS
 ↓
 Review (test, fix bugs if needed)
 ↓
-[Ask: Ready?] → PR
+[Ready?] → PR
 ```
 
-The `/prdx` command orchestrates the entire workflow with decision points at each phase.
+The `/prdx:prdx` command is the main entry point, orchestrating the workflow with decision points.
 
 **1 PRD = 1 Branch = 1 PR:** Each PRD gets a unique branch name at planning time. All implementation happens on that branch, and the PR is created from it.
 
-**Multi-platform mobile implementation is sequential** to learn from the first platform before implementing the second.
-
-### Individual Commands (Context-Isolated)
-
-Each command uses agents that run in **isolated contexts** to minimize main conversation size:
+### Individual Commands
 
 ```
-1. Create Plan
+1. Create Plan (uses native plan mode)
    /prdx:plan "add biometric authentication"
    ↓
-   - Pre-plan hook validates environment
-   - prdx:planner agent (ISOLATED) explores codebase
-   - Agent creates comprehensive PRD with Branch field
-   - Returns only PRD document (~2KB)
+   - Enters plan mode
+   - Explores codebase
+   - Creates PRD using the template format
    - User iterates until approval
-   - PRD file written to .prdx/prds/{slug}.md
-   - Branch name set: feat/{slug} (or fix/, refactor/, chore/)
+   - Plan auto-saved to ~/.claude/plans/{slug}.md
+   - Status: planning
 
 2. Publish to GitHub (optional)
    /prdx:publish {slug}
    ↓
    - Creates GitHub issue from PRD
    - Updates PRD with issue number
-   - Renames PRD to platform-issue format
+   - Status: published
 
-3. Implement Feature
+4. Implement Feature
    /prdx:implement {slug}
    /prdx:implement {slug} android  (for multi-platform: Android only)
    /prdx:implement {slug} ios      (for multi-platform: iOS only)
    ↓
-   - Pre-implement hook validates PRD
-   - Checks out PRD's designated branch (from Branch field)
-   - For each target platform (sequentially):
-     - prdx:dev-planner agent (ISOLATED) creates dev plan
-     - Returns only dev plan (~3KB)
-     - Platform agent (ISOLATED) executes dev plan
-     - Returns only implementation summary (~1KB)
-     - Learnings passed to next platform
-   - Post-implement hook sets PRD status to `review`
+   - Reads PRD from ~/.claude/plans/
+   - Updates status to in-progress
+   - Checks out PRD's designated branch
+   - prdx:dev-planner agent creates dev plan
+   - Platform agent executes dev plan
+   - Updates status to review
 
-4. Review Implementation
+5. Review Implementation
    (Status: review)
    ↓
    - User tests the implementation
    - If bugs found: describe issues, Claude fixes them
-   - Status remains `review` until user confirms ready
-   - Resume with /prdx {slug} to get fix/push options
+   - Resume with /prdx:prdx {slug} to get fix/push options
 
-5. Create Pull Request
+6. Create Pull Request
    /prdx:push {slug}
    ↓
-   - Confirms implementation is ready (if status is `review`)
-   - Updates status to `implemented`
-   - Validates current branch matches PRD's Branch field
-   - prdx:pr-author agent (ISOLATED) creates PR
-   - Returns only PR URL and number (~100B)
-   - Each PRD gets exactly one PR
+   - Updates status to implemented
+   - prdx:pr-author agent creates PR
+   - Appends PR metadata to PRD
 ```
 
-**Why Context Isolation?**
-- File contents stay in agent's context, not main conversation
-- Enables larger features without exhausting context limits
-- Each agent focuses on its specialized task
+**Status tracking:** Status is stored in the PRD file itself (`**Status:**` field) and updated by editing the file directly.
 
 ### Key Features
 
-**Context-Isolated Agents:**
-- Each agent runs in its own context
-- File contents stay in agent's context
-- Main conversation only receives summaries
-- Enables larger features without context limits
+**Native Plan Mode:**
+- Uses Claude's built-in plan mode for PRD creation
+- Plans auto-saved to `~/.claude/plans/`
+- No custom file management needed
+- Interactive iteration until approval
 
-**Specialized Agents:**
-- `prdx:planner`: Codebase exploration and PRD creation
+**Status in Plan File:**
+- Status tracked in the `**Status:**` field of each PRD
+- Updated by editing the file directly
+- Workflow: planning → in-progress → review → implemented → completed
+
+**Context-Isolated Agents:**
 - `prdx:dev-planner`: Technical planning with files/tasks/tests
 - `prdx:pr-author`: PR creation with comprehensive description
 - Platform agents: TDD implementation execution
@@ -170,38 +230,31 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
 - Platform agent second: Executes the plan using TDD
 
 **Hooks for Validation:**
-- `pre-plan.sh` - Validates git repo, .gitignore
 - `pre-implement.sh` - Validates PRD completeness, branch state
-- `post-implement.sh` - Sets status to `review`, adds metadata
+- `post-implement.sh` - Updates status to `review`
 
 **Platform Agents for Execution:**
 - Each agent specializes in one platform
-- Executes the dev plan from Plan agent
+- Executes the dev plan
 - Uses TodoWrite for task tracking
 - Follows TDD and creates conventional commits
 
-**Interactive Approval:**
-- Plans displayed in conversation
-- User iterates naturally
-- Clear approval phrases trigger next phase
-- No complex state management needed
-
 ## Commands (Thin Wrappers)
 
-### /prdx (Main Orchestrator)
+### /prdx:prdx (Main Entry Point)
 
 **What it does:**
 1. Determines entry point (new feature or existing PRD)
-2. Runs `/prdx:plan` for planning
-3. Asks: Publish to GitHub? → runs `/prdx:publish`
-4. Asks: Implement now? → runs `/prdx:implement`
-5. Asks: Create PR? → runs `/prdx:push`
+2. Runs `/prdx:plan` for planning (uses native plan mode)
+3. Asks: Implement now? → runs `/prdx:implement`
+4. Asks: Create PR? → runs `/prdx:push`
 
 **Usage:**
-- `/prdx add user authentication` - Start new feature
-- `/prdx biometric-login` - Resume existing PRD
+- `/prdx:prdx add user authentication` - Start new feature
+- `/prdx:prdx biometric-login` - Resume existing PRD
 
 **Key features:**
+- Main entry point for all PRDX workflows
 - Decision points at each phase (never auto-proceeds)
 - Resumes from current status when given existing PRD
 - Shows context and next steps at each decision
@@ -209,14 +262,13 @@ Each command uses agents that run in **isolated contexts** to minimize main conv
 ### /prdx:plan
 
 **What it does:**
-1. Runs `pre-plan.sh` hook
-2. Detects platform from description/codebase
-3. Invokes `prdx:planner` agent (isolated context)
-4. Agent explores codebase and creates PRD
-5. Returns only PRD document (~2KB)
-6. Writes PRD file after approval
+1. Detects platform from description/codebase
+2. Enters native plan mode
+3. Explores codebase and creates PRD using template format
+4. Iterates with user until approval
+5. Plan auto-saved to `~/.claude/plans/`
 
-**Agent used:** `prdx:planner` (isolated context)
+**Uses:** Native plan mode (not an isolated agent)
 
 **Focus:** Recon, feasibility, business context, high-level approach (not detailed dev tasks)
 
@@ -260,30 +312,25 @@ All are thin wrappers around bash/git/gh CLI.
 
 ## Agents
 
-All agents run in **isolated contexts** to minimize main conversation size.
+Agents run in **isolated contexts** to minimize main conversation size.
 
 ### Workflow Agents
 
-**1. prdx:planner**
-- Explores codebase architecture
-- Assesses feasibility and risks
-- Creates business-focused PRD
-- Handles interactive iteration
-- **Returns:** PRD document only (~2KB)
-
-**2. prdx:dev-planner**
+**1. prdx:dev-planner**
 - Reads skills (impl-patterns.md, testing-strategy.md)
 - Explores codebase for patterns
 - Creates detailed implementation plan
 - Maps tests to acceptance criteria
 - **Returns:** Dev plan only (~3KB)
 
-**3. prdx:pr-author**
+**2. prdx:pr-author**
 - Reads PRD and analyzes commits
 - Generates comprehensive PR description
 - Executes `gh pr create`
 - Updates PRD with PR metadata
 - **Returns:** PR URL and number only (~100B)
+
+**Note:** PRD creation uses native plan mode instead of a custom agent.
 
 ### Platform Agents
 
@@ -322,33 +369,17 @@ All agents run in **isolated contexts** to minimize main conversation size.
 - Handle git operations (command does this)
 - Custom orchestration (they just implement)
 
-### Context Isolation Benefits
+### Context Efficiency
 
-```
-BEFORE (Context Bloat):
-┌─────────────────────────────────────────────────────────┐
-│ Main Conversation                                       │
-│ ┌─────────────────────────────────────────────────────┐ │
-│ │ All explored files from planning                    │ │
-│ │ + All explored files from dev planning              │ │
-│ │ + All files from implementation                     │ │
-│ │ + Skills content                                    │ │
-│ │ = MASSIVE CONTEXT (easily exhausted)                │ │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
+**Plan mode benefits:**
+- Exploration happens in plan mode context
+- Plan is saved to file, not kept in conversation
+- Conversation context stays minimal
 
-AFTER (Context Isolated):
-┌─────────────────────────────────────────────────────────┐
-│ Main Conversation                                       │
-│ ┌─────────────────────────────────────────────────────┐ │
-│ │ PRD document (~2KB)                                 │ │
-│ │ + Dev plan (~3KB)                                   │ │
-│ │ + Implementation summary (~1KB)                     │ │
-│ │ + PR URL (~100B)                                    │ │
-│ │ = MINIMAL CONTEXT (~6KB total)                      │ │
-│ └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
+**Agent isolation benefits:**
+- Dev-planner and platform agents run isolated
+- File contents stay in agent's context
+- Main conversation receives summaries only
 
 ## Skills (Knowledge Bases)
 
@@ -384,7 +415,7 @@ Skills are read by agents during execution:
 
 **Validates:**
 - Git repository exists
-- `.prdx/prds/` directory exists
+- `~/.claude/plans/` directory exists
 - PRDs are in `.gitignore`
 
 **On failure:** Stops planning
@@ -422,7 +453,7 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 **Type:** feature | bug-fix | refactor | spike
 **Platform:** backend | android | ios | mobile
 **Platforms:** android, ios (only for mobile - lists target platforms)
-**Status:** planning | in-progress | review | implemented | completed
+**Status:** planning | published | in-progress | review | implemented | completed
 **Created:** [DATE]
 **Branch:** [BRANCH_NAME]
 
@@ -568,24 +599,22 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 
 ### What We DON'T Do
 
-❌ Custom codebase exploration (use Plan agent)
+❌ Custom plan storage (use native plan mode)
+❌ Custom codebase exploration (plan mode does this)
 ❌ Manual multi-agent orchestration (one agent per phase)
-❌ Context files / state management (stateless commands)
-❌ Two-level planning (single comprehensive plan)
+❌ Separate state management (status in plan file)
 ❌ Custom task tracking (use TodoWrite)
 ❌ TDD review checkpoints (trust agent to follow TDD)
-❌ Metrics tracking (keep it simple)
-❌ Templates (agents create plans from scratch)
 
 ### What We DO
 
-✅ Delegate to Plan agent for exploration
-✅ One agent per command invocation
+✅ Use native plan mode for PRD creation
+✅ Store status in plan file directly
+✅ One agent per implementation phase
 ✅ Hooks for validation gates
 ✅ Skills as passive knowledge bases
 ✅ TodoWrite for task visibility
-✅ Interactive approval in conversation
-✅ Conventional commits via agent instruction
+✅ Interactive approval in plan mode
 ✅ Thin commands that orchestrate native tools
 
 ## Testing

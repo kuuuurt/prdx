@@ -24,7 +24,7 @@ You are helping the user close a PRD after all implementation work is complete.
 **Find and verify the PRD:**
 
 1. **Find PRD file:**
-   - If slug provided: `ls .prdx/prds/*[slug]*.md`
+   - If slug provided: `ls ~/.claude/plans/prdx-*[slug]*.md`
    - If multiple matches, prompt user to select
    - If not found, show error and suggest using `/prdx:list`
 
@@ -195,7 +195,7 @@ Timeline:
   Duration:   [N days]
 
 Links:
-  PRD:   .prdx/prds/[filename]
+  PRD:   ~/.claude/plans/[filename]
   Issue: #[number] [closed ✓ / still open]
   PR:    #[number] (merged ✓)
 
@@ -215,7 +215,7 @@ Statistics:
 What's next?
   - Review completed work: gh pr view [pr-number]
   - Start blocked PRDs: /prdx:deps [slug] (to see what's unblocked)
-  - Create new PRD: /prdx:wizard or /prdx:plan "feature description"
+  - Create new PRD: /prdx:prdx "feature description"
 
 ╚════════════════════════════════════════════════════════════════════════════╝
 ```

@@ -34,7 +34,7 @@ This command is a **thin wrapper** that:
 
 **If slug provided:**
 ```bash
-ls .prdx/prds/*[slug]*.md
+ls ~/.claude/plans/prdx-*[slug]*.md
 ```
 
 **If not provided:**
@@ -57,15 +57,12 @@ Use AskUserQuestion to confirm the implementation is ready:
 - Option 2: "No, I found issues to fix"
 
 **If user confirms ready:**
-- Update PRD status to `implemented`:
-  ```bash
-  sed -i '' 's/^\*\*Status:\*\* review/\*\*Status:\*\* implemented/' "$PRD_FILE"
-  ```
+- Update PRD status to `implemented` by editing the `**Status:**` line in the PRD file
 - Continue to Phase 2
 
 **If user found issues:**
 - Tell user to describe the issues for fixing
-- End workflow (they can resume with `/prdx [slug]` after fixing)
+- End workflow (they can resume with `/prdx:prdx [slug]` after fixing)
 
 **If PRD status is already `implemented`:**
 - Skip confirmation, proceed to Phase 2
@@ -146,7 +143,7 @@ After agent returns:
 ```
 Pull Request Created!
 
-PRD: .prdx/prds/{SLUG}.md
+PRD: ~/.claude/plans/{SLUG}.md
 PR: #{PR_NUMBER}
 URL: {PR_URL}
 
@@ -231,7 +228,7 @@ This keeps the main conversation context minimal.
 ```
 User: /prdx:push backend-auth
 
-→ Finds PRD: .prdx/prds/backend-auth.md
+→ Finds PRD: ~/.claude/plans/backend-auth.md
 → Status is "review" - confirms implementation is ready
 → User confirms → Status updated to "implemented"
 → Validates git state
@@ -243,7 +240,7 @@ User: /prdx:push backend-auth
 
 Pull Request Created!
 
-PRD: .prdx/prds/backend-auth.md
+PRD: ~/.claude/plans/backend-auth.md
 PR: #42
 URL: https://github.com/user/repo/pull/42
 

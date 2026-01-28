@@ -14,7 +14,7 @@ argument-hint: "[slug] [--issue #123]"
 
 **Find the PRD:**
 
-1. If slug provided: `ls .prdx/prds/*[slug]*.md`
+1. If slug provided: `ls ~/.claude/plans/prdx-*[slug]*.md`
 2. If not: list all PRDs and ask user to select
 3. **DO NOT PROCEED** without valid PRD
 
@@ -185,12 +185,12 @@ If "Create new":
    - Issue number from Phase 3a or 3b
 
 2. Construct new filename:
-   - Format: `[platform]-[issue-number].md`
-   - Examples: `android-216.md`, `backend-1114.md`, `ios-431.md`
+   - Format: `prdx-[platform]-[issue-number].md`
+   - Examples: `prdx-android-216.md`, `prdx-backend-1114.md`, `prdx-ios-431.md`
 
 3. Rename file:
    ```bash
-   mv .prdx/prds/[old-filename].md .prdx/prds/[platform]-[issue-number].md
+   mv ~/.claude/plans/[old-filename].md ~/.claude/plans/prdx-[platform]-[issue-number].md
    ```
 
 4. Display success:
@@ -202,8 +202,8 @@ If "Create new":
    Action: [Created new issue / Linked to existing issue]
 
    PRD renamed:
-   - From: .prdx/prds/[old-filename].md
-   - To:   .prdx/prds/[platform]-[issue-number].md
+   - From: ~/.claude/plans/[old-filename].md
+   - To:   ~/.claude/plans/prdx-[platform]-[issue-number].md
 
    Next steps:
    - View issue: gh issue view [number] --web

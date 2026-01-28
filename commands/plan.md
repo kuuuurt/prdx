@@ -1,11 +1,11 @@
 ---
-description: "Create implementation plan by delegating to Plan agent"
+description: "Create PRD using native plan mode"
 argument-hint: "[description]"
 ---
 
 # /prdx:plan - Create Product Requirements Document
 
-Delegates to the `prdx:planner` agent to explore the codebase and create a business-focused PRD.
+Uses Claude's **native plan mode** to explore the codebase and create a business-focused PRD.
 
 ## Philosophy
 
@@ -27,33 +27,16 @@ Detailed implementation planning is done in `/prdx:implement` using the dev-plan
 
 ## How It Works
 
-This command is a **thin wrapper** that:
-1. Runs pre-plan validation hook (if exists)
-2. Detects platform from description/codebase
-3. Invokes `prdx:planner` agent (runs in isolated context)
-4. Agent explores codebase and creates PRD
-5. Agent handles interactive iteration until approval
-6. Returns PRD document (file contents stay in agent's context)
-7. Writes PRD file
+This command enters **native plan mode** to:
+1. Detect platform from description/codebase
+2. Explore codebase architecture
+3. Create PRD using the PRDX template format
+4. Iterate with user until approval
+5. Plan auto-saved to `~/.claude/plans/`
 
 ## Workflow
 
-### Phase 1: Pre-Plan Hook
-
-Run validation hook if it exists:
-
-```bash
-if [ -f hooks/prdx/pre-plan.sh ]; then
-  ./hooks/prdx/pre-plan.sh
-fi
-```
-
-Hook validates:
-- Git repository exists
-- `.prdx/prds/` directory exists
-- PRDs are in `.gitignore`
-
-### Phase 2: Platform Detection
+### Step 1: Platform Detection
 
 Auto-detect platform from:
 
@@ -77,7 +60,7 @@ if [ -d "ios" ]; then HAS_IOS=true; fi
 
 **4. Mobile Platform Selection:**
 
-If the detected platform is `mobile` OR the codebase has both android and ios directories AND the description doesn't specify a single platform:
+If detected platform is `mobile` OR codebase has both android and ios directories:
 
 Use **AskUserQuestion** to ask which platforms this PRD should target:
 
@@ -86,93 +69,98 @@ Question: "Which platforms should this PRD cover?"
 Header: "Platforms"
 Options:
   - Label: "Android & iOS (Recommended)"
-    Description: "Apply to both platforms - implement sequentially to learn from first platform"
+    Description: "Apply to both platforms - implement sequentially"
   - Label: "Android only"
-    Description: "Platform-specific feature or fix for Android"
+    Description: "Platform-specific feature for Android"
   - Label: "iOS only"
-    Description: "Platform-specific feature or fix for iOS"
+    Description: "Platform-specific feature for iOS"
 ```
 
-Based on answer:
-- "Android & iOS" → PLATFORM="mobile", PLATFORMS=["android", "ios"]
-- "Android only" → PLATFORM="android", PLATFORMS=["android"]
-- "iOS only" → PLATFORM="ios", PLATFORMS=["ios"]
+### Step 2: Enter Plan Mode
 
-If ambiguous (single platform project), default to that platform.
+Use **EnterPlanMode** tool to begin planning.
 
-### Phase 3: Invoke Planner Agent
+Once in plan mode, explore the codebase and create a PRD following this exact format:
 
-Use Task tool with prdx:planner agent:
+```markdown
+# [Title]
 
+**Type:** feature | bug-fix | refactor | spike
+**Platform:** {DETECTED_PLATFORM}
+**Platforms:** {PLATFORMS_LIST} (only for mobile)
+**Status:** planning
+**Created:** {TODAY's DATE}
+**Branch:** {BRANCH_NAME}
+
+## Problem
+
+[What pain point or opportunity exists? Why does this matter?]
+
+## Goal
+
+[What outcome do we want? Express in terms of user/business benefit.]
+
+## User Stories
+
+- As a [user type], I want to [action] so that [benefit]
+
+## Acceptance Criteria
+
+- [ ] [User-observable outcome - testable]
+- [ ] [User-observable outcome - testable]
+
+## Scope
+
+### Included
+- [What this PRD covers]
+
+### Excluded
+- [What this PRD explicitly does NOT cover]
+
+## Approach
+
+[High-level strategy - general direction, NOT detailed dev tasks]
+
+## Risks & Considerations
+
+- [Technical/business risks and constraints]
 ```
-subagent_type: "prdx:planner"
 
-prompt: "Create a PRD for: {DESCRIPTION}
-
-**Platform:** {PLATFORM}
-**Platforms:** {PLATFORMS} (only for mobile - e.g., ["android", "ios"] or ["android"])
-
-Explore the codebase, assess feasibility, and create a business-focused PRD.
-Iterate with the user until they approve the plan.
-
-When approved, return the final PRD document with Branch field included."
-```
-
-**For mobile PRDs (PLATFORM="mobile"):**
-- Pass both PLATFORM and PLATFORMS to the agent
-- Agent will include `Platforms:` field in PRD header
-- Implementation will run sequentially per platform
-
-**Branch naming (included in PRD by agent):**
+**Branch naming convention:**
 - feature → `feat/{slug}`
 - bug-fix → `fix/{slug}`
 - refactor → `refactor/{slug}`
 - spike → `chore/{slug}`
 
-Each PRD gets exactly one branch. This branch is used for all implementation and the eventual PR.
+### Step 3: Iterate Until Approval
 
-**Agent runs in isolated context:**
-- Explores codebase (file contents stay in agent's context)
-- Creates PRD draft
-- Handles user iteration
-- Returns only the PRD document
+Present the PRD draft and iterate based on user feedback:
+- Revise sections as requested
+- Add/remove scope items
+- Adjust approach based on discussion
 
-### Phase 4: Write PRD File
+When user approves (says "looks good", "approve", "let's do it", etc.), finalize the plan.
 
-After agent returns approved PRD:
+### Step 4: Exit Plan Mode
 
-**Generate slug:**
-```bash
-# Convert title to kebab-case
-SLUG=$(echo "{TITLE}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | sed 's/[^a-z0-9-]//g')
+Use **ExitPlanMode** tool when the PRD is complete and approved.
 
-# Add platform prefix for clarity
-if [ "{PLATFORM}" != "backend" ]; then
-  SLUG="{PLATFORM}-${SLUG}"
-fi
-```
+The plan will be automatically saved to `~/.claude/plans/` with the filename `prdx-{slug}.md`.
 
-**Write PRD:**
-```bash
-PRD_FILE=".prdx/prds/${SLUG}.md"
-echo "{PRD_CONTENT}" > "$PRD_FILE"
-```
+**IMPORTANT:** Name the plan file `prdx-{slug}.md` where slug is derived from the title (kebab-case, e.g., `prdx-biometric-login.md`).
 
 **Display summary:**
 ```
 PRD created and saved
 
-PRD: .prdx/prds/{SLUG}.md
+PRD: ~/.claude/plans/prdx-{slug}.md
 Platform: {PLATFORM}
 Status: planning
+Branch: {BRANCH}
 
 Next steps:
-1. Review the plan in the PRD file
-2. Run `/prdx:implement {SLUG}` to start implementation
-3. Or edit the PRD manually if needed
-
-To implement: /prdx:implement {SLUG}
-To view: /prdx:show {SLUG}
+- Run /prdx:implement {slug} to start implementation
+- Or run /prdx:prdx {slug} for guided workflow
 ```
 
 ## Error Handling
@@ -189,26 +177,9 @@ Examples:
   /prdx:plan "fix memory leak in image loading"
 ```
 
-### Hook Validation Failed
-
-```
-Pre-plan validation failed
-
-Check hooks/prdx/pre-plan.sh output above
-
-Fix the issues and try again.
-```
-
 ### Platform Detection Ambiguous
 
-```
-Could not detect platform from description
-
-Please specify with --platform flag:
-  /prdx:plan "description" --platform=backend
-  /prdx:plan "description" --platform=android
-  /prdx:plan "description" --platform=ios
-```
+Use AskUserQuestion to let user choose platform.
 
 ## Optional Flags
 
@@ -228,73 +199,11 @@ Override type inference:
 
 Valid types: `feature`, `bug-fix`, `refactor`, `spike`
 
-## Context Efficiency
+## Key Points
 
-The `prdx:planner` agent runs in an **isolated context**:
-
-| What stays in agent context | What returns to main conversation |
-|-----------------------------|-----------------------------------|
-| All explored file contents | PRD document only (~2KB) |
-| Architecture analysis | Suggested slug |
-| Similar feature research | Approval status |
-
-This keeps the main conversation context small.
-
-## Examples
-
-### Example 1: New Feature
-
-```
-User: /prdx:plan "add biometric login to Android app"
-
-→ Pre-plan hook validates environment
-→ Platform detected: android
-→ prdx:planner agent invoked (isolated context)
-→ Agent explores codebase
-→ Agent creates PRD draft
-→ Agent displays for user review
-→ User: "looks good"
-→ Agent returns approved PRD
-→ PRD written to .prdx/prds/android-biometric-login.md
-
-PRD created and saved
-
-PRD: .prdx/prds/android-biometric-login.md
-Platform: android
-Status: planning
-
-To implement: /prdx:implement android-biometric-login
-```
-
-### Example 2: With Iteration
-
-```
-User: /prdx:plan "fix crash when API returns null user"
-
-→ Agent creates initial PRD
-→ User: "Can we also add better error logging?"
-→ Agent revises PRD
-→ User: "approve"
-→ PRD written to file
-```
-
-## Implementation Notes
-
-### Agent vs Native Plan Agent
-
-| Before | After |
-|--------|-------|
-| Native Plan agent | prdx:planner agent |
-| File contents in main context | File contents in agent context |
-| PRD + all explored files | PRD only |
-
-### Division of Labor
-
-```
-/prdx:plan
-└── prdx:planner → PRD (what, why, high-level how)
-
-/prdx:implement
-├── prdx:dev-planner → Dev Plan (detailed how)
-└── prdx:{platform}-developer → Code (execution)
-```
+1. **Uses native plan mode** - Not a custom agent
+2. **Follow the PRD template exactly** - See CLAUDE.md for format
+3. **Plans auto-save** - To `~/.claude/plans/` directory
+4. **Naming convention** - `prdx-{slug}.md` (e.g., `prdx-biometric-login.md`)
+5. **Status starts as `planning`** - Updated by implement/push commands
+6. **Branch name in PRD** - Used by implement command

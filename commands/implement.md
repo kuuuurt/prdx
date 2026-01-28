@@ -12,7 +12,7 @@ echo "Default: $(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@
 git status --short
 echo ""
 echo "=== Available PRDs ==="
-ls -1 .prdx/prds/*.md 2>/dev/null | xargs -I{} basename {} .md || echo "No PRDs found"
+ls -1 ~/.claude/plans/prdx-*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
 ```
 
 # /prdx:implement - Implement Feature
@@ -21,7 +21,9 @@ Two-phase implementation: **Dev Planning** (prdx:dev-planner) → **Development*
 
 Both agents run in **isolated contexts** to minimize main conversation context usage.
 
-**For mobile PRDs with multiple platforms:** Implementation runs **sequentially** per platform to learn from the first implementation.
+**PRDs are read from `~/.claude/plans/`** (created by native plan mode).
+
+**For mobile PRDs with multiple platforms:** Implementation runs **sequentially** per platform.
 
 ## Usage
 
@@ -88,7 +90,8 @@ This command orchestrates two agents in **isolated contexts**:
 
 1. Find PRD file matching the slug:
    ```bash
-   ls .prdx/prds/*{slug}*.md
+   ls ~/.claude/plans/prdx-*{slug}*.md
+   # Or exact match: ~/.claude/plans/prdx-{slug}.md
    ```
 
 2. If not found, show error and list available PRDs
@@ -97,8 +100,12 @@ This command orchestrates two agents in **isolated contexts**:
    - Platform (backend/android/ios/mobile)
    - **Platforms** (for mobile only - e.g., "android, ios" or just "android")
    - Type (feature/bug-fix/refactor/spike)
-   - Branch name (if exists)
+   - Branch name from `**Branch:**` field
+   - Status from `**Status:**` field
    - Full PRD content
+
+4. **Update status to `in-progress`:**
+   Edit the PRD file to change `**Status:** planning` to `**Status:** in-progress`
 
 ### Step 2a: Determine Target Platform(s)
 
@@ -439,15 +446,17 @@ After each platform completes:
 
 ---
 
-### Step 6: Post-Implement Hook
+### Step 6: Update Status and Post-Implement Hook
 
-Run the post-implement hook:
+1. **Update status to `review`:**
+   Edit the PRD file to change `**Status:** in-progress` to `**Status:** review`
 
-```bash
-if [ -f hooks/prdx/post-implement.sh ]; then
-  ./hooks/prdx/post-implement.sh "{slug}"
-fi
-```
+2. Run the post-implement hook (optional):
+   ```bash
+   if [ -f hooks/prdx/post-implement.sh ]; then
+     ./hooks/prdx/post-implement.sh "{slug}"
+   fi
+   ```
 
 ### Step 7: Display Completion
 
@@ -496,7 +505,7 @@ Next steps:
 Usage: /prdx:implement <slug>
 
 Available PRDs:
-{List PRDs from .prdx/prds/}
+{List PRDs from ~/.claude/plans/}
 ```
 
 ### PRD Not Found
@@ -532,10 +541,12 @@ Fix the issues and try again.
 
 ## Key Points
 
-1. **Always read prdx.json first** - Config determines commit format
-2. **Build commit instructions dynamically** - Based on actual config values
-3. **Pass commit instructions to agent** - Include in the prompt
-4. **Agents run isolated** - They don't have access to main conversation context
-5. **Return summaries only** - File contents stay in agent context
-6. **Multi-platform mobile runs sequentially** - Android first, then iOS, to learn from first implementation
-7. **Pass learnings between platforms** - Include previous platform notes for the second implementation
+1. **PRDs from native plan mode** - Read from `~/.claude/plans/`
+2. **Status tracking via file edit** - Update `**Status:**` field directly
+3. **Always read prdx.json first** - Config determines commit format
+4. **Build commit instructions dynamically** - Based on actual config values
+5. **Pass commit instructions to agent** - Include in the prompt
+6. **Agents run isolated** - They don't have access to main conversation context
+7. **Return summaries only** - File contents stay in agent context
+8. **Multi-platform mobile runs sequentially** - Android first, then iOS
+9. **Pass learnings between platforms** - Include previous platform notes

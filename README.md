@@ -1,21 +1,21 @@
 # PRDX
 
-> PRD workflow for Claude Code leveraging native tooling
+> PRD workflow for Claude Code leveraging native plan mode
 
-PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) workflow using native Plan agents, platform-specific agents, hooks, and skills.
+PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) workflow using Claude's **native plan mode**, platform-specific agents, hooks, and skills.
 
 ## The Workflow
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                              /prdx "feature"                                │
+│                           /prdx:prdx "feature"                              │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  1. PLAN                                                                    │
+│  1. PLAN (native plan mode)                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  prdx:planner agent (isolated context)                                │  │
+│  │  Claude's native plan mode                                            │  │
 │  │  • Explores codebase architecture                                     │  │
 │  │  • Assesses feasibility                                               │  │
 │  │  • Creates PRD with branch name                                       │  │
@@ -26,7 +26,7 @@ PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) w
 │                    └────────┬────────┘                                      │
 │                             │ yes                                           │
 │                             ▼                                               │
-│               Status: planning ──────────────────────────────► .prdx/prds/  │
+│               Status: planning ────────────────► ~/.claude/plans/prdx-*.md  │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                          ┌────────────┴────────────┐
@@ -124,45 +124,45 @@ PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) w
 ## Status Flow
 
 ```
-planning ──► in-progress ──► review ──► implemented ──► completed
-    │             │            │              │              │
-    │             │            │              │              │
-    ▼             ▼            ▼              ▼              ▼
-PRD created   Coding...   User tests    PR created    PR merged
-                          Fix bugs      Ready to      All done!
-                          if needed     merge
+planning ──► published ──► in-progress ──► review ──► implemented ──► completed
+    │            │              │            │              │              │
+    ▼            ▼              ▼            ▼              ▼              ▼
+PRD created  GitHub issue  Coding...   User tests    PR created    PR merged
+             (optional)                Fix bugs      Ready to      All done!
+                                       if needed     merge
 ```
 
-## Why Context Isolation?
+## Why This Approach?
 
-Each agent runs in its own context, keeping the main conversation lightweight:
+**Native plan mode** handles PRD creation - plans auto-save to `~/.claude/plans/prdx-*.md`.
+
+**Context-isolated agents** handle implementation, keeping the main conversation lightweight:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Main Conversation (stays small)                                            │
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │  • PRD document (~2KB)                                                  ││
 │  │  • Dev plan summary (~3KB)                                              ││
 │  │  • Implementation summary (~1KB)                                        ││
 │  │  • PR URL (~100B)                                                       ││
 │  │  ────────────────────────────                                           ││
-│  │  Total: ~6KB                                                            ││
+│  │  Total: ~4KB                                                            ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Agent Contexts (isolated, discarded after use)                             │
 │                                                                             │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐          │
-│  │ prdx:planner     │  │ prdx:dev-planner │  │ Platform agent   │          │
-│  │                  │  │                  │  │                  │          │
-│  │ • All explored   │  │ • Skills content │  │ • All source     │          │
-│  │   files          │  │ • Codebase       │  │   files read     │          │
-│  │ • Architecture   │  │   patterns       │  │ • Test files     │          │
-│  │   analysis       │  │ • Task breakdown │  │ • Build output   │          │
-│  │                  │  │                  │  │                  │          │
-│  │ Returns: PRD     │  │ Returns: Plan    │  │ Returns: Summary │          │
-│  └──────────────────┘  └──────────────────┘  └──────────────────┘          │
+│  ┌──────────────────┐  ┌──────────────────┐                                │
+│  │ prdx:dev-planner │  │ Platform agent   │                                │
+│  │                  │  │                  │                                │
+│  │ • Skills content │  │ • All source     │                                │
+│  │ • Codebase       │  │   files read     │                                │
+│  │   patterns       │  │ • Test files     │                                │
+│  │ • Task breakdown │  │ • Build output   │                                │
+│  │                  │  │                  │                                │
+│  │ Returns: Plan    │  │ Returns: Summary │                                │
+│  └──────────────────┘  └──────────────────┘                                │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -196,6 +196,7 @@ Each agent runs in its own context, keeping the main conversation lightweight:
 ```
 
 This orchestrates the entire workflow with decision points at each phase.
+Plans auto-save to `~/.claude/plans/prdx-{slug}.md`.
 Stop anytime and resume with `/prdx:prdx <slug>`.
 
 ### Individual Commands
@@ -260,7 +261,6 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Workflow Agents                                                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  prdx:planner      │ Explores codebase, creates business-focused PRDs      │
 │  prdx:dev-planner  │ Creates detailed technical implementation plans       │
 │  prdx:pr-author    │ Creates comprehensive PR descriptions                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -270,11 +270,13 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 │  prdx:android-developer  │ Android implementation (Kotlin/Compose)         │
 │  prdx:ios-developer      │ iOS implementation (Swift/SwiftUI)              │
 └─────────────────────────────────────────────────────────────────────────────┘
+
+Note: PRD creation uses Claude's native plan mode (not a custom agent).
 ```
 
 ## PRD Structure
 
-PRDs are stored in `.prdx/prds/`:
+PRDs are stored in `~/.claude/plans/` with `prdx-` prefix:
 
 ```markdown
 # Feature Title

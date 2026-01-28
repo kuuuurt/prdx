@@ -1,17 +1,16 @@
 ---
-description: "Migrate PRDs and config from .claude to .prdx folder"
+description: "Migrate PRDs from old .prdx/prds to ~/.claude/plans"
 ---
 
-# /prdx:migrate - Migrate to New Folder Structure
+# /prdx:migrate - Migrate to Native Plans Directory
 
-Migrates PRDX files from the old `.claude/` location to the new `.prdx/` folder.
+Migrates PRDX files from the old `.prdx/prds/` location to Claude's native `~/.claude/plans/` directory with the `prdx-` prefix.
 
 ## What Gets Migrated
 
 | Old Location | New Location |
 |--------------|--------------|
-| `.claude/prds/` | `.prdx/prds/` |
-| `.claude/prdx.json` | `.prdx/prdx.json` |
+| `.prdx/prds/*.md` | `~/.claude/plans/prdx-*.md` |
 
 ## Usage
 
@@ -21,136 +20,71 @@ Migrates PRDX files from the old `.claude/` location to the new `.prdx/` folder.
 
 ## How It Works
 
-### Step 1: Check for Existing Files
+### Step 1: Check for Files to Migrate
 
-Check if there are files to migrate:
+Check if there are files in the old location:
 
 ```bash
-# Check for old PRDs directory
-OLD_PRDS_EXISTS=$([ -d ".claude/prds" ] && echo "yes" || echo "no")
-
-# Check for old config file
-OLD_CONFIG_EXISTS=$([ -f ".claude/prdx.json" ] && echo "yes" || echo "no")
+OLD_PRDS_COUNT=$(ls -1 .prdx/prds/*.md 2>/dev/null | wc -l)
 ```
 
-If neither exists, inform user:
+If none exist, inform user:
 ```
 Nothing to migrate.
 
-Old locations checked:
-- .claude/prds/ (not found)
-- .claude/prdx.json (not found)
+Old location: .prdx/prds/ (not found or empty)
 
-Your project may already be using the new .prdx/ structure,
-or PRDX hasn't been used in this project yet.
+Your PRDs may already be in ~/.claude/plans/ with prdx-* prefix.
 ```
 
-### Step 2: Check for Conflicts
-
-Before migrating, check if new locations already have files:
+### Step 2: Ensure Target Directory Exists
 
 ```bash
-# Check for existing .prdx directory
-NEW_PRDS_EXISTS=$([ -d ".prdx/prds" ] && echo "yes" || echo "no")
-NEW_CONFIG_EXISTS=$([ -f ".prdx/prdx.json" ] && echo "yes" || echo "no")
+mkdir -p ~/.claude/plans
 ```
 
-If conflicts exist, use **AskUserQuestion**:
+### Step 3: Migrate Each PRD
 
-```
-Question: "Found existing files in .prdx/. How should we handle conflicts?"
-Header: "Conflicts"
-Options:
-  - Label: "Skip existing"
-    Description: "Only migrate files that don't already exist in .prdx/"
-  - Label: "Overwrite"
-    Description: "Replace existing .prdx/ files with ones from .claude/"
-  - Label: "Cancel"
-    Description: "Don't migrate anything, I'll handle it manually"
-```
+For each file in `.prdx/prds/`:
 
-### Step 3: Create New Directory Structure
+1. Extract the slug from filename
+2. Copy to new location with `prdx-` prefix:
+   ```bash
+   cp .prdx/prds/backend-auth.md ~/.claude/plans/prdx-backend-auth.md
+   ```
 
-```bash
-mkdir -p .prdx/prds
-```
-
-### Step 4: Migrate PRDs
-
-If `.claude/prds/` exists and has files:
-
-```bash
-# Count PRDs to migrate
-PRD_COUNT=$(ls -1 .claude/prds/*.md 2>/dev/null | wc -l)
-
-if [ "$PRD_COUNT" -gt 0 ]; then
-  # Copy PRDs (or move based on user preference)
-  cp .claude/prds/*.md .prdx/prds/
-fi
-```
-
-### Step 5: Migrate Config
-
-If `.claude/prdx.json` exists:
-
-```bash
-cp .claude/prdx.json .prdx/prdx.json
-```
-
-### Step 6: Update .gitignore
-
-Check if `.gitignore` needs updating:
-
-```bash
-# Check if old pattern exists
-if grep -q "\.claude/prds" .gitignore 2>/dev/null; then
-  # Add new pattern if not already present
-  if ! grep -q "\.prdx/prds" .gitignore 2>/dev/null; then
-    echo ".prdx/prds/" >> .gitignore
-  fi
-fi
-```
-
-### Step 7: Ask About Cleanup
+### Step 4: Ask About Cleanup
 
 After successful migration, use **AskUserQuestion**:
 
 ```
-Question: "Migration complete. Remove old .claude/prds/ and .claude/prdx.json?"
+Question: "Migration complete. Remove old .prdx/prds/ directory?"
 Header: "Cleanup"
 Options:
   - Label: "Yes, remove old files (Recommended)"
-    Description: "Delete .claude/prds/ and .claude/prdx.json to avoid confusion"
+    Description: "Delete .prdx/prds/ to avoid confusion"
   - Label: "No, keep both"
-    Description: "Keep old files as backup (you can delete them later)"
+    Description: "Keep old files as backup"
 ```
 
 If user chooses to remove:
-
 ```bash
-rm -rf .claude/prds
-rm -f .claude/prdx.json
+rm -rf .prdx/prds
 ```
 
-### Step 8: Display Summary
+### Step 5: Display Summary
 
 ```
-✅ Migration Complete!
+Migration Complete!
 
 Migrated:
-  📁 {PRD_COUNT} PRDs → .prdx/prds/
-  ⚙️  Config → .prdx/prdx.json
+  {COUNT} PRDs → ~/.claude/plans/prdx-*.md
 
 {If cleanup was done:}
 Removed:
-  🗑️  .claude/prds/
-  🗑️  .claude/prdx.json
+  .prdx/prds/
 
-{If .gitignore was updated:}
-Updated:
-  📝 .gitignore (added .prdx/prds/)
-
-Your PRDX files are now in the .prdx/ folder.
+Your PRDs are now in Claude's native plans directory.
 ```
 
 ## Error Handling
@@ -158,9 +92,9 @@ Your PRDX files are now in the .prdx/ folder.
 ### Permission Denied
 
 ```
-❌ Permission denied
+Permission denied
 
-Could not write to .prdx/ directory.
+Could not write to ~/.claude/plans/ directory.
 Check folder permissions and try again.
 ```
 
@@ -169,7 +103,7 @@ Check folder permissions and try again.
 If some files fail to copy:
 
 ```
-⚠️  Partial migration
+Partial migration
 
 Successfully migrated:
 - {list of successful files}

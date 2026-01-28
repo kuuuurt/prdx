@@ -1,11 +1,11 @@
 ---
-description: "Complete PRD workflow: plan → publish → implement → push"
+description: "Complete PRD workflow: plan → implement → push"
 argument-hint: "[feature description or PRD slug]"
 ---
 
-# /prdx - Complete Feature Workflow
+# /prdx:prdx - Complete Feature Workflow
 
-> **One command to rule them all.**
+> **Main entry point for PRDX.**
 > Orchestrates the complete feature development workflow with decision points.
 
 ## Workflow
@@ -14,8 +14,8 @@ Execute the following phases based on the argument provided:
 
 ### Step 1: Determine Entry Point
 
-**If the argument matches an existing PRD** (check `.prdx/prds/`):
-- Read PRD and check its status
+**If the argument matches an existing PRD** (check `~/.claude/plans/`):
+- Read PRD and check its `**Status:**` field
 - For multi-platform mobile PRDs, also check which platforms have been implemented (look for `## Implementation Notes (android)` and `## Implementation Notes (ios)` sections)
 - Resume from the appropriate phase:
   - `planning` → Continue planning (Phase 2)
@@ -30,7 +30,7 @@ Execute the following phases based on the argument provided:
 - Proceed to Phase 2 (planning)
 
 **If no argument provided**:
-- List existing PRDs with their status using: `ls -la .prdx/prds/*.md 2>/dev/null`
+- List existing PRDX plans using: `ls -la ~/.claude/plans/prdx-*.md 2>/dev/null`
 - Ask: "Start a new feature or continue an existing PRD?"
 
 ---
@@ -43,27 +43,19 @@ Run the planning command with the feature description:
 /prdx:plan [description]
 ```
 
-**IMPORTANT: The planner agent will use AskUserQuestion to get explicit PRD approval.**
+This enters native plan mode and creates a PRD following the PRDX template format.
 
-Wait for `/prdx:plan` to complete. The agent will:
-1. Explore the codebase
-2. Create a PRD draft
-3. Ask user to approve via AskUserQuestion (Approve / Request changes / Start over)
-4. Only return when user explicitly selects "Approve PRD"
+Wait for plan mode to complete. The PRD will be auto-saved to `~/.claude/plans/`.
 
-**Do NOT proceed until the planner returns with "✅ PRD Approved" in its output.**
-
-If the planner returns without approval (user chose "Start over" or abandoned), stop the workflow.
-
-**After PRD is approved and saved, use AskUserQuestion to ask:**
-- Option 1: "Publish to GitHub" (creates issue for team visibility)
+**After PRD is saved, use AskUserQuestion to ask:**
+- Option 1: "Publish to GitHub" (create issue for team visibility)
 - Option 2: "Implement now" (start coding immediately)
 - Option 3: "Stop here" (review PRD later)
 
 Route based on choice:
 - Publish → Phase 2a (then ask about implementation)
 - Implement → Phase 3
-- Stop → End workflow, tell user they can resume with `/prdx [slug]`
+- Stop → End workflow, tell user they can resume with `/prdx:prdx [slug]`
 
 ---
 
@@ -95,7 +87,7 @@ Read the PRD and check for `**Platforms:**` field with multiple platforms (e.g.,
 ```
 /prdx:implement [slug]
 ```
-Wait for implementation to complete, then proceed to PR decision.
+Wait for implementation to complete, then proceed to review decision.
 
 **For multi-platform mobile PRDs:**
 
@@ -114,8 +106,8 @@ Implementation runs **sequentially** per platform to learn from the first implem
 
    Route based on choice:
    - Continue → Proceed to iOS
-   - Stop → End workflow, tell user to resume with `/prdx [slug]`
-   - Skip → Update PRD to remove iOS from Platforms, proceed to PR decision
+   - Stop → End workflow, tell user to resume with `/prdx:prdx [slug]`
+   - Skip → Update PRD to remove iOS from Platforms, proceed to review
 
 3. **Second Platform (iOS):**
    - Display: "Starting iOS implementation (applying learnings from Android)..."
@@ -124,11 +116,11 @@ Implementation runs **sequentially** per platform to learn from the first implem
 
 **After all platform implementations complete, use AskUserQuestion:**
 - Option 1: "Yes, create PR now"
-- Option 2: "No, I need to review first"
+- Option 2: "No, I need to test first"
 
 Route based on choice:
 - Yes → Phase 4
-- No → End workflow, tell user they can resume with `/prdx [slug]`
+- No → End workflow, tell user they can resume with `/prdx:prdx [slug]`
 
 ---
 
@@ -166,10 +158,9 @@ Run the push command:
 **After PR is created, display completion message:**
 
 ```
-🎉 Feature complete!
+Feature complete!
 
-PRD: .prdx/prds/[slug].md
-Issue: #[issue-number] (if published)
+PRD: ~/.claude/plans/[slug].md
 PR: #[pr-number]
 
 The feature is ready for review.
@@ -189,7 +180,12 @@ The feature is ready for review.
 **Respect user choice:**
 - Never auto-proceed to the next phase without asking
 - "Stop here" is always a valid option
-- Always show how to resume later with `/prdx [slug]`
+- Always show how to resume later with `/prdx:prdx [slug]`
+
+**Status tracking:**
+- Read status from PRD file's `**Status:**` field
+- Update status by editing the PRD file directly
+- Status flow: planning → in-progress → review → implemented → completed
 
 **Error handling:**
 - If any phase fails, show clear error message

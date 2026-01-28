@@ -7,29 +7,29 @@ set -e
 PRD_SLUG="$1"
 
 if [ -z "$PRD_SLUG" ]; then
-    echo "❌ No PRD slug provided"
+    echo "No PRD slug provided"
     exit 1
 fi
 
-# Find PRD file
-PRD_FILE=$(find .prdx/prds -name "*${PRD_SLUG}*.md" -type f | head -1)
+# Find PRD file (prdx-* naming convention)
+PRD_FILE=$(ls ~/.claude/plans/prdx-*${PRD_SLUG}*.md 2>/dev/null | head -1)
 
 if [ -z "$PRD_FILE" ]; then
-    echo "❌ PRD not found: $PRD_SLUG"
+    echo "PRD not found: $PRD_SLUG"
     echo ""
     echo "Available PRDs:"
-    find .prdx/prds -name "*.md" -type f -exec basename {} .md \;
+    ls ~/.claude/plans/prdx-*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
     exit 1
 fi
 
-echo "📄 Validating PRD: $PRD_FILE"
+echo "Validating PRD: $PRD_FILE"
 
 # Check PRD has required sections
-REQUIRED_SECTIONS=("## Goal" "## Acceptance Criteria" "## Approach" "## Implementation Tasks")
+REQUIRED_SECTIONS=("## Goal" "## Acceptance Criteria" "## Approach")
 
 for section in "${REQUIRED_SECTIONS[@]}"; do
     if ! grep -q "$section" "$PRD_FILE"; then
-        echo "❌ Missing required section: $section"
+        echo "Missing required section: $section"
         exit 1
     fi
 done
@@ -38,7 +38,7 @@ done
 STATUS=$(grep "^\*\*Status:\*\*" "$PRD_FILE" | sed 's/\*\*Status:\*\* //')
 
 if [ "$STATUS" = "completed" ] || [ "$STATUS" = "closed" ]; then
-    echo "❌ PRD is already $STATUS"
+    echo "PRD is already $STATUS"
     echo "Cannot implement a closed PRD"
     exit 1
 fi
@@ -49,7 +49,7 @@ if grep -q "^\*\*Branch:\*\*" "$PRD_FILE"; then
     CURRENT_BRANCH=$(git branch --show-current)
 
     if [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ]; then
-        echo "⚠️  Not on expected branch"
+        echo "Not on expected branch"
         echo "Current: $CURRENT_BRANCH"
         echo "Expected: $EXPECTED_BRANCH"
         echo ""
@@ -65,7 +65,7 @@ fi
 
 # Check for uncommitted changes
 if [ -n "$(git status --porcelain)" ]; then
-    echo "⚠️  You have uncommitted changes"
+    echo "You have uncommitted changes"
     git status --short
     echo ""
     read -p "Continue anyway? (y/n) " -n 1 -r
@@ -75,5 +75,5 @@ if [ -n "$(git status --porcelain)" ]; then
     fi
 fi
 
-echo "✓ PRD validation passed"
+echo "PRD validation passed"
 exit 0

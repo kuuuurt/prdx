@@ -44,7 +44,7 @@
 
 1. **Check for exact slug match:**
    ```bash
-   ls .prdx/prds/*[input]*.md 2>/dev/null
+   ls ~/.claude/plans/prdx-*[input]*.md 2>/dev/null
    ```
    - If exactly 1 match → STATUS mode
    - If multiple matches → Ask user to select
@@ -68,7 +68,7 @@
 
 1. **Find all PRD files:**
    ```bash
-   find .prdx/prds -name "*.md" -type f ! -path "*/templates/*"
+   ls ~/.claude/plans/prdx-*.md 2>/dev/null
    ```
 
 2. **Parse metadata from each:**
@@ -86,7 +86,7 @@
 4. **Group by platform and display:**
 
 ```
-PRDs in .prdx/prds/ (12 found)
+PRDs in ~/.claude/plans/ (12 found)
 
 BACKEND (3)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -141,7 +141,7 @@ Quick actions:
 
 1. **Search using grep:**
    ```bash
-   grep -r -i -n "<keyword>" .prdx/prds --include="*.md" --exclude-dir=templates
+   grep -i -n "<keyword>" ~/.claude/plans/prdx-*.md
    ```
    - Case-insensitive search
    - Show line numbers
@@ -265,7 +265,7 @@ Actions:
 ╚═══════════════════════════════════════════════════════╝
 
 Status: in-progress | Created: 2025-11-05 (3 days ago)
-File: .prdx/prds/android-optimize-loginviewmodel.md
+File: ~/.claude/plans/android-optimize-loginviewmodel.md
 
 WORKFLOW PROGRESS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -322,7 +322,7 @@ NEXT ACTIONS ━━━━━━━━━━━━━━━━━━━━━━�
 
 Recommended:
   1. ✨ Continue work: /prdx:dev
-  2. 📝 Review plan: Read .prdx/prds/android-optimize-loginviewmodel.md
+  2. 📝 Review plan: Read ~/.claude/plans/android-optimize-loginviewmodel.md
 
 Quick commands:
   /prdx:dev       Continue implementation
