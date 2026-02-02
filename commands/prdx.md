@@ -45,9 +45,11 @@ Run the planning command with the feature description:
 
 This enters native plan mode and creates a PRD following the PRDX template format.
 
-Wait for plan mode to complete. The PRD will be auto-saved to `~/.claude/plans/`.
+**IMPORTANT: Stop here and wait.** Plan mode is an interactive process where the user reviews and iterates on the PRD. Do NOT proceed to implementation until:
+1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
+2. The PRD file exists in `~/.claude/plans/prdx-{slug}.md`
 
-**After PRD is saved, use AskUserQuestion to ask:**
+**After plan mode completes and the PRD is saved, STOP and use AskUserQuestion to ask:**
 - Option 1: "Publish to GitHub" (create issue for team visibility)
 - Option 2: "Implement now" (start coding immediately)
 - Option 3: "Stop here" (review PRD later)
@@ -169,6 +171,11 @@ The feature is ready for review.
 ---
 
 ## Important Guidelines
+
+**CRITICAL: Never skip user decision points.**
+- After planning completes → MUST ask before implementing
+- After implementing completes → MUST ask before creating PR
+- Each phase transition requires explicit user consent via AskUserQuestion
 
 **Use AskUserQuestion tool** at each decision point with clear options.
 
