@@ -26,3 +26,6 @@ build/
 
 # User-specific context files
 .claude/.prdx-context
+
+# Test temporary files
+tests/tmp/
