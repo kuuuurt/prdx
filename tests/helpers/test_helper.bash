@@ -3,20 +3,20 @@
 
 # Setup function - runs before each test
 setup() {
-    # Create temporary directory for test isolation
-    export TEST_TEMP_DIR="/Users/kuuurt/Documents/Work/personal/prdx/tests/tmp"
-    mkdir -p "$TEST_TEMP_DIR"
+    # Determine repo root from this script's location
+    # BATS_TEST_DIRNAME is the directory containing the .bats file
+    export REPO_ROOT="$(cd "$(dirname "$BATS_TEST_DIRNAME")" && pwd)"
+    export FIXTURES_DIR="$REPO_ROOT/tests/fixtures"
+
+    # Create temporary directory for test isolation (use mktemp for portability)
+    export TEST_TEMP_DIR="$(mktemp -d)"
 
     # Set up test plans directory (mimicking ~/.claude/plans/)
     export TEST_PLANS_DIR="$TEST_TEMP_DIR/.claude/plans"
     mkdir -p "$TEST_PLANS_DIR"
 
-    # Store original HOME and replace with test directory
+    # Store original HOME
     export ORIGINAL_HOME="$HOME"
-
-    # Set REPO_ROOT for accessing fixtures
-    export REPO_ROOT="/Users/kuuurt/Documents/Work/personal/prdx"
-    export FIXTURES_DIR="$REPO_ROOT/tests/fixtures"
 }
 
 # Teardown function - runs after each test
