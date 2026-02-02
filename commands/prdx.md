@@ -19,11 +19,11 @@ Execute the following phases based on the argument provided:
 - For multi-platform mobile PRDs, also check which platforms have been implemented (look for `## Implementation Notes (android)` and `## Implementation Notes (ios)` sections)
 - Resume from the appropriate phase:
   - `planning` → Continue planning (Phase 2)
-  - `published` → Implement (Phase 3)
+  - `published` → Ask user: Implement now? (Phase 3)
   - `in-progress` → Continue implementation (Phase 3)
     - For multi-platform: Check which platforms are done, resume with remaining platform
-  - `review` → Ask user: Fix issues OR Create PR (Phase 3a)
-  - `implemented` → Create PR (Phase 4)
+  - `review` → Ask user: Fix issues OR Create PR? (Phase 3a)
+  - `implemented` → PR already created, inform user and show PR link from PRD
   - `completed` → Inform user the PRD is done
 
 **If the argument is a feature description** (not an existing PRD):
@@ -116,13 +116,16 @@ Implementation runs **sequentially** per platform to learn from the first implem
    - Run: `/prdx:implement [slug] ios`
    - Wait for completion
 
-**After all platform implementations complete, use AskUserQuestion:**
-- Option 1: "Yes, create PR now"
-- Option 2: "No, I need to test first"
+**IMPORTANT: After implementation completes, STOP and use AskUserQuestion:**
+
+Do NOT proceed to create PR automatically. The user must test the implementation first.
+
+- Option 1: "Test first" (Recommended) - Let me verify the implementation works
+- Option 2: "Create PR now" - Skip testing, go straight to PR
 
 Route based on choice:
-- Yes → Phase 4
-- No → End workflow, tell user they can resume with `/prdx:prdx [slug]`
+- Test first → End workflow, tell user to test and resume with `/prdx:prdx [slug]` when ready
+- Create PR now → Proceed to Phase 4 (but ask for confirmation again in Phase 4)
 
 ---
 
@@ -151,7 +154,13 @@ The implementation is complete but user hasn't confirmed it's ready for PR. Use 
 
 ### Step 4: Create Pull Request
 
-Run the push command:
+**IMPORTANT: Confirm before creating PR.**
+
+Use AskUserQuestion to confirm:
+- Option 1: "Yes, create PR" - Ready to submit for review
+- Option 2: "No, wait" - Need more time
+
+If user confirms, run the push command:
 
 ```
 /prdx:push [slug]
@@ -172,10 +181,12 @@ The feature is ready for review.
 
 ## Important Guidelines
 
-**CRITICAL: Never skip user decision points.**
-- After planning completes → MUST ask before implementing
-- After implementing completes → MUST ask before creating PR
+**CRITICAL: Never skip user decision points. ALWAYS use AskUserQuestion.**
+- After planning completes → STOP, ask before implementing
+- After implementing completes → STOP, ask before creating PR (recommend testing first)
+- Before running `/prdx:push` → STOP, ask for final confirmation
 - Each phase transition requires explicit user consent via AskUserQuestion
+- When in doubt, STOP and ask - never auto-proceed
 
 **Use AskUserQuestion tool** at each decision point with clear options.
 
