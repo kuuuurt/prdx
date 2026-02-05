@@ -123,6 +123,7 @@ prdx/
 │   ├── dev-planner.md       # Technical planning (isolated context)
 │   ├── pr-author.md         # PR creation (isolated context)
 │   ├── backend-developer.md # Backend expert (discovers stack)
+│   ├── frontend-developer.md # Frontend/web expert (discovers stack)
 │   ├── android-developer.md # Kotlin/Compose expert
 │   ├── ios-developer.md     # Swift/SwiftUI expert
 │   ├── code-explorer.md     # Codebase exploration (isolated context)
@@ -344,14 +345,21 @@ Agents run in **isolated contexts** to minimize main conversation size.
 - Adapts to project's framework and patterns
 - **Returns:** Implementation summary (~1KB)
 
-**2. prdx:android-developer**
+**2. prdx:frontend-developer**
+- Framework-agnostic frontend/web expert
+- Discovers stack from codebase (React, Vue, Svelte, Next.js, etc.)
+- Component development, state management, data fetching
+- Adapts to project's styling and patterns
+- **Returns:** Implementation summary (~1KB)
+
+**3. prdx:android-developer**
 - Kotlin + Jetpack Compose expert
 - Discovers DI/persistence from build.gradle
 - MVVM architecture, StateFlow
 - Adapts to project's libraries
 - **Returns:** Implementation summary (~1KB)
 
-**3. prdx:ios-developer**
+**4. prdx:ios-developer**
 - Swift + SwiftUI expert
 - Discovers dependencies from Package.swift/Podfile
 - MVVM, async/await, NavigationStack

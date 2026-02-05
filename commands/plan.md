@@ -41,7 +41,8 @@ This command enters **native plan mode** to:
 Auto-detect platform from:
 
 **1. Description keywords:**
-- "backend", "API", "endpoint" → backend
+- "backend", "API", "endpoint", "server" → backend
+- "frontend", "web", "UI", "React", "Vue", "Svelte", "Next.js" → frontend
 - "Android", "Kotlin", "Compose" → android
 - "iOS", "Swift", "SwiftUI" → ios
 - "mobile", "app" (without platform specifics) → mobile (needs platform selection)
