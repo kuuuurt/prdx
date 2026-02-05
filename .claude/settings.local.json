@@ -2,9 +2,25 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:code.claude.com)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "WebSearch",
+      "WebFetch(domain:www.reddit.com)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/prdx/post-edit-optimize.sh"
+          }
+        ]
+      }
+    ]
   }
 }

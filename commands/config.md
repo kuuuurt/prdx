@@ -23,6 +23,11 @@ Manage PRDX configuration interactively or via command line.
 # Granular Control
 /prdx:config set commits.format simple # Set specific value
 /prdx:config get commits.format        # Get specific value
+
+# Hooks Management
+/prdx:config hooks                     # Show available hooks
+/prdx:config hooks enable auto-optimize # Enable auto-optimize hook
+/prdx:config hooks disable auto-optimize # Disable auto-optimize hook
 ```
 
 ## Workflow
@@ -54,6 +59,10 @@ elif [ "$1" = "set" ]; then
 elif [ "$1" = "get" ]; then
   MODE="get"
   SETTING_PATH="$2"
+elif [ "$1" = "hooks" ]; then
+  MODE="hooks"
+  HOOKS_ACTION="$2"  # enable, disable, or empty (show)
+  HOOK_NAME="$3"     # auto-optimize
 else
   echo "❌ Unknown command: $1"
   echo ""
@@ -61,6 +70,7 @@ else
   echo "  /prdx:config                    # Interactive setup"
   echo "  /prdx:config [minimal|standard|simple]  # Quick presets"
   echo "  /prdx:config [show|init|set|get]        # Manage config"
+  echo "  /prdx:config hooks [enable|disable] [hook-name]  # Manage hooks"
   exit 1
 fi
 ```
@@ -577,6 +587,204 @@ Commands:
   Disable co-author: /prdx:config set commits.coAuthor.enabled false
 ```
 
+#### Mode: hooks
+
+Manage PRDX hooks for the current project.
+
+```bash
+# Determine settings file location
+SETTINGS_FILE=".claude/settings.local.json"
+
+# Ensure .claude directory exists
+mkdir -p .claude
+
+# Create settings file if it doesn't exist
+if [ ! -f "$SETTINGS_FILE" ]; then
+  echo '{}' > "$SETTINGS_FILE"
+fi
+```
+
+**Show available hooks (no action):**
+
+```bash
+if [ -z "$HOOKS_ACTION" ]; then
+  echo "🔧 PRDX Hooks"
+  echo ""
+  echo "Available hooks:"
+  echo ""
+  echo "  auto-optimize"
+  echo "    Prompts optimization of changed lines after Edit/Write operations."
+  echo "    Removes documentation-style comments, inlines single-use variables"
+  echo "    and functions."
+  echo ""
+
+  # Check if hook is enabled
+  if command -v jq &> /dev/null && [ -f "$SETTINGS_FILE" ]; then
+    HOOK_ENABLED=$(jq -r '.hooks.PostToolUse[]?.hooks[]?.command // empty' "$SETTINGS_FILE" 2>/dev/null | grep -c "post-edit-optimize" || true)
+    if [ "$HOOK_ENABLED" -gt 0 ]; then
+      echo "  Status: ✅ enabled"
+    else
+      echo "  Status: ❌ disabled"
+    fi
+  else
+    echo "  Status: ❌ disabled"
+  fi
+
+  echo ""
+  echo "Commands:"
+  echo "  /prdx:config hooks enable auto-optimize"
+  echo "  /prdx:config hooks disable auto-optimize"
+  exit 0
+fi
+```
+
+**Enable hook:**
+
+```bash
+if [ "$HOOKS_ACTION" = "enable" ]; then
+  if [ -z "$HOOK_NAME" ]; then
+    echo "❌ No hook name provided"
+    echo "Usage: /prdx:config hooks enable <hook-name>"
+    echo ""
+    echo "Available hooks: auto-optimize"
+    exit 1
+  fi
+
+  case "$HOOK_NAME" in
+    "auto-optimize")
+      # Find the plugin hooks directory
+      PLUGIN_DIR=""
+      if [ -d "$HOME/.claude/plugins/prdx/hooks/prdx" ]; then
+        PLUGIN_DIR="$HOME/.claude/plugins/prdx"
+      elif [ -d ".claude/plugins/prdx/hooks/prdx" ]; then
+        PLUGIN_DIR=".claude/plugins/prdx"
+      else
+        echo "❌ PRDX plugin not found"
+        echo ""
+        echo "Install PRDX first:"
+        echo "  /plugin marketplace add kuuuurt/prdx"
+        exit 1
+      fi
+
+      # Add hook configuration using jq
+      if ! command -v jq &> /dev/null; then
+        echo "⚠️  jq not installed - cannot modify settings"
+        echo ""
+        echo "Install: brew install jq (macOS) or apt-get install jq (Linux)"
+        echo ""
+        echo "Manual setup: Add this to $SETTINGS_FILE:"
+        cat << 'MANUAL_EOF'
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$PLUGIN_DIR/hooks/prdx/post-edit-optimize.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+MANUAL_EOF
+        exit 1
+      fi
+
+      # Create or update the settings file with the hook
+      HOOK_CONFIG=$(cat << EOF
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$PLUGIN_DIR/hooks/prdx/post-edit-optimize.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+)
+
+      # Merge with existing settings
+      if [ -f "$SETTINGS_FILE" ] && [ -s "$SETTINGS_FILE" ]; then
+        jq -s '.[0] * .[1]' "$SETTINGS_FILE" <(echo "$HOOK_CONFIG") > "${SETTINGS_FILE}.tmp"
+        mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
+      else
+        echo "$HOOK_CONFIG" > "$SETTINGS_FILE"
+      fi
+
+      echo "✅ Enabled auto-optimize hook"
+      echo ""
+      echo "The hook will prompt optimization after Edit/Write operations on:"
+      echo "  .kt, .kts, .swift, .ts, .tsx, .js, .jsx, .py, .go, .rs files"
+      echo ""
+      echo "Optimization rules:"
+      echo "  - Remove documentation-style comments (keeps // MARK:, // TODO:)"
+      echo "  - Inline single-use variables when expression is clear"
+      echo "  - Inline single-use private functions when simple"
+      echo ""
+      echo "To disable: /prdx:config hooks disable auto-optimize"
+      ;;
+    *)
+      echo "❌ Unknown hook: $HOOK_NAME"
+      echo ""
+      echo "Available hooks: auto-optimize"
+      exit 1
+      ;;
+  esac
+fi
+```
+
+**Disable hook:**
+
+```bash
+if [ "$HOOKS_ACTION" = "disable" ]; then
+  if [ -z "$HOOK_NAME" ]; then
+    echo "❌ No hook name provided"
+    echo "Usage: /prdx:config hooks disable <hook-name>"
+    exit 1
+  fi
+
+  case "$HOOK_NAME" in
+    "auto-optimize")
+      if ! command -v jq &> /dev/null; then
+        echo "⚠️  jq not installed - cannot modify settings"
+        echo "Manual: Remove the PostToolUse hook from $SETTINGS_FILE"
+        exit 1
+      fi
+
+      if [ -f "$SETTINGS_FILE" ]; then
+        # Remove the auto-optimize hook from PostToolUse
+        jq 'del(.hooks.PostToolUse[] | select(.hooks[]?.command | contains("post-edit-optimize")))' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp"
+        mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
+
+        # Clean up empty arrays
+        jq 'if .hooks.PostToolUse == [] then del(.hooks.PostToolUse) else . end | if .hooks == {} then del(.hooks) else . end' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp"
+        mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
+      fi
+
+      echo "✅ Disabled auto-optimize hook"
+      echo ""
+      echo "To re-enable: /prdx:config hooks enable auto-optimize"
+      ;;
+    *)
+      echo "❌ Unknown hook: $HOOK_NAME"
+      echo ""
+      echo "Available hooks: auto-optimize"
+      exit 1
+      ;;
+  esac
+fi
+```
+
 ## Examples
 
 ### Example 1: Quick Preset - Minimal
@@ -725,6 +933,55 @@ To view anytime: /prdx:config show
 User: /prdx:config get commits.format
 
 conventional
+```
+
+### Example 6: View Hooks
+
+```
+User: /prdx:config hooks
+
+🔧 PRDX Hooks
+
+Available hooks:
+
+  auto-optimize
+    Prompts optimization of changed lines after Edit/Write operations.
+    Removes documentation-style comments, inlines single-use variables
+    and functions.
+
+  Status: ❌ disabled
+
+Commands:
+  /prdx:config hooks enable auto-optimize
+  /prdx:config hooks disable auto-optimize
+```
+
+### Example 7: Enable Auto-Optimize Hook
+
+```
+User: /prdx:config hooks enable auto-optimize
+
+✅ Enabled auto-optimize hook
+
+The hook will prompt optimization after Edit/Write operations on:
+  .kt, .kts, .swift, .ts, .tsx, .js, .jsx, .py, .go, .rs files
+
+Optimization rules:
+  - Remove documentation-style comments (keeps // MARK:, // TODO:)
+  - Inline single-use variables when expression is clear
+  - Inline single-use private functions when simple
+
+To disable: /prdx:config hooks disable auto-optimize
+```
+
+### Example 8: Disable Auto-Optimize Hook
+
+```
+User: /prdx:config hooks disable auto-optimize
+
+✅ Disabled auto-optimize hook
+
+To re-enable: /prdx:config hooks enable auto-optimize
 ```
 
 ## Error Handling

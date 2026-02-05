@@ -113,7 +113,8 @@ prdx/
 ├── hooks/prdx/              # Validation hooks
 │   ├── pre-plan.sh          # Pre-planning validation
 │   ├── pre-implement.sh     # Pre-implementation validation
-│   └── post-implement.sh    # Post-implementation actions
+│   ├── post-implement.sh    # Post-implementation actions
+│   └── post-edit-optimize.sh # Auto-optimize on file changes
 ├── skills/                  # Knowledge bases (read by agents)
 │   ├── prd-review.md        # Review checklist
 │   ├── impl-patterns.md     # Implementation patterns
@@ -123,7 +124,9 @@ prdx/
 │   ├── pr-author.md         # PR creation (isolated context)
 │   ├── backend-developer.md # Backend expert (discovers stack)
 │   ├── android-developer.md # Kotlin/Compose expert
-│   └── ios-developer.md     # Swift/SwiftUI expert
+│   ├── ios-developer.md     # Swift/SwiftUI expert
+│   ├── code-explorer.md     # Codebase exploration (isolated context)
+│   └── docs-explorer.md     # Documentation search (isolated context)
 └── install.sh               # Installation script
 ```
 
@@ -369,6 +372,25 @@ Agents run in **isolated contexts** to minimize main conversation size.
 - Handle git operations (command does this)
 - Custom orchestration (they just implement)
 
+### Exploration Agents
+
+**1. prdx:code-explorer**
+- Explores codebase to understand patterns
+- Traces execution paths and dependencies
+- Maps architecture layers
+- **Returns:** Summary + key code snippets (~3KB)
+
+**2. prdx:docs-explorer**
+- Searches web and Context7 for documentation
+- Prioritizes official sources
+- Synthesizes from multiple sources
+- **Returns:** Summary + key examples (~3KB)
+
+**What exploration agents do:**
+- Run in isolated context (keeps full content internally)
+- Return concise summaries for main conversation
+- Save context by not dumping full files/pages
+
 ### Context Efficiency
 
 **Plan mode benefits:**
@@ -442,6 +464,29 @@ Skills are read by agents during execution:
 - Metadata
 
 **On failure:** Warns but doesn't block
+
+### post-edit-optimize.sh
+
+**Runs after:** Edit/Write tool usage on source files
+
+**Behavior:**
+- Detects changed lines via `git diff`
+- Outputs `additionalContext` prompting optimization
+- Only triggers for source files (`.kt`, `.swift`, `.ts`, etc.)
+
+**Enable for your project:**
+```bash
+/prdx:config hooks enable auto-optimize
+```
+
+## Auto-Optimize Hook
+
+When you see `PRDX Auto-Optimize:` in context, apply optimization rules:
+1. Check the specified lines for optimization opportunities
+2. Remove documentation-style comments (keep `// MARK:`, `// TODO:`, why-comments)
+3. Inline single-use variables when expression is clear
+4. Inline single-use private functions when simple (1-3 lines)
+5. Apply changes with Edit tool, or continue if no optimizations needed
 
 ## PRD Structure
 
