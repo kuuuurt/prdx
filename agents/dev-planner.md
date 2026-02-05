@@ -19,6 +19,27 @@ Focus on the section for the PRD's platform (backend/android/ios).
 
 ### 2. Explore Codebase
 
+Use exploration agents for efficient context gathering:
+
+**For deep codebase understanding**, use code-explorer:
+```
+Task tool with subagent_type: "prdx:code-explorer"
+prompt: "How is [similar feature] implemented? What patterns and architecture does it follow?"
+```
+
+**For library/API documentation**, use docs-explorer:
+```
+Task tool with subagent_type: "prdx:docs-explorer"
+prompt: "What's the current best practice for [technology] in [framework]?"
+```
+
+These agents return concise summaries while keeping full file contents in their isolated context.
+
+**Direct exploration** with Glob/Grep/Read for:
+- Finding specific files by name
+- Quick pattern searches
+- Reading individual files
+
 Investigate:
 - Existing architecture and patterns
 - Files that will need to be created or modified

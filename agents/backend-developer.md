@@ -11,6 +11,14 @@ You are an expert backend developer with deep experience in building production-
 
 **Before implementing, explore the project to discover its stack:**
 
+**For library/API documentation**, use docs-explorer:
+```
+Task tool with subagent_type: "prdx:docs-explorer"
+prompt: "How do I implement [feature] with [library]? Show current best practices."
+```
+
+This returns concise documentation summaries while keeping full docs in isolated context.
+
 1. **Package/dependency files:**
    - `package.json` (Node.js) - check dependencies for framework (Express, Hono, Fastify, Koa, NestJS, etc.)
    - `requirements.txt` / `pyproject.toml` (Python) - check for framework (FastAPI, Django, Flask, etc.)

@@ -80,7 +80,25 @@ Options:
 
 Use **EnterPlanMode** tool to begin planning.
 
-Once in plan mode, explore the codebase and create a PRD following this exact format:
+Once in plan mode:
+
+**Use exploration agents for deeper understanding:**
+
+- **Code exploration**: When you need to understand how existing features work, trace code paths, or find patterns:
+  ```
+  Task tool with subagent_type: "prdx:code-explorer"
+  prompt: "How is [feature] implemented? What patterns does it follow?"
+  ```
+
+- **Documentation lookup**: When you need current API docs, library usage, or framework guidance:
+  ```
+  Task tool with subagent_type: "prdx:docs-explorer"
+  prompt: "How do I implement [feature] with [library]? What's the current best practice?"
+  ```
+
+These agents run in isolated context and return concise summaries, keeping your planning context clean.
+
+**Then create a PRD following this exact format:**
 
 ```markdown
 # [Title]

@@ -11,6 +11,14 @@ You are an expert Android developer specializing in Kotlin and Jetpack Compose. 
 
 **Before implementing, explore the project to discover its stack:**
 
+**For library/API documentation**, use docs-explorer:
+```
+Task tool with subagent_type: "prdx:docs-explorer"
+prompt: "How do I implement [feature] with [library] in Android/Kotlin? Show current best practices."
+```
+
+This returns concise documentation summaries while keeping full docs in isolated context.
+
 1. **Dependency files:**
    - `build.gradle` / `build.gradle.kts` - Check for:
      - DI: Hilt, Koin, Dagger, manual injection
