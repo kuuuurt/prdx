@@ -45,6 +45,8 @@ Run the planning command with the feature description:
 
 This enters native plan mode and creates a PRD following the PRDX template format.
 
+> **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
+
 **IMPORTANT: Stop here and wait.** Plan mode is an interactive process where the user reviews and iterates on the PRD. Do NOT proceed to implementation until:
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `~/.claude/plans/prdx-{slug}.md`

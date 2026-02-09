@@ -25,11 +25,23 @@ Detailed implementation planning is done in `/prdx:implement` using the dev-plan
 /prdx:plan "improve checkout conversion rate"
 ```
 
+## MANDATORY: Use Isolated Exploration Agents
+
+> **DO NOT use Glob, Grep, Read, or the built-in `Explore` subagent for codebase exploration.**
+> **DO NOT use `subagent_type: "Explore"` - this is FORBIDDEN.**
+>
+> Instead, ALWAYS use these PRDX agents via the Task tool:
+> - `subagent_type: "prdx:code-explorer"` — for understanding code, patterns, architecture
+> - `subagent_type: "prdx:docs-explorer"` — for looking up library/API documentation
+>
+> These run in isolated context and return concise summaries, keeping the planning context clean.
+> Launch multiple agents in parallel when possible.
+
 ## How It Works
 
 This command enters **native plan mode** to:
 1. Detect platform from description/codebase
-2. Explore codebase architecture
+2. Explore codebase using `prdx:code-explorer` agent (NOT `Explore`, NOT direct Glob/Grep/Read)
 3. Create PRD using the PRDX template format
 4. Iterate with user until approval
 5. Plan auto-saved to `~/.claude/plans/`
@@ -81,23 +93,14 @@ Options:
 
 Use **EnterPlanMode** tool to begin planning.
 
-Once in plan mode:
+Once in plan mode, explore the codebase using **ONLY the PRDX exploration agents** (see mandatory section above):
 
-**Use exploration agents for deeper understanding:**
+```
+Task tool: subagent_type="prdx:code-explorer", prompt="[your exploration question]"
+Task tool: subagent_type="prdx:docs-explorer", prompt="[your docs question]"
+```
 
-- **Code exploration**: When you need to understand how existing features work, trace code paths, or find patterns:
-  ```
-  Task tool with subagent_type: "prdx:code-explorer"
-  prompt: "How is [feature] implemented? What patterns does it follow?"
-  ```
-
-- **Documentation lookup**: When you need current API docs, library usage, or framework guidance:
-  ```
-  Task tool with subagent_type: "prdx:docs-explorer"
-  prompt: "How do I implement [feature] with [library]? What's the current best practice?"
-  ```
-
-These agents run in isolated context and return concise summaries, keeping your planning context clean.
+**NEVER use:** `subagent_type: "Explore"`, Glob, Grep, or Read for exploration. These pollute the main context.
 
 **Then create a PRD following this exact format:**
 
@@ -162,7 +165,9 @@ When user approves (says "looks good", "approve", "let's do it", etc.), finalize
 
 ### Step 4: Exit Plan Mode
 
-Use **ExitPlanMode** tool when the PRD is complete and approved.
+When the user approves, call **ExitPlanMode** immediately.
+
+**IMPORTANT:** Do NOT ask "Should I exit plan mode?" or "Ready to exit?" - just call ExitPlanMode directly when the user approves the plan. The approval to exit is implicit in their approval of the plan.
 
 The plan will be automatically saved to `~/.claude/plans/` with the filename `prdx-{slug}.md`.
 

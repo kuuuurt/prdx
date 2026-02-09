@@ -211,6 +211,18 @@ The `/prdx:prdx` command is the main entry point, orchestrating the workflow wit
 
 **Status tracking:** Status is stored in the PRD file itself (`**Status:**` field) and updated by editing the file directly.
 
+### Standalone Commands (No PRD Required)
+
+These commands work independently of the PRDX workflow for quick, ad-hoc work:
+
+```
+/prdx:commit "fix typo"       # Commit with prdx.json config (format, co-author, etc.)
+/prdx:optimize src/auth/      # Code cleanup on any files
+/prdx:push                    # Create PR from current branch (auto-detects PRD if one exists)
+```
+
+**`/prdx:push` auto-detection:** When called without a slug, it checks if the current branch matches any PRD. If yes, uses PRD mode with full context. If no, uses standalone mode and creates a PR purely from commits/diff analysis.
+
 ### Key Features
 
 **Native Plan Mode:**
@@ -268,11 +280,15 @@ The `/prdx:prdx` command is the main entry point, orchestrating the workflow wit
 **What it does:**
 1. Detects platform from description/codebase
 2. Enters native plan mode
-3. Explores codebase and creates PRD using template format
-4. Iterates with user until approval
-5. Plan auto-saved to `~/.claude/plans/`
+3. Uses `prdx:code-explorer` and `prdx:docs-explorer` agents for codebase/docs exploration (keeps main context clean)
+4. Creates PRD using template format
+5. Iterates with user until approval
+6. Calls ExitPlanMode immediately when user approves (do NOT ask "should I exit plan mode?")
+7. Plan auto-saved to `~/.claude/plans/`
 
 **Uses:** Native plan mode (not an isolated agent)
+
+**Exploration:** MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents (NOT direct Glob/Grep/Read, NOT built-in Explore subagent)
 
 **Focus:** Recon, feasibility, business context, high-level approach (not detailed dev tasks)
 
@@ -297,10 +313,15 @@ The `/prdx:prdx` command is the main entry point, orchestrating the workflow wit
 ### /prdx:push
 
 **What it does:**
-1. Validates git state
-2. Invokes `prdx:pr-author` agent (isolated context)
-3. Agent creates PR via `gh` CLI
-4. Returns only PR URL and number (~100B)
+1. Auto-detects PRD mode or standalone mode
+2. Validates git state
+3. Invokes `prdx:pr-author` agent (isolated context)
+4. Agent creates PR via `gh` CLI
+5. Returns only PR URL and number (~100B)
+
+**Modes:**
+- **PRD mode** (slug provided or matching PRD found): Full workflow with status updates, branch validation, PRD-enriched PR description
+- **Standalone mode** (no matching PRD): Creates PR from commits/diff analysis only, no PRD interaction
 
 **Agent used:** `prdx:pr-author` (isolated context)
 
@@ -310,9 +331,13 @@ The `/prdx:prdx` command is the main entry point, orchestrating the workflow wit
 - `/prdx:close` - Update PRD status to completed
 - `/prdx:publish` - Create GitHub issue from PRD
 - `/prdx:sync` - Sync PRD with GitHub issue
-- `/prdx:optimize` - Simplify code (remove comments, inline single-use vars/functions)
 
-All are thin wrappers around bash/git/gh CLI.
+### Standalone-Capable Commands
+
+These work with or without a PRD:
+- `/prdx:commit` - Commit with prdx.json config (always standalone)
+- `/prdx:optimize` - Code cleanup (always standalone)
+- `/prdx:push` - Auto-detects PRD or standalone mode
 
 ## Agents
 
@@ -398,6 +423,11 @@ Agents run in **isolated contexts** to minimize main conversation size.
 - Run in isolated context (keeps full content internally)
 - Return concise summaries for main conversation
 - Save context by not dumping full files/pages
+
+**IMPORTANT:** During PRDX workflows (plan, implement), ALWAYS use `prdx:code-explorer` and `prdx:docs-explorer` agents instead of:
+- Direct Glob/Grep/Read for codebase exploration
+- The built-in `Explore` subagent type
+This keeps the main context window clean.
 
 ### Context Efficiency
 
@@ -653,7 +683,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 ### What We DON'T Do
 
 ❌ Custom plan storage (use native plan mode)
-❌ Custom codebase exploration (plan mode does this)
+❌ Direct codebase exploration in main context (use prdx:code-explorer/docs-explorer agents)
 ❌ Manual multi-agent orchestration (one agent per phase)
 ❌ Separate state management (status in plan file)
 ❌ Custom task tracking (use TodoWrite)
