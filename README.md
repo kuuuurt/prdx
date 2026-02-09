@@ -124,12 +124,14 @@ PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) w
 ## Status Flow
 
 ```
-planning ──► published ──► in-progress ──► review ──► implemented ──► completed
-    │            │              │            │              │              │
-    ▼            ▼              ▼            ▼              ▼              ▼
-PRD created  GitHub issue  Coding...   User tests    PR created    PR merged
-             (optional)                Fix bugs      Ready to      All done!
-                                       if needed     merge
+planning ──► in-progress ──► review ──► implemented ──► completed
+    │              │            │              │              │
+    ▼              ▼            ▼              ▼              ▼
+PRD created    Coding...   User tests    PR created    PR merged
+               + review    Fix bugs      Ready to      All done!
+                           if needed     merge
+
+Optional: /prdx:publish adds GitHub issue link at any status (metadata, not a workflow state)
 ```
 
 ## Why This Approach?

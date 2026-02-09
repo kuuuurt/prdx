@@ -51,7 +51,7 @@
    - If no match → SEARCH mode
 
 2. **Parse filters:**
-   - Extract `--status` value (draft, published, in-progress, review, implemented, completed)
+   - Extract `--status` value (planning, in-progress, review, implemented, completed)
    - Extract `--platform` value (backend, android, ios, web)
 
 3. **Determine mode:**

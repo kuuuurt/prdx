@@ -19,7 +19,6 @@ Execute the following phases based on the argument provided:
 - For multi-platform mobile PRDs, also check which platforms have been implemented (look for `## Implementation Notes (android)` and `## Implementation Notes (ios)` sections)
 - Resume from the appropriate phase:
   - `planning` → Continue planning (Phase 2)
-  - `published` → Ask user: Implement now? (Phase 3)
   - `in-progress` → Continue implementation (Phase 3)
     - For multi-platform: Check which platforms are done, resume with remaining platform
   - `review` → Ask user: Fix issues OR Create PR? (Phase 3a)
@@ -205,7 +204,7 @@ The feature is ready for review.
 **Status tracking:**
 - Read status from PRD file's `**Status:**` field
 - Update status by editing the PRD file directly
-- Status flow: planning → in-progress → review → implemented → completed
+- Status flow: planning → in-progress → review → implemented → completed (publish adds issue metadata but doesn't change status)
 
 **Error handling:**
 - If any phase fails, show clear error message

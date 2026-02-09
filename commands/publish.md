@@ -170,7 +170,7 @@ If "Create new":
 
 1. Update PRD metadata with Edit tool:
    - Add or update `**Issue:**` field with `#[number]`
-   - Update `**Status:**` to `published`
+   - Status stays unchanged (publishing is metadata, not a workflow state)
 
 2. Save original filename for Phase 5
 

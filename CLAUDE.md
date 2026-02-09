@@ -38,7 +38,7 @@ PRDX uses Claude's default plans directory (`~/.claude/plans/`).
 **Type:** feature | bug-fix | refactor | spike
 **Platform:** backend | android | ios | mobile
 **Platforms:** android, ios (only for mobile - list target platforms)
-**Status:** planning | published | in-progress | review | implemented | completed
+**Status:** planning | in-progress | review | implemented | completed
 **Created:** [YYYY-MM-DD]
 **Branch:** feat/[slug] | fix/[slug] | refactor/[slug] | chore/[slug]
 
@@ -84,11 +84,10 @@ PRDX uses Claude's default plans directory (`~/.claude/plans/`).
 
 **Status workflow:**
 1. `planning` - Initial state, plan being created
-2. `published` - GitHub issue created (optional)
-3. `in-progress` - Implementation started
-4. `review` - Implementation done, awaiting user testing
-5. `implemented` - User confirmed ready, PR created
-6. `completed` - PR merged
+2. `in-progress` - Implementation started
+3. `review` - Implementation done, awaiting user testing
+4. `implemented` - User confirmed ready, PR created
+5. `completed` - PR merged
 
 **To update status:** Edit the `**Status:**` line in the plan file directly.
 
@@ -122,6 +121,7 @@ prdx/
 ├── agents/                  # Specialized agents
 │   ├── dev-planner.md       # Technical planning (isolated context)
 │   ├── pr-author.md         # PR creation (isolated context)
+│   ├── code-reviewer.md     # Code review (isolated context)
 │   ├── backend-developer.md # Backend expert (discovers stack)
 │   ├── frontend-developer.md # Frontend/web expert (discovers stack)
 │   ├── android-developer.md # Kotlin/Compose expert
@@ -180,9 +180,9 @@ The `/prdx:prdx` command is the main entry point, orchestrating the workflow wit
    ↓
    - Creates GitHub issue from PRD
    - Updates PRD with issue number
-   - Status: published
+   - Status stays unchanged (publish is metadata, not a workflow state)
 
-4. Implement Feature
+3. Implement Feature
    /prdx:implement {slug}
    /prdx:implement {slug} android  (for multi-platform: Android only)
    /prdx:implement {slug} ios      (for multi-platform: iOS only)
@@ -241,13 +241,14 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 - `prdx:pr-author`: PR creation with comprehensive description
 - Platform agents: TDD implementation execution
 
-**Two-Phase Implementation:**
+**Three-Phase Implementation:**
 - Dev-planner agent first: Creates detailed technical plan
 - Platform agent second: Executes the plan using TDD
+- Code reviewer third: Validates diff against acceptance criteria
 
 **Hooks for Validation:**
 - `pre-implement.sh` - Validates PRD completeness, branch state
-- `post-implement.sh` - Updates status to `review`
+- `post-implement.sh` - Runs tests, updates status to `review`
 
 **Platform Agents for Execution:**
 - Each agent specializes in one platform
@@ -300,15 +301,17 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 3. Sets up git branch
 4. Invokes `prdx:dev-planner` agent (isolated) for detailed planning
 5. Invokes platform agent (isolated) to execute dev plan
-6. Agent implements with TDD + TodoWrite
-7. Runs `post-implement.sh` hook
-8. Appends implementation summary to PRD
+6. Invokes `prdx:code-reviewer` agent (isolated) to validate implementation
+7. If issues found: platform agent fixes, re-review (max 2 cycles)
+8. Runs `post-implement.sh` hook (runs tests, updates status)
+9. Appends implementation summary to PRD
 
-**Agents used (both isolated):**
+**Agents used (all isolated):**
 - `prdx:dev-planner` → returns dev plan (~3KB)
 - Platform agent → returns summary (~1KB)
+- `prdx:code-reviewer` → returns review summary (~2KB)
 
-**Why two agents:** Dev-planner creates the technical roadmap; platform agent executes it.
+**Why three agents:** Dev-planner creates the roadmap; platform agent executes it; code reviewer catches issues before user handoff.
 
 ### /prdx:push
 
@@ -358,6 +361,12 @@ Agents run in **isolated contexts** to minimize main conversation size.
 - Executes `gh pr create`
 - Updates PRD with PR metadata
 - **Returns:** PR URL and number only (~100B)
+
+**3. prdx:code-reviewer**
+- Reviews diff against acceptance criteria
+- Flags bugs, security issues, quality problems
+- Only reports high-confidence issues (>80%)
+- **Returns:** Review summary (~2KB)
 
 **Note:** PRD creation uses native plan mode instead of a custom agent.
 
@@ -496,12 +505,15 @@ Skills are read by agents during execution:
 
 **Runs after:** `/prdx:implement`
 
+**Validates:**
+- Runs project tests (auto-detects test runner)
+- If tests fail: blocks status change, agent must fix
+
 **Updates:**
 - PRD status to "review" (user must confirm before PR creation)
 - Implementation timestamp
-- Metadata
 
-**On failure:** Warns but doesn't block
+**On failure:** Blocks if tests fail; warns for other issues
 
 ### post-edit-optimize.sh
 
@@ -536,7 +548,7 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 **Type:** feature | bug-fix | refactor | spike
 **Platform:** backend | android | ios | mobile
 **Platforms:** android, ios (only for mobile - lists target platforms)
-**Status:** planning | published | in-progress | review | implemented | completed
+**Status:** planning | in-progress | review | implemented | completed
 **Created:** [DATE]
 **Branch:** [BRANCH_NAME]
 
@@ -687,7 +699,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 ❌ Manual multi-agent orchestration (one agent per phase)
 ❌ Separate state management (status in plan file)
 ❌ Custom task tracking (use TodoWrite)
-❌ TDD review checkpoints (trust agent to follow TDD)
+❌ TDD review checkpoints (code reviewer validates after implementation)
 
 ### What We DO
 

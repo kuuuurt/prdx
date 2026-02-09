@@ -17,7 +17,7 @@ ls -1 ~/.claude/plans/prdx-*.md 2>/dev/null | xargs -I{} basename {} .md | sed '
 
 # /prdx:implement - Implement Feature
 
-Two-phase implementation: **Dev Planning** (prdx:dev-planner) → **Development** (Platform agent)
+Three-phase implementation: **Dev Planning** (prdx:dev-planner) → **Development** (Platform agent) → **Code Review** (prdx:code-reviewer)
 
 Both agents run in **isolated contexts** to minimize main conversation context usage.
 
@@ -38,7 +38,7 @@ Both agents run in **isolated contexts** to minimize main conversation context u
 
 ## How It Works
 
-This command orchestrates two agents in **isolated contexts**:
+This command orchestrates three agents in **isolated contexts**:
 
 **Phase A: Dev Planning (prdx:dev-planner)**
 - Runs in isolated context
@@ -51,6 +51,13 @@ This command orchestrates two agents in **isolated contexts**:
 - Executes the implementation plan
 - Follows TDD (tests first)
 - Returns only implementation summary (~1KB)
+
+**Phase C: Code Review (prdx:code-reviewer)**
+- Runs in isolated context
+- Reviews diff against acceptance criteria
+- Flags bugs, security issues, unmet criteria
+- If issues found: platform agent fixes, then re-review (max 2 cycles)
+- Returns only review summary (~2KB)
 
 **For Multi-Platform Mobile PRDs:**
 - Runs Phase A + B for the first platform (Android by default)
@@ -442,7 +449,53 @@ After each platform completes:
    - **Loop back to Step 5a** for the next platform
 
 4. **When all platforms are done:**
-   - Continue to Step 6 (Post-Implement Hook)
+   - Continue to Step 5e (Code Review)
+
+---
+
+#### Step 5e: Code Review (prdx:code-reviewer)
+
+After all platform implementations are complete, run an automated code review before handing off to the user.
+
+Invoke the code-reviewer agent using the Task tool:
+
+```
+subagent_type: "prdx:code-reviewer"
+
+prompt: "Review the implementation for this PRD.
+
+PRD Slug: {SLUG}
+
+Acceptance Criteria:
+{ACCEPTANCE_CRITERIA from PRD}
+
+Review the diff (git diff main..HEAD) against the acceptance criteria.
+Flag bugs, security issues, quality problems, and unmet criteria.
+Only report high-confidence issues.
+
+Return only the review summary."
+```
+
+**If issues found:**
+1. Display the review summary to the conversation
+2. Feed each issue back to the platform agent for fixing:
+
+```
+subagent_type: "{PLATFORM_AGENT}"
+
+prompt: "Fix the following code review issues.
+
+{REVIEW_ISSUES}
+
+Fix each issue, run tests to verify, and commit the fixes.
+
+Return only a summary of fixes applied."
+```
+
+3. After fixes, re-run the code reviewer to verify (max 2 review cycles to avoid loops)
+
+**If no issues found (or after fixes verified):**
+- Continue to Step 6
 
 ---
 
@@ -550,3 +603,4 @@ Fix the issues and try again.
 7. **Return summaries only** - File contents stay in agent context
 8. **Multi-platform mobile runs sequentially** - Android first, then iOS
 9. **Pass learnings between platforms** - Include previous platform notes
+10. **Code review before handoff** - prdx:code-reviewer runs after implementation, fixes issues automatically (max 2 cycles)

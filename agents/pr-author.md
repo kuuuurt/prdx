@@ -47,7 +47,7 @@ git branch --show-current
 **PRD mode:**
 Create PR title and description that:
 - Summarizes the change clearly
-- Links to issue if published
+- Links to issue if one exists
 - Shows acceptance criteria status
 - Describes key changes
 - Notes testing approach
