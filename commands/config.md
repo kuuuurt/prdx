@@ -26,8 +26,8 @@ Manage PRDX configuration interactively or via command line.
 
 # Hooks Management
 /prdx:config hooks                     # Show available hooks
-/prdx:config hooks enable auto-optimize # Enable auto-optimize hook
-/prdx:config hooks disable auto-optimize # Disable auto-optimize hook
+/prdx:config hooks enable auto-simplify # Enable auto-simplify hook
+/prdx:config hooks disable auto-simplify # Disable auto-simplify hook
 ```
 
 ## Workflow
@@ -62,7 +62,7 @@ elif [ "$1" = "get" ]; then
 elif [ "$1" = "hooks" ]; then
   MODE="hooks"
   HOOKS_ACTION="$2"  # enable, disable, or empty (show)
-  HOOK_NAME="$3"     # auto-optimize
+  HOOK_NAME="$3"     # auto-simplify
 else
   echo "❌ Unknown command: $1"
   echo ""
@@ -612,7 +612,7 @@ if [ -z "$HOOKS_ACTION" ]; then
   echo ""
   echo "Available hooks:"
   echo ""
-  echo "  auto-optimize"
+  echo "  auto-simplify"
   echo "    Prompts optimization of changed lines after Edit/Write operations."
   echo "    Removes documentation-style comments, inlines single-use variables"
   echo "    and functions."
@@ -620,7 +620,7 @@ if [ -z "$HOOKS_ACTION" ]; then
 
   # Check if hook is enabled
   if command -v jq &> /dev/null && [ -f "$SETTINGS_FILE" ]; then
-    HOOK_ENABLED=$(jq -r '.hooks.PostToolUse[]?.hooks[]?.command // empty' "$SETTINGS_FILE" 2>/dev/null | grep -c "post-edit-optimize" || true)
+    HOOK_ENABLED=$(jq -r '.hooks.PostToolUse[]?.hooks[]?.command // empty' "$SETTINGS_FILE" 2>/dev/null | grep -c "post-edit-simplify" || true)
     if [ "$HOOK_ENABLED" -gt 0 ]; then
       echo "  Status: ✅ enabled"
     else
@@ -632,8 +632,8 @@ if [ -z "$HOOKS_ACTION" ]; then
 
   echo ""
   echo "Commands:"
-  echo "  /prdx:config hooks enable auto-optimize"
-  echo "  /prdx:config hooks disable auto-optimize"
+  echo "  /prdx:config hooks enable auto-simplify"
+  echo "  /prdx:config hooks disable auto-simplify"
   exit 0
 fi
 ```
@@ -646,12 +646,12 @@ if [ "$HOOKS_ACTION" = "enable" ]; then
     echo "❌ No hook name provided"
     echo "Usage: /prdx:config hooks enable <hook-name>"
     echo ""
-    echo "Available hooks: auto-optimize"
+    echo "Available hooks: auto-simplify"
     exit 1
   fi
 
   case "$HOOK_NAME" in
-    "auto-optimize")
+    "auto-simplify")
       # Find the plugin hooks directory
       PLUGIN_DIR=""
       if [ -d "$HOME/.claude/plugins/prdx/hooks/prdx" ]; then
@@ -682,7 +682,7 @@ if [ "$HOOKS_ACTION" = "enable" ]; then
         "hooks": [
           {
             "type": "command",
-            "command": "$PLUGIN_DIR/hooks/prdx/post-edit-optimize.sh"
+            "command": "$PLUGIN_DIR/hooks/prdx/post-edit-simplify.sh"
           }
         ]
       }
@@ -703,7 +703,7 @@ MANUAL_EOF
         "hooks": [
           {
             "type": "command",
-            "command": "$PLUGIN_DIR/hooks/prdx/post-edit-optimize.sh"
+            "command": "$PLUGIN_DIR/hooks/prdx/post-edit-simplify.sh"
           }
         ]
       }
@@ -721,7 +721,7 @@ EOF
         echo "$HOOK_CONFIG" > "$SETTINGS_FILE"
       fi
 
-      echo "✅ Enabled auto-optimize hook"
+      echo "✅ Enabled auto-simplify hook"
       echo ""
       echo "The hook will prompt optimization after Edit/Write operations on:"
       echo "  .kt, .kts, .swift, .ts, .tsx, .js, .jsx, .py, .go, .rs files"
@@ -731,12 +731,12 @@ EOF
       echo "  - Inline single-use variables when expression is clear"
       echo "  - Inline single-use private functions when simple"
       echo ""
-      echo "To disable: /prdx:config hooks disable auto-optimize"
+      echo "To disable: /prdx:config hooks disable auto-simplify"
       ;;
     *)
       echo "❌ Unknown hook: $HOOK_NAME"
       echo ""
-      echo "Available hooks: auto-optimize"
+      echo "Available hooks: auto-simplify"
       exit 1
       ;;
   esac
@@ -754,7 +754,7 @@ if [ "$HOOKS_ACTION" = "disable" ]; then
   fi
 
   case "$HOOK_NAME" in
-    "auto-optimize")
+    "auto-simplify")
       if ! command -v jq &> /dev/null; then
         echo "⚠️  jq not installed - cannot modify settings"
         echo "Manual: Remove the PostToolUse hook from $SETTINGS_FILE"
@@ -762,8 +762,8 @@ if [ "$HOOKS_ACTION" = "disable" ]; then
       fi
 
       if [ -f "$SETTINGS_FILE" ]; then
-        # Remove the auto-optimize hook from PostToolUse
-        jq 'del(.hooks.PostToolUse[] | select(.hooks[]?.command | contains("post-edit-optimize")))' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp"
+        # Remove the auto-simplify hook from PostToolUse
+        jq 'del(.hooks.PostToolUse[] | select(.hooks[]?.command | contains("post-edit-simplify")))' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp"
         mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
 
         # Clean up empty arrays
@@ -771,14 +771,14 @@ if [ "$HOOKS_ACTION" = "disable" ]; then
         mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
       fi
 
-      echo "✅ Disabled auto-optimize hook"
+      echo "✅ Disabled auto-simplify hook"
       echo ""
-      echo "To re-enable: /prdx:config hooks enable auto-optimize"
+      echo "To re-enable: /prdx:config hooks enable auto-simplify"
       ;;
     *)
       echo "❌ Unknown hook: $HOOK_NAME"
       echo ""
-      echo "Available hooks: auto-optimize"
+      echo "Available hooks: auto-simplify"
       exit 1
       ;;
   esac
@@ -944,7 +944,7 @@ User: /prdx:config hooks
 
 Available hooks:
 
-  auto-optimize
+  auto-simplify
     Prompts optimization of changed lines after Edit/Write operations.
     Removes documentation-style comments, inlines single-use variables
     and functions.
@@ -952,16 +952,16 @@ Available hooks:
   Status: ❌ disabled
 
 Commands:
-  /prdx:config hooks enable auto-optimize
-  /prdx:config hooks disable auto-optimize
+  /prdx:config hooks enable auto-simplify
+  /prdx:config hooks disable auto-simplify
 ```
 
-### Example 7: Enable Auto-Optimize Hook
+### Example 7: Enable Auto-Simplify Hook
 
 ```
-User: /prdx:config hooks enable auto-optimize
+User: /prdx:config hooks enable auto-simplify
 
-✅ Enabled auto-optimize hook
+✅ Enabled auto-simplify hook
 
 The hook will prompt optimization after Edit/Write operations on:
   .kt, .kts, .swift, .ts, .tsx, .js, .jsx, .py, .go, .rs files
@@ -971,17 +971,17 @@ Optimization rules:
   - Inline single-use variables when expression is clear
   - Inline single-use private functions when simple
 
-To disable: /prdx:config hooks disable auto-optimize
+To disable: /prdx:config hooks disable auto-simplify
 ```
 
-### Example 8: Disable Auto-Optimize Hook
+### Example 8: Disable Auto-Simplify Hook
 
 ```
-User: /prdx:config hooks disable auto-optimize
+User: /prdx:config hooks disable auto-simplify
 
-✅ Disabled auto-optimize hook
+✅ Disabled auto-simplify hook
 
-To re-enable: /prdx:config hooks enable auto-optimize
+To re-enable: /prdx:config hooks enable auto-simplify
 ```
 
 ## Error Handling

@@ -3,32 +3,32 @@ description: "Simplify code with pragmatic cleanup"
 argument-hint: "[files/features]"
 ---
 
-# /prdx:optimize - Code Cleanup
+# /prdx:simplify - Code Cleanup
 
 Simplify code by removing unnecessary complexity, documentation-style comments, and single-use abstractions.
 
 ## Usage
 
 ```bash
-/prdx:optimize                      # Changed files on current branch
-/prdx:optimize src/auth/            # Specific directory
-/prdx:optimize UserService.kt       # Specific file
-/prdx:optimize "authentication"     # Feature name (searches for related files)
+/prdx:simplify                      # Changed files on current branch
+/prdx:simplify src/auth/            # Specific directory
+/prdx:simplify UserService.kt       # Specific file
+/prdx:simplify "authentication"     # Feature name (searches for related files)
 ```
 
 ## Target Files
 
-**Arguments provided:** Optimize specified files/features.
+**Arguments provided:** Simplify specified files/features.
 
-**No arguments:** Optimize ONLY changed files on the current branch:
+**No arguments:** Simplify ONLY changed files on the current branch:
 
 ```bash
 git diff --name-only $(git merge-base HEAD main)..HEAD
 ```
 
-Read those files and focus optimization on changed portions.
+Read those files and focus simplification on changed portions.
 
-## Optimization Rules
+## Simplification Rules
 
 ### Code Style
 
@@ -91,7 +91,7 @@ src/auth/UserService.kt
 src/auth/AuthViewModel.kt
 src/ui/LoginScreen.kt
 
-Proceed with optimization? (y/n)
+Proceed with simplification? (y/n)
 ```
 
 ### Phase 2: Analyze Each File
@@ -99,13 +99,13 @@ Proceed with optimization? (y/n)
 For each target file:
 
 1. Read the file content
-2. Identify optimization opportunities:
+2. Identify simplification opportunities:
    - Documentation-style comments to remove
    - Single-use variables to inline
    - Single-use functions to inline
    - Similar code to consolidate
 
-### Phase 3: Apply Optimizations
+### Phase 3: Apply Simplifications
 
 Use the Edit tool to apply changes. Show before/after for significant changes.
 
@@ -153,7 +153,7 @@ Thread.sleep(100)  ← KEEP THE COMMENT
 ### Phase 4: Summary
 
 ```
-✅ Optimization complete!
+✅ Simplification complete!
 
 Files modified: 3
 - src/auth/UserService.kt (removed 5 comments, inlined 2 variables)
@@ -165,10 +165,10 @@ Total: 12 simplifications applied
 
 ## Examples
 
-### Optimize Changed Files
+### Simplify Changed Files
 
 ```
-User: /prdx:optimize
+User: /prdx:simplify
 
 → Gets changed files from git diff
 → Found: UserService.kt, AuthViewModel.kt
@@ -182,24 +182,24 @@ Proceed? (y/n)
 
 User: y
 
-→ Analyzes and optimizes each file
+→ Analyzes and simplifies each file
 → Applies edits
 
-✅ Optimization complete!
+✅ Simplification complete!
 
 Files modified: 2
 Total: 8 simplifications applied
 ```
 
-### Optimize Specific File
+### Simplify Specific File
 
 ```
-User: /prdx:optimize src/auth/UserService.kt
+User: /prdx:simplify src/auth/UserService.kt
 
 → Reading UserService.kt
-→ Found 6 optimization opportunities
+→ Found 6 simplification opportunities
 
-Optimizations:
+Simplifications:
 1. Line 23: Remove comment "// Get user by ID"
 2. Line 45: Inline single-use variable `result`
 3. Line 67: Remove comment "// Check if valid"
@@ -211,13 +211,13 @@ Apply all? (y/n/select)
 
 User: y
 
-✅ Applied 6 optimizations to UserService.kt
+✅ Applied 6 simplifications to UserService.kt
 ```
 
-### Optimize by Feature Name
+### Simplify by Feature Name
 
 ```
-User: /prdx:optimize "authentication"
+User: /prdx:simplify "authentication"
 
 → Searching for files related to "authentication"
 → Found: AuthService.kt, LoginViewModel.kt, AuthRepository.kt

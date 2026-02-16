@@ -260,7 +260,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 | Command | Description |
 |---------|-------------|
 | `/prdx:commit` | Create commit using prdx.json config |
-| `/prdx:optimize` | Simplify code with pragmatic cleanup |
+| `/prdx:simplify` | Simplify code with pragmatic cleanup |
 | `/prdx:push` | Also works standalone (auto-detects PRD or creates PR from commits) |
 
 ### Management

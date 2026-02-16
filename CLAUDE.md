@@ -107,13 +107,13 @@ prdx/
 │   ├── close.md             # Close PRD
 │   ├── publish.md           # Create GitHub issue
 │   ├── sync.md              # Sync with GitHub
-│   ├── optimize.md          # Code cleanup/simplification
+│   ├── simplify.md          # Code cleanup/simplification
 │   └── help.md              # Documentation
 ├── hooks/prdx/              # Validation hooks
 │   ├── pre-plan.sh          # Pre-planning validation
 │   ├── pre-implement.sh     # Pre-implementation validation
 │   ├── post-implement.sh    # Post-implementation actions
-│   └── post-edit-optimize.sh # Auto-optimize on file changes
+│   └── post-edit-simplify.sh # Auto-simplify on file changes
 ├── skills/                  # Knowledge bases (read by agents)
 │   ├── prd-review.md        # Review checklist
 │   ├── impl-patterns.md     # Implementation patterns
@@ -217,7 +217,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 
 ```
 /prdx:commit "fix typo"       # Commit with prdx.json config (format, co-author, etc.)
-/prdx:optimize src/auth/      # Code cleanup on any files
+/prdx:simplify src/auth/      # Code cleanup on any files
 /prdx:push                    # Create PR from current branch (auto-detects PRD if one exists)
 ```
 
@@ -339,7 +339,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 
 These work with or without a PRD:
 - `/prdx:commit` - Commit with prdx.json config (always standalone)
-- `/prdx:optimize` - Code cleanup (always standalone)
+- `/prdx:simplify` - Code cleanup (always standalone)
 - `/prdx:push` - Auto-detects PRD or standalone mode
 
 ## Agents
@@ -515,28 +515,28 @@ Skills are read by agents during execution:
 
 **On failure:** Blocks if tests fail; warns for other issues
 
-### post-edit-optimize.sh
+### post-edit-simplify.sh
 
 **Runs after:** Edit/Write tool usage on source files
 
 **Behavior:**
 - Detects changed lines via `git diff`
-- Outputs `additionalContext` prompting optimization
+- Outputs `additionalContext` prompting simplification
 - Only triggers for source files (`.kt`, `.swift`, `.ts`, etc.)
 
 **Enable for your project:**
 ```bash
-/prdx:config hooks enable auto-optimize
+/prdx:config hooks enable auto-simplify
 ```
 
-## Auto-Optimize Hook
+## Auto-Simplify Hook
 
-When you see `PRDX Auto-Optimize:` in context, apply optimization rules:
-1. Check the specified lines for optimization opportunities
+When you see `PRDX Auto-Simplify:` in context, apply simplification rules:
+1. Check the specified lines for simplification opportunities
 2. Remove documentation-style comments (keep `// MARK:`, `// TODO:`, why-comments)
 3. Inline single-use variables when expression is clear
 4. Inline single-use private functions when simple (1-3 lines)
-5. Apply changes with Edit tool, or continue if no optimizations needed
+5. Apply changes with Edit tool, or continue if no simplifications needed
 
 ## PRD Structure
 

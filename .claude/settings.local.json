@@ -5,7 +5,10 @@
       "Bash(chmod:*)",
       "WebSearch",
       "WebFetch(domain:www.reddit.com)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: add auto-optimize hook and exploration agents\n\n- Add post-edit-optimize.sh hook that prompts code optimization after\n  Edit/Write operations on source files\n- Add code-explorer agent for codebase exploration with summary output\n- Add docs-explorer agent for documentation search via Context7 and web\n- Add /prdx:config hooks command for plugin consumers to enable hooks\n- Bump version to 0.7.0\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
@@ -17,7 +20,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./hooks/prdx/post-edit-optimize.sh"
+            "command": "./hooks/prdx/post-edit-simplify.sh"
           }
         ]
       }

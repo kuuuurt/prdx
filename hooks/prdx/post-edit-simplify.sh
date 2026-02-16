@@ -1,5 +1,5 @@
 #!/bin/bash
-# PostToolUse hook that prompts Claude to optimize changed lines
+# PostToolUse hook that prompts Claude to simplify changed lines
 # Triggered after Edit/Write operations
 #
 # Usage: Configure in .claude/settings.json:
@@ -11,7 +11,7 @@
 #         "hooks": [
 #           {
 #             "type": "command",
-#             "command": "./hooks/prdx/post-edit-optimize.sh"
+#             "command": "./hooks/prdx/post-edit-simplify.sh"
 #           }
 #         ]
 #       }
@@ -43,7 +43,7 @@ if [ -n "$CHANGED_LINES" ]; then
   # Output JSON with additionalContext for Claude
   cat << EOF
 {
-  "additionalContext": "PRDX Auto-Optimize: Apply optimization rules to lines $CHANGED_LINES in $FILE. Check for: documentation-style comments to remove, single-use variables to inline, single-use functions to inline. Use Edit tool to apply any optimizations found. If no optimizations needed, continue."
+  "additionalContext": "PRDX Auto-Simplify: Apply simplification rules to lines $CHANGED_LINES in $FILE. Check for: documentation-style comments to remove, single-use variables to inline, single-use functions to inline. Use Edit tool to apply any simplifications found. If no simplifications needed, continue."
 }
 EOF
 fi
