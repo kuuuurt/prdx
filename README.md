@@ -41,18 +41,19 @@ PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) w
                          └────────────┬────────────┘
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  2. IMPLEMENT                                                               │
+│  2. IMPLEMENT (three-phase)                                                 │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  prdx:dev-planner agent (isolated context)                            │  │
+│  │  Phase A: prdx:dev-planner agent (isolated context)                   │  │
 │  │  • Reads skills (impl-patterns, testing-strategy)                     │  │
 │  │  • Creates detailed technical plan                                    │  │
 │  │  • Maps tests to acceptance criteria                                  │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                              ▼                                              │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  Platform agent (isolated context)                                    │  │
-│  │  • prdx:backend-developer  OR                                         │  │
-│  │  • prdx:android-developer  OR                                         │  │
+│  │  Phase B: Platform agent (isolated context)                           │  │
+│  │  • prdx:backend-developer   OR                                        │  │
+│  │  • prdx:frontend-developer  OR                                        │  │
+│  │  • prdx:android-developer   OR                                        │  │
 │  │  • prdx:ios-developer                                                 │  │
 │  │                                                                       │  │
 │  │  Executes dev plan with TDD:                                          │  │
@@ -60,6 +61,13 @@ PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) w
 │  │  2. Implement to pass                                                 │  │
 │  │  3. Commit                                                            │  │
 │  │  4. Repeat                                                            │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                              ▼                                              │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │  Phase C: prdx:code-reviewer agent (isolated context)                 │  │
+│  │  • Reviews diff against acceptance criteria                           │  │
+│  │  • Flags bugs, security issues, quality problems                      │  │
+│  │  • If issues found: platform agent fixes, re-review (max 2 cycles)   │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                              ▼                                              │
 │               Status: in-progress → review                                  │
@@ -128,8 +136,8 @@ planning ──► in-progress ──► review ──► implemented ──► 
     │              │            │              │              │
     ▼              ▼            ▼              ▼              ▼
 PRD created    Coding...   User tests    PR created    PR merged
-               + review    Fix bugs      Ready to      All done!
-                           if needed     merge
+               + code      Fix bugs      Ready to      All done!
+               review      if needed     merge
 
 Optional: /prdx:publish adds GitHub issue link at any status (metadata, not a workflow state)
 ```
@@ -146,25 +154,26 @@ Optional: /prdx:publish adds GitHub issue link at any status (metadata, not a wo
 │  ┌─────────────────────────────────────────────────────────────────────────┐│
 │  │  • Dev plan summary (~3KB)                                              ││
 │  │  • Implementation summary (~1KB)                                        ││
+│  │  • Code review summary (~2KB)                                           ││
 │  │  • PR URL (~100B)                                                       ││
 │  │  ────────────────────────────                                           ││
-│  │  Total: ~4KB                                                            ││
+│  │  Total: ~6KB                                                            ││
 │  └─────────────────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Agent Contexts (isolated, discarded after use)                             │
 │                                                                             │
-│  ┌──────────────────┐  ┌──────────────────┐                                │
-│  │ prdx:dev-planner │  │ Platform agent   │                                │
-│  │                  │  │                  │                                │
-│  │ • Skills content │  │ • All source     │                                │
-│  │ • Codebase       │  │   files read     │                                │
-│  │   patterns       │  │ • Test files     │                                │
-│  │ • Task breakdown │  │ • Build output   │                                │
-│  │                  │  │                  │                                │
-│  │ Returns: Plan    │  │ Returns: Summary │                                │
-│  └──────────────────┘  └──────────────────┘                                │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
+│  │ prdx:dev-planner │  │ Platform agent   │  │ prdx:code-       │         │
+│  │                  │  │                  │  │ reviewer         │         │
+│  │ • Skills content │  │ • All source     │  │                  │         │
+│  │ • Codebase       │  │   files read     │  │ • Diff analysis  │         │
+│  │   patterns       │  │ • Test files     │  │ • AC validation  │         │
+│  │ • Task breakdown │  │ • Build output   │  │ • Quality checks │         │
+│  │                  │  │                  │  │                  │         │
+│  │ Returns: Plan    │  │ Returns: Summary │  │ Returns: Review  │         │
+│  └──────────────────┘  └──────────────────┘  └──────────────────┘         │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -246,16 +255,23 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 | `/prdx:push` | Create pull request |
 | `/prdx:close` | Mark PRD complete |
 
+### Standalone (no PRD required)
+
+| Command | Description |
+|---------|-------------|
+| `/prdx:commit` | Create commit using prdx.json config |
+| `/prdx:optimize` | Simplify code with pragmatic cleanup |
+| `/prdx:push` | Also works standalone (auto-detects PRD or creates PR from commits) |
+
 ### Management
 
 | Command | Description |
 |---------|-------------|
-| `/prdx:show` | View/list PRDs |
+| `/prdx:show` | View/list/search PRDs |
 | `/prdx:config` | Configure settings |
-| `/prdx:publish` | Create GitHub issue |
-| `/prdx:sync` | Sync with GitHub |
-| `/prdx:optimize` | Simplify code |
-| `/prdx:commit` | Create commit |
+| `/prdx:publish` | Create GitHub issue from PRD |
+| `/prdx:sync` | Sync PRD with GitHub issue |
+| `/prdx:migrate` | Migrate PRDs from old `.prdx/prds/` location |
 
 ## Agents
 
@@ -263,14 +279,21 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │  Workflow Agents                                                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  prdx:dev-planner  │ Creates detailed technical implementation plans       │
-│  prdx:pr-author    │ Creates comprehensive PR descriptions                 │
+│  prdx:dev-planner    │ Creates detailed technical implementation plans     │
+│  prdx:code-reviewer  │ Reviews diff against acceptance criteria            │
+│  prdx:pr-author      │ Creates comprehensive PR descriptions              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Platform Agents (framework-agnostic, discovers stack from codebase)       │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  prdx:backend-developer  │ Backend implementation (any framework)          │
-│  prdx:android-developer  │ Android implementation (Kotlin/Compose)         │
-│  prdx:ios-developer      │ iOS implementation (Swift/SwiftUI)              │
+│  prdx:backend-developer   │ Backend implementation (any framework)         │
+│  prdx:frontend-developer  │ Frontend/web implementation (any framework)    │
+│  prdx:android-developer   │ Android implementation (Kotlin/Compose)        │
+│  prdx:ios-developer       │ iOS implementation (Swift/SwiftUI)             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Exploration Agents (keeps main context clean)                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  prdx:code-explorer  │ Explores codebase patterns and architecture        │
+│  prdx:docs-explorer  │ Searches web/Context7 for library documentation    │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 Note: PRD creation uses Claude's native plan mode (not a custom agent).
@@ -284,8 +307,10 @@ PRDs are stored in `~/.claude/plans/` with `prdx-` prefix:
 # Feature Title
 
 **Type:** feature | bug-fix | refactor | spike
-**Platform:** backend | android | ios | mobile
+**Platform:** backend | frontend | android | ios | mobile
+**Platforms:** android, ios (only for mobile - lists target platforms)
 **Status:** planning | in-progress | review | implemented | completed
+**Created:** YYYY-MM-DD
 **Branch:** feat/feature-slug
 
 ## Problem
@@ -294,11 +319,19 @@ PRDs are stored in `~/.claude/plans/` with `prdx-` prefix:
 ## Goal
 [What outcome do we want?]
 
+## User Stories
+- As a [user type], I want to [action] so that [benefit]
+
 ## Acceptance Criteria
 - [ ] [Testable outcome]
 
+## Scope
+### Included / ### Excluded
+
 ## Approach
 [High-level strategy]
+
+## Risks & Considerations
 ```
 
 ## Configuration
