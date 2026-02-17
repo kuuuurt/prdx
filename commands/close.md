@@ -133,7 +133,78 @@ You are helping the user close a PRD after all implementation work is complete.
 
 ---
 
-### Phase 3: Optional Cleanup
+### Phase 3: Extract Learnings (Compound Learning)
+
+**Capture lessons from this implementation for future PRDs.**
+
+After updating status to completed, extract learnings from the PRD and append them to the lessons-learned skill file.
+
+1. **Gather learning sources:**
+   - Read the `## Implementation Notes` section(s) from the PRD
+   - If PR number exists, fetch PR description:
+     ```bash
+     gh pr view [pr-number] --json body --jq '.body' 2>/dev/null
+     ```
+
+2. **Extract learnings using a haiku-model agent:**
+
+```
+subagent_type: "general-purpose"
+model: haiku
+
+prompt: "Extract implementation learnings from this completed PRD.
+
+Platform: {PLATFORM}
+Title: {TITLE}
+
+Implementation Notes:
+{IMPLEMENTATION_NOTES from PRD}
+
+PR Description:
+{PR_BODY}
+
+Extract concise learnings (3-5 bullet points total) in these categories:
+
+**Patterns:** What patterns worked well and should be reused?
+**Challenges & Solutions:** What problems came up and how were they solved?
+**Deviations from Plan:** Where did the implementation diverge from the plan and why?
+
+Format your response as markdown bullet points, grouped by category. Only include categories that have learnings. Each bullet should be one line, starting with a dash.
+
+Example output:
+**Patterns:**
+- Used repository pattern with Result<T> for clean error propagation
+
+**Challenges & Solutions:**
+- Auth token refresh race condition — solved with mutex lock on refresh call
+
+Keep entries specific and actionable. Skip generic observations."
+```
+
+3. **Append learnings to skill file:**
+
+   Read `skills/lessons-learned.md` (relative to the plugin installation, check `.claude/skills/lessons-learned.md` or local `skills/lessons-learned.md`).
+
+   Use Edit tool to append the learnings under the correct platform section. Insert before the `---` separator that follows the platform's "Deviations from Plan" section:
+
+   ```markdown
+   #### {TITLE} ({DATE})
+   {EXTRACTED_LEARNINGS}
+   ```
+
+4. **Display confirmation:**
+   ```
+   Learnings captured in skills/lessons-learned.md
+   ```
+
+   If the skill file is not found, warn but continue:
+   ```
+   Learnings extraction skipped — skills/lessons-learned.md not found
+   ```
+
+---
+
+### Phase 4: Optional Cleanup
 
 **Ask about additional cleanup steps:**
 
@@ -174,7 +245,7 @@ gh issue close [issue-number] --comment "Completed in PR #[pr-number]"
 
 ---
 
-### Phase 4: Summary
+### Phase 5: Summary
 
 **Display completion summary:**
 

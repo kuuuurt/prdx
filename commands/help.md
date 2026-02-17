@@ -27,7 +27,7 @@ Complete PRD workflow system for feature development with AI agents.
 
 ---
 
-## Core Commands (11 total)
+## Core Commands (13 total)
 
 ### Main Entry Point
 
@@ -95,6 +95,26 @@ Complete PRD workflow system for feature development with AI agents.
   /prdx:push backend-auth       # PRD mode: rich PR description
   /prdx:push                    # Auto-detect PRD or standalone
   /prdx:push --draft            # Create draft PR
+  ```
+
+**`/prdx:bugfix [description]`**
+- Lightweight bug fix workflow without PRD overhead
+- **Auto-detects platform** from description and codebase
+- Creates `fix/` branch, invokes platform agent, runs code review, creates PR
+- Examples:
+  ```bash
+  /prdx:bugfix "crash when user avatar is nil"
+  /prdx:bugfix "search returns 500 on empty query"
+  ```
+
+**`/prdx:explore [code|docs] [query]`**
+- Quick codebase or documentation exploration
+- **No PRD required** — just answers
+- Examples:
+  ```bash
+  /prdx:explore code "how does auth middleware work?"
+  /prdx:explore docs "React Query mutations"
+  /prdx:explore                                      # Interactive
   ```
 
 **`/prdx:commit [message]`**
@@ -221,6 +241,19 @@ Things that happen automatically:
 # → Plans, implements, creates PR
 ```
 
+### Bug Fix Flow (No PRD)
+```bash
+/prdx:bugfix "crash when avatar is nil"
+# → Auto-detects platform, creates fix/ branch
+# → Platform agent fixes, code review, PR
+```
+
+### Explore (No PRD)
+```bash
+/prdx:explore code "how does auth work?"
+/prdx:explore docs "React Query mutations"
+```
+
 ### Standalone (No PRD)
 ```bash
 # Quick commit with project config
@@ -244,6 +277,8 @@ Things that happen automatically:
 | `/prdx:show` | View PRDs | No |
 | `/prdx:implement` | Implement feature | Yes |
 | `/prdx:push` | Create PR | Yes |
+| `/prdx:bugfix` | Quick bug fix | No |
+| `/prdx:explore` | Explore code/docs | No |
 | `/prdx:commit` | Commit changes | No |
 | `/prdx:simplify` | Code cleanup | No |
 | `/prdx:publish` | Create GitHub issue | No |
