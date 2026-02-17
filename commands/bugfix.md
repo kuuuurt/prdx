@@ -51,9 +51,11 @@ Describe the issue — what's broken, where it happens, and any error messages.
 
 **IMPORTANT: Read and parse prdx.json (same as /prdx:implement).**
 
-1. Check for config file:
-   - `prdx.json` (project root)
-   - `.prdx/prdx.json`
+1. **Walk up the directory tree** to find the config file (supports monorepo/meta-project layouts):
+   - Starting from the current working directory, check each directory going up:
+     - `{dir}/prdx.json`
+     - `{dir}/.prdx/prdx.json`
+   - Stop at the first match or at filesystem root
 
 2. Extract commit configuration values (format, coAuthor, extendedDescription).
 

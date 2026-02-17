@@ -71,9 +71,12 @@ This command orchestrates three agents in **isolated contexts**:
 
 **IMPORTANT: You must read and parse the project's prdx.json configuration.**
 
-1. Use the Read tool to check for config file in this order:
-   - `prdx.json` (project root)
-   - `.prdx/prdx.json`
+1. **Walk up the directory tree** to find the config file (supports monorepo/meta-project layouts):
+   - Starting from the current working directory, check each directory going up:
+     - `{dir}/prdx.json`
+     - `{dir}/.prdx/prdx.json`
+   - Stop at the first match or at filesystem root
+   - This ensures config is found even when working inside a sub-project of a meta-project
 
 2. If config file exists, extract these values:
    - `commits.format` → "conventional" or "simple"

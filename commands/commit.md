@@ -32,13 +32,20 @@ This command creates commits based on `prdx.json` settings:
 Load PRDX configuration:
 
 ```bash
-# Load prdx.json config (check multiple locations)
+# Walk up directory tree to find prdx.json (like .gitignore, .eslintrc)
+# This supports monorepo/meta-project layouts where config lives in a parent directory
 CONFIG_FILE=""
-if [ -f "prdx.json" ]; then
-  CONFIG_FILE="prdx.json"
-elif [ -f ".prdx/prdx.json" ]; then
-  CONFIG_FILE=".prdx/prdx.json"
-fi
+SEARCH_DIR="$(pwd)"
+while [ "$SEARCH_DIR" != "/" ]; do
+  if [ -f "$SEARCH_DIR/prdx.json" ]; then
+    CONFIG_FILE="$SEARCH_DIR/prdx.json"
+    break
+  elif [ -f "$SEARCH_DIR/.prdx/prdx.json" ]; then
+    CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json"
+    break
+  fi
+  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+done
 
 # Parse config or use defaults
 if [ -n "$CONFIG_FILE" ]; then

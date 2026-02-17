@@ -77,27 +77,26 @@ fi
 
 ### Phase 2: Locate or Create Config File
 
-Find or create configuration file:
+Find or create configuration file. **Walk up the directory tree** to find existing config (supports monorepo/meta-project layouts where config lives in a parent directory):
 
 ```bash
-# Check for existing config
+# Walk up directory tree to find existing config
 CONFIG_FILE=""
-if [ -f "prdx.json" ]; then
-  CONFIG_FILE="prdx.json"
-elif [ -f ".prdx/prdx.json" ]; then
-  CONFIG_FILE=".prdx/prdx.json"
-fi
-
-# For init mode, decide location
-if [ "$MODE" = "init" ]; then
-  if [ -d ".claude" ]; then
-    CONFIG_FILE=".prdx/prdx.json"
-  else
-    CONFIG_FILE="prdx.json"
+SEARCH_DIR="$(pwd)"
+while [ "$SEARCH_DIR" != "/" ]; do
+  if [ -f "$SEARCH_DIR/prdx.json" ]; then
+    CONFIG_FILE="$SEARCH_DIR/prdx.json"
+    break
+  elif [ -f "$SEARCH_DIR/.prdx/prdx.json" ]; then
+    CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json"
+    break
   fi
+  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+done
 
-  # Check if already exists
-  if [ -f "$CONFIG_FILE" ]; then
+# For init mode, decide location (create in current directory, not parent)
+if [ "$MODE" = "init" ]; then
+  if [ -n "$CONFIG_FILE" ]; then
     echo "⚠️  Configuration file already exists: $CONFIG_FILE"
     echo ""
     echo "Options:"
@@ -106,9 +105,17 @@ if [ "$MODE" = "init" ]; then
     echo "3. Overwrite (cancel and backup manually)"
     exit 0
   fi
+
+  # Create in current directory
+  if [ -d ".claude" ]; then
+    CONFIG_FILE=".prdx/prdx.json"
+  else
+    CONFIG_FILE="prdx.json"
+  fi
 fi
 
-# For other modes, use existing or create default location
+# For write modes (set, preset, interactive) with no existing config,
+# create in current directory
 if [ -z "$CONFIG_FILE" ] && [ "$MODE" != "init" ]; then
   if [ -d ".claude" ]; then
     CONFIG_FILE=".prdx/prdx.json"
@@ -116,6 +123,15 @@ if [ -z "$CONFIG_FILE" ] && [ "$MODE" != "init" ]; then
     CONFIG_FILE="prdx.json"
   fi
 fi
+```
+
+**Display found config location** (for show/get modes):
+```
+Config: {CONFIG_FILE}
+```
+If found in a parent directory, show:
+```
+Config: {CONFIG_FILE} (inherited from parent directory)
 ```
 
 ### Phase 3: Execute Mode
@@ -1103,12 +1119,27 @@ Use `jq` for JSON manipulation when available:
 - Writing: `jq '.commits.format = "simple"' prdx.json`
 - Provide fallback instructions if `jq` not available
 
-### File Location Priority
+### File Location Priority (Walk-Up Resolution)
 
-1. Check for existing config in project root
-2. Check for existing config in `.claude/` directory
-3. Create new config in `.claude/` if directory exists
-4. Otherwise create in project root
+**Reading config** (show, get, and all commands that load config):
+1. Check `prdx.json` in current directory
+2. Check `.prdx/prdx.json` in current directory
+3. Walk up to parent directory and repeat
+4. Continue until found or filesystem root reached
+
+This supports monorepo/meta-project layouts:
+```
+meta/               ← prdx.json found here
+  project1/         ← working directory (no config here)
+  project2/
+  .prdx/prdx.json
+```
+
+**Creating config** (init, set, preset, interactive):
+1. If config found via walk-up, modify it in place
+2. If no config found, create in current directory:
+   - `.prdx/prdx.json` if `.claude/` directory exists
+   - `prdx.json` otherwise
 
 ### Validation
 
