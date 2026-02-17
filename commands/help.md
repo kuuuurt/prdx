@@ -5,27 +5,41 @@ Complete PRD workflow system for feature development with AI agents.
 ## Quick Start
 
 ```bash
+# All-in-one workflow (recommended)
+/prdx:prdx "add biometric login"
+
+# Or step-by-step:
 # 1. Create a PRD (smart defaults, minimal questions)
 /prdx:plan "add biometric login"
 
 # 2. Publish to GitHub (optional)
-/prdx:publish android-219
+/prdx:publish biometric-login
 
 # 3. Start implementation (auto-creates detailed plan)
-/prdx:dev
+/prdx:implement biometric-login
 
 # 4. Create PR (auto-verifies quality)
-/prdx:dev:push
+/prdx:push biometric-login
 
 # 5. Sync issue status (after PR created)
-/prdx:sync
+/prdx:sync biometric-login
 ```
-
-That's it! Clean separation: `plan/sync` for issues, `dev:*` for PRs.
 
 ---
 
-## Core Commands (8 total)
+## Core Commands (11 total)
+
+### Main Entry Point
+
+**`/prdx:prdx [description or slug]`**
+- Complete workflow: plan → implement → push
+- **Decision points**: Never auto-proceeds between phases
+- **Resumes from current status** when given existing PRD slug
+- Examples:
+  ```bash
+  /prdx:prdx "add biometric login"    # New feature
+  /prdx:prdx biometric-login          # Resume existing PRD
+  ```
 
 ### Planning & Discovery
 
@@ -50,49 +64,53 @@ That's it! Clean separation: `plan/sync` for issues, `dev:*` for PRs.
 - Options: `--status`, `--platform`
 - Examples:
   ```bash
-  /prdx:show                    # List all PRDs
-  /prdx:show auth               # Search for "auth"
-  /prdx:show android-219        # Detailed status
-  /prdx:show --status draft     # Filter by status
-  ```
-
-**`/prdx:update [slug]`**
-- Update existing PRD with agent assistance
-- Uses strikethrough to preserve history
-- Agent-powered impact analysis
-- Optional auto-sync to GitHub
-- Example:
-  ```bash
-  /prdx:update android-219
+  /prdx:show                       # List all PRDs
+  /prdx:show auth                  # Search for "auth"
+  /prdx:show biometric-login       # Detailed status
+  /prdx:show --status planning     # Filter by status
   ```
 
 ---
 
 ### Development
 
-**`/prdx:dev [slug] [prompt]`**
-- **Context-aware**: Remembers last PRD, no slug needed
-- **Shows what you're working on**: Visual PRD banner
-- **Validates context**: Asks if wrong PRD loaded
-- Auto-creates detailed implementation plan if missing
-- Handles PRD updates via prompt
+**`/prdx:implement [slug] [platform]`**
+- Three-phase implementation: Dev Planning → Development → Code Review
+- Auto-creates detailed implementation plan
+- Platform agent executes with TDD
+- Code reviewer validates before handoff
 - Examples:
   ```bash
-  /prdx:dev                   # Continue last PRD (confirms which one)
-  /prdx:dev android-219       # Start new PRD
-  /prdx:dev "add OAuth"       # Continue with prompt
+  /prdx:implement backend-auth           # Implement backend feature
+  /prdx:implement mobile-login android   # Implement Android only
+  /prdx:implement mobile-login ios       # Implement iOS only
   ```
 
-**`/prdx:dev:push [slug] [options]`**
-- **Auto-verifies** before creating PR (runs quality checks)
-- Creates comprehensive PR description
-- Links PR to GitHub issue
-- Options: `--skip-check`
+**`/prdx:push [slug] [--draft]`**
+- Create PR with comprehensive description
+- **Auto-detects PRD** from current branch if no slug provided
+- **Standalone mode**: Works without a PRD (analyzes commits/diff)
 - Examples:
   ```bash
-  /prdx:dev:push                    # Use context
-  /prdx:dev:push android-219        # Specify PRD
-  /prdx:dev:push --skip-check       # Skip verification
+  /prdx:push backend-auth       # PRD mode: rich PR description
+  /prdx:push                    # Auto-detect PRD or standalone
+  /prdx:push --draft            # Create draft PR
+  ```
+
+**`/prdx:commit [message]`**
+- Commit with project's prdx.json configuration
+- Respects commit format, co-author, and extended description settings
+- Example:
+  ```bash
+  /prdx:commit "fix login validation"
+  ```
+
+**`/prdx:simplify [path]`**
+- Code cleanup and simplification
+- Removes unnecessary complexity
+- Example:
+  ```bash
+  /prdx:simplify src/auth/
   ```
 
 ---
@@ -104,17 +122,17 @@ That's it! Clean separation: `plan/sync` for issues, `dev:*` for PRs.
 - Auto-updates PRD with issue number
 - Example:
   ```bash
-  /prdx:publish android-219
+  /prdx:publish biometric-login
   ```
 
-**`/prdx:sync [slug]`**
-- Sync PRD status/updates to GitHub issue
-- Updates issue labels and posts comments
-- Context-aware (can omit slug)
+**`/prdx:sync [slug] [--github]`**
+- Sync PRD with current implementation state
+- Updates acceptance criteria, implementation notes
+- Optional GitHub issue sync with `--github`
 - Example:
   ```bash
-  /prdx:sync android-219     # Sync specific PRD
-  /prdx:sync                 # Sync current PRD
+  /prdx:sync backend-auth          # Local sync
+  /prdx:sync backend-auth --github # Also sync GitHub issue
   ```
 
 **`/prdx:close [slug]`**
@@ -122,7 +140,7 @@ That's it! Clean separation: `plan/sync` for issues, `dev:*` for PRs.
 - Closes GitHub issue
 - Example:
   ```bash
-  /prdx:close android-219
+  /prdx:close backend-auth
   ```
 
 ---
@@ -131,42 +149,44 @@ That's it! Clean separation: `plan/sync` for issues, `dev:*` for PRs.
 
 These commands were **removed** for simplicity:
 
-- ❌ `/prdx:wizard` → Use `/prdx:plan` (smarter, fewer steps)
-- ❌ `/prdx:list` → Use `/prdx:show` (smart viewer)
-- ❌ `/prdx:search` → Use `/prdx:show <keyword>`
-- ❌ `/prdx:status` → Use `/prdx:show <slug>`
-- ❌ `/prdx:deps` → Shown in `/prdx:show <slug>`
-- ❌ `/prdx:dev:check` → Auto-runs in `/prdx:dev:push`
-
-**Result**: 14 commands → 8 commands (43% reduction!)
+- `/prdx:wizard` → Use `/prdx:plan` (smarter, fewer steps)
+- `/prdx:list` → Use `/prdx:show` (smart viewer)
+- `/prdx:search` → Use `/prdx:show <keyword>`
+- `/prdx:status` → Use `/prdx:show <slug>`
+- `/prdx:deps` → Shown in `/prdx:show <slug>`
+- `/prdx:update` → Use `/prdx:prdx <slug>` to resume and iterate
+- `/prdx:dev` → Use `/prdx:implement`
+- `/prdx:dev:push` → Use `/prdx:push`
+- `/prdx:dev:check` → Auto-runs in `/prdx:push`
 
 ---
 
 ## Key Features
 
-### 🎯 Context Awareness
+### Context Awareness
 Commands remember your last PRD:
 ```bash
-/prdx:dev android-219    # Set context (shows PRD banner)
-/prdx:dev                # Uses android-219 (confirms PRD)
-/prdx:dev:push           # Also uses android-219
+/prdx:prdx biometric-login   # Set context
+/prdx:prdx                   # Offers last-used PRD
+/prdx:implement               # Uses last-used slug
 ```
 
-### 🤖 Smart Defaults
+### Smart Defaults
 Minimal questions, maximum intelligence:
 - **Type inference**: "fix bug" → `bug-fix`, "add feature" → `feature`
 - **Platform detection**: From directory, description, or recent PRDs
 - **Duplicate detection**: Automatically checks for similar PRDs
 
-### ⚡ Automation
+### Automation
 Things that happen automatically:
+- Code review before handoff to user
 - Quality verification before PR
 - GitHub issue sync
 - Detailed implementation planning
 - Duplicate PRD detection
 - Type and platform inference
 
-### 🔍 All-in-One Viewer
+### All-in-One Viewer
 `/prdx:show` does everything:
 - List all PRDs
 - Search by keyword
@@ -178,73 +198,73 @@ Things that happen automatically:
 
 ## Typical Workflows
 
-### Quick Feature (5 commands)
+### Complete Feature (One Command)
 ```bash
-/prdx:plan "add biometric login"
-/prdx:publish               # Create GitHub issue
-/prdx:dev                   # Start implementation (shows PRD banner)
-# ...implement...
-/prdx:dev:push             # Create PR
-/prdx:sync                 # Update issue status
+/prdx:prdx "add biometric login"
+# Plan Mode → PRD saved → [Publish?] → [Implement?] → Implementation → Review → [PR?] → PR
 ```
 
-### With Context (Fewer Args)
+### Step-by-Step
 ```bash
-/prdx:plan "add dark mode"
-/prdx:publish android-219
-/prdx:dev                   # Remembers android-219 (shows banner)
-# ...work...
-/prdx:dev                   # Continue (confirms PRD)
-# ...more work...
-/prdx:dev:push             # Still remembers the PRD
-/prdx:sync                 # Sync to issue
+/prdx:plan "add biometric login"
+/prdx:publish biometric-login    # Optional: create GitHub issue
+/prdx:implement biometric-login  # Three-phase implementation
+# ...test implementation...
+/prdx:push biometric-login       # Create PR
+/prdx:close biometric-login      # After PR merged
 ```
 
 ### Bug Fix Flow
 ```bash
-/prdx:plan "fix memory leak in auth service"
-→ Auto-infers: bug-fix type
-→ Asks: "Steps to reproduce?"
-/prdx:dev
-/prdx:dev:push
+/prdx:prdx "fix memory leak in auth service"
+# → Auto-infers: bug-fix type
+# → Plans, implements, creates PR
 ```
 
-### Search & Continue
+### Standalone (No PRD)
 ```bash
-/prdx:show auth                  # Find auth-related PRDs
-/prdx:dev android-219            # Pick one (shows PRD banner)
-/prdx:dev "add OAuth"            # Continue with update
+# Quick commit with project config
+/prdx:commit "fix typo in readme"
+
+# Quick PR from current branch
+/prdx:push
+
+# Code cleanup
+/prdx:simplify src/auth/
 ```
 
 ---
 
 ## Full Command Reference
 
-| Command | Purpose | Manages | Context-Aware |
-|---------|---------|---------|---------------|
-| `/prdx:plan` | Create PRD | PRDs | No |
-| `/prdx:show` | View PRDs | PRDs | No |
-| `/prdx:update` | Update PRD | PRDs | Yes |
-| `/prdx:publish` | Create issue | GitHub Issues | No |
-| `/prdx:sync` | Sync to issue | GitHub Issues | Yes |
-| `/prdx:dev` | Implement | Code | Yes |
-| `/prdx:dev:push` | Create PR | GitHub PRs | Yes |
-| `/prdx:close` | Complete | PRDs + Issues | No |
+| Command | Purpose | Context-Aware |
+|---------|---------|---------------|
+| `/prdx:prdx` | Complete workflow | Yes |
+| `/prdx:plan` | Create PRD | No |
+| `/prdx:show` | View PRDs | No |
+| `/prdx:implement` | Implement feature | Yes |
+| `/prdx:push` | Create PR | Yes |
+| `/prdx:commit` | Commit changes | No |
+| `/prdx:simplify` | Code cleanup | No |
+| `/prdx:publish` | Create GitHub issue | No |
+| `/prdx:sync` | Sync PRD state | Yes |
+| `/prdx:close` | Complete PRD | No |
+| `/prdx:help` | Show this help | No |
 
 ### Clean Separation of Concerns
 
-**Planning** (`plan`, `show`, `update`):
+**Planning** (`plan`, `show`):
 - Manage PRD files locally
 - Agent-powered planning and review
 
-**GitHub Issues** (`publish`, `sync`):
-- Create and sync issues
-- Update status labels and comments
-- Track work at planning level
-
-**Development** (`dev`, `dev:push`):
+**Development** (`implement`, `push`, `commit`, `simplify`):
 - Implement features
 - Create and manage PRs
 - Auto-verify quality
+
+**GitHub Issues** (`publish`, `sync`, `close`):
+- Create and sync issues
+- Update status labels and comments
+- Track work at planning level
 
 **That's it!** Simple, smart, and context-aware.

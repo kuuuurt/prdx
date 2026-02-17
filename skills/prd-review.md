@@ -89,6 +89,38 @@ Expert skill for reviewing PRDs with platform-specific domain knowledge and best
 - UI tests for critical flows
 - Snapshot tests for visual regression
 
+### Frontend (Web)
+
+**Architecture Checks:**
+- Component structure follows project conventions (pages, components, layouts)
+- State management approach is consistent (Redux, Zustand, Context, signals, etc.)
+- Data fetching uses project's established pattern (React Query, SWR, server components, etc.)
+- Routing follows framework conventions (file-based, programmatic)
+- Form handling uses consistent validation approach (Zod, Yup, native)
+- API layer is properly abstracted (not fetching directly in components)
+
+**Common Pitfalls:**
+- Missing loading, error, and empty states in UI
+- Not handling form validation on both client and display level
+- Prop drilling instead of using context or state management
+- Missing responsive design for mobile viewports
+- No error boundaries for graceful failure handling
+- Forgetting accessibility (ARIA labels, keyboard navigation, focus management)
+- Not handling stale data or race conditions in async operations
+
+**Performance Considerations:**
+- Bundle size monitored (code splitting, tree shaking)
+- Lazy loading for routes and heavy components
+- Memoization for expensive computations (useMemo, computed)
+- Image optimization (lazy loading, proper formats, srcset)
+- Avoiding unnecessary re-renders
+
+**Testing Requirements:**
+- Component tests for interactive behavior
+- Integration tests for user flows
+- Accessibility testing (axe, testing-library queries)
+- Visual regression tests for key screens (optional)
+
 ## Cross-Platform Concerns
 
 **Security:**

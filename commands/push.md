@@ -34,11 +34,52 @@ This command is a **thin wrapper** that:
 
 ## Workflow
 
+### Step 0: Validate GitHub CLI
+
+**Before any GitHub operations, verify `gh` is available and authenticated:**
+
+1. Check if `gh` CLI is installed:
+   ```bash
+   command -v gh
+   ```
+   If not found, show error and stop:
+   ```
+   GitHub CLI (gh) not found.
+
+   This command requires the GitHub CLI to create pull requests.
+
+   Install:
+     macOS: brew install gh
+     Linux: See https://github.com/cli/cli#installation
+     Windows: winget install GitHub.cli
+   ```
+
+2. Check authentication status:
+   ```bash
+   gh auth status
+   ```
+   If not authenticated, show error and stop:
+   ```
+   Not authenticated with GitHub.
+
+   Please authenticate:
+     gh auth login
+
+   Then try again.
+   ```
+
+---
+
 ### Phase 1: Detect Mode
 
 **If slug provided:**
+
+Resolve slug using enhanced matching (exact → substring → word-boundary → disambiguation):
 ```bash
-ls ~/.claude/plans/prdx-*[slug]*.md
+# 1. Exact: ~/.claude/plans/prdx-{slug}.md
+# 2. Substring: ls ~/.claude/plans/prdx-*{slug}*.md
+# 3. Word-boundary: split slug into words, find PRDs containing all words
+# 4. Multiple matches → ask user to select
 ```
 - Found → **PRD mode**
 - Not found → Error: "PRD not found: {slug}. Did you mean to run without a PRD? Use `/prdx:push` with no arguments from your feature branch."
@@ -50,7 +91,12 @@ ls ~/.claude/plans/prdx-*[slug]*.md
    grep -rl "^\*\*Branch:\*\*.*$(git branch --show-current)" ~/.claude/plans/prdx-*.md 2>/dev/null
    ```
 3. Found → **PRD mode** (use that PRD)
-4. Not found → **Standalone mode**
+4. Not found → Check last-used slug as fallback:
+   ```bash
+   cat .prdx/last-slug 2>/dev/null
+   ```
+   - If last slug exists and matching PRD file exists → **PRD mode** (use that PRD, confirm with user first)
+   - If no last slug or no matching PRD → **Standalone mode**
 
 ---
 

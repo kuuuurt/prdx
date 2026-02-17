@@ -358,6 +358,75 @@ struct YourAppApp: App {
 
 ---
 
+## Frontend Patterns (Web)
+
+**Discover the stack from:** `package.json`, `vite.config.*`, `next.config.*`, `nuxt.config.*`, `svelte.config.*`, `angular.json`
+- Framework: React, Vue, Svelte, Angular, Next.js, Nuxt, SvelteKit
+- State: Redux, Zustand, Pinia, Context API, signals
+- Styling: Tailwind CSS, CSS Modules, styled-components, Emotion
+- Data fetching: React Query, SWR, tRPC, server components
+
+### Project Structure Principles
+```
+frontend-project/src/
+├── app/                        # App entry, routing, layouts
+├── components/                 # Shared UI components
+│   ├── ui/                     # Primitives (Button, Input, Card)
+│   └── feature/                # Feature-specific components
+├── pages/ or routes/           # Route-level components
+├── hooks/ or composables/      # Shared logic (framework-specific)
+├── services/ or api/           # API client, data fetching
+├── stores/ or state/           # State management
+├── types/                      # TypeScript types/interfaces
+└── utils/                      # Pure utility functions
+```
+
+### Component Pattern
+```
+Component responsibilities:
+1. Render UI based on props/state
+2. Handle user interactions
+3. Delegate business logic to hooks/services
+
+Keep components focused:
+- Container components: data fetching, state management
+- Presentational components: pure UI, receive data via props
+- Compose small components into larger features
+```
+
+### Data Fetching Pattern
+```
+Data fetching responsibilities:
+1. Abstract API calls into a service/client layer
+2. Use framework's data fetching primitives (React Query, SWR, server components, etc.)
+3. Handle loading, error, and success states
+4. Cache and invalidate data appropriately
+
+Never fetch directly in UI components - always go through a service layer.
+```
+
+### Form Pattern
+```
+Form handling:
+1. Define validation schema (Zod, Yup, or native)
+2. Use form library if available (React Hook Form, Formik, VeeValidate)
+3. Show validation errors inline
+4. Handle submission with loading/error states
+5. Disable submit during processing
+```
+
+### Implementation Checklist
+
+1. Define TypeScript types/interfaces for data
+2. Create API service methods (data fetching layer)
+3. Build reusable components (if needed)
+4. Create page/route component with state management
+5. Add form handling and validation (if applicable)
+6. Ensure responsive design and accessibility
+7. Write tests (component + integration)
+
+---
+
 ## Common Patterns Across Platforms
 
 ### Error Handling

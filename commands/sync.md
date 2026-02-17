@@ -25,14 +25,53 @@ This command analyzes the current implementation and updates the PRD to reflect:
 
 ## Workflow
 
+### Step 0: Validate GitHub CLI (if --github flag provided)
+
+**Only validate when `--github` flag is used:**
+
+1. Check if `gh` CLI is installed:
+   ```bash
+   command -v gh
+   ```
+   If not found, warn and continue with local-only sync:
+   ```
+   GitHub CLI (gh) not found. Skipping GitHub sync.
+   PRD will be updated locally only.
+
+   Install gh for GitHub sync:
+     macOS: brew install gh
+     Linux: See https://github.com/cli/cli#installation
+   ```
+   Remove `--github` flag and continue to Phase 1.
+
+2. Check authentication status:
+   ```bash
+   gh auth status
+   ```
+   If not authenticated, warn and continue with local-only sync:
+   ```
+   Not authenticated with GitHub. Skipping GitHub sync.
+   PRD will be updated locally only.
+
+   Authenticate for GitHub sync:
+     gh auth login
+   ```
+   Remove `--github` flag and continue to Phase 1.
+
+---
+
 ### Phase 1: Load PRD
 
-**Find PRD file:**
+**Find PRD file using enhanced matching** (exact → substring → word-boundary → disambiguation):
 
 ```bash
-# If slug provided
+# If slug provided, resolve using enhanced matching:
+# 1. Exact: ~/.claude/plans/prdx-{slug}.md
+# 2. Substring: ls ~/.claude/plans/prdx-*{slug}*.md
+# 3. Word-boundary: split slug into words, find PRDs containing all words
+# 4. Multiple matches → ask user to select
 if [ -n "$SLUG" ]; then
-  PRD_FILE=$(ls ~/.claude/plans/prdx-*${SLUG}*.md 2>/dev/null | head -1)
+  PRD_FILE=$(ls ~/.claude/plans/prdx-${SLUG}.md 2>/dev/null || ls ~/.claude/plans/prdx-*${SLUG}*.md 2>/dev/null | head -1)
 fi
 
 # If no slug, detect from branch name

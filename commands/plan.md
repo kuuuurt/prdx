@@ -169,9 +169,42 @@ When the user approves, call **ExitPlanMode** immediately.
 
 **IMPORTANT:** Do NOT ask "Should I exit plan mode?" or "Ready to exit?" - just call ExitPlanMode directly when the user approves the plan. The approval to exit is implicit in their approval of the plan.
 
-The plan will be automatically saved to `~/.claude/plans/` with the filename `prdx-{slug}.md`.
+**CRITICAL — Plan File Naming:**
 
-**IMPORTANT:** Name the plan file `prdx-{slug}.md` where slug is derived from the title (kebab-case, e.g., `prdx-biometric-login.md`).
+The plan filename **MUST** be `prdx-{slug}.md` (e.g., `prdx-biometric-login.md`). This prefix is how all PRDX commands discover plans. Without it, the plan is invisible to the workflow.
+
+- Derive `{slug}` from the title in kebab-case (e.g., "Add Biometric Login" → `biometric-login`)
+- The full path will be `~/.claude/plans/prdx-{slug}.md`
+
+### Step 5: Verify Plan File Naming
+
+**After ExitPlanMode**, verify the saved plan has the correct `prdx-` prefix:
+
+1. Check if the plan was saved with the correct name:
+   ```bash
+   ls ~/.claude/plans/prdx-{slug}.md 2>/dev/null
+   ```
+
+2. If not found, search for the plan by its title or recent creation:
+   ```bash
+   # Find recently created plans without prdx- prefix
+   find ~/.claude/plans/ -name "*.md" -newer .prdx/last-slug -not -name "prdx-*" 2>/dev/null
+   # Or search by title content
+   grep -rl "^# {TITLE}" ~/.claude/plans/*.md 2>/dev/null | grep -v "prdx-"
+   ```
+
+3. If a non-prefixed plan is found, rename it:
+   ```bash
+   mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-{slug}.md
+   ```
+
+4. If no plan file is found at all, the plan may not have saved. Warn the user:
+   ```
+   ⚠️  Plan file not found at expected path: ~/.claude/plans/prdx-{slug}.md
+
+   Check ~/.claude/plans/ for recently created files and rename if needed:
+     mv ~/.claude/plans/{actual-name}.md ~/.claude/plans/prdx-{slug}.md
+   ```
 
 **Display summary:**
 ```

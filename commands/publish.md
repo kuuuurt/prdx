@@ -10,11 +10,53 @@ argument-hint: "[slug] [--issue #123]"
 
 ---
 
+## Step 0: Validate GitHub CLI
+
+**Before any GitHub operations, verify `gh` is available and authenticated:**
+
+1. Check if `gh` CLI is installed:
+   ```bash
+   command -v gh
+   ```
+   If not found, show error and stop:
+   ```
+   GitHub CLI (gh) not found.
+
+   This command requires the GitHub CLI to publish PRDs as issues.
+
+   Install:
+     macOS: brew install gh
+     Linux: See https://github.com/cli/cli#installation
+     Windows: winget install GitHub.cli
+   ```
+
+2. Check authentication status:
+   ```bash
+   gh auth status
+   ```
+   If not authenticated, show error and stop:
+   ```
+   Not authenticated with GitHub.
+
+   Please authenticate:
+     gh auth login
+
+   Then try again.
+   ```
+
+---
+
 ## Phase 1: Locate & Validate PRD
 
 **Find the PRD:**
 
-1. If slug provided: `ls ~/.claude/plans/prdx-*[slug]*.md`
+1. If slug provided, resolve using enhanced matching (exact → substring → word-boundary → disambiguation):
+   ```bash
+   # 1. Exact: ~/.claude/plans/prdx-{slug}.md
+   # 2. Substring: ls ~/.claude/plans/prdx-*{slug}*.md
+   # 3. Word-boundary: split slug into words, find PRDs containing all words
+   # 4. Multiple matches → ask user to select
+   ```
 2. If not: list all PRDs and ask user to select
 3. **DO NOT PROCEED** without valid PRD
 

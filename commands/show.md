@@ -20,7 +20,7 @@
 /prdx:show android-219
 
 # Filter by status or platform
-/prdx:show --status draft
+/prdx:show --status planning
 /prdx:show --platform backend
 /prdx:show auth --platform android
 ```
@@ -42,9 +42,11 @@
 
 **Parse arguments and detect intent:**
 
-1. **Check for exact slug match:**
+1. **Resolve slug using enhanced matching** (exact → substring → word-boundary):
    ```bash
-   ls ~/.claude/plans/prdx-*[input]*.md 2>/dev/null
+   # 1. Exact: ~/.claude/plans/prdx-{input}.md
+   # 2. Substring: ls ~/.claude/plans/prdx-*{input}*.md
+   # 3. Word-boundary: split input into words, find PRDs containing all words
    ```
    - If exactly 1 match → STATUS mode
    - If multiple matches → Ask user to select
@@ -90,7 +92,7 @@ PRDs in ~/.claude/plans/ (12 found)
 
 BACKEND (3)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  draft       Fix Context Storage Logger Tracing
+  planning       Fix Context Storage Logger Tracing
               Created: 2025-11-08
 
   in-progress Add Health Check Endpoint (#234)
@@ -104,7 +106,7 @@ ANDROID (5)
   review      Production Observability (#218 → PR #230)
               Created: 2025-11-04 | 2 reviews pending
 
-  draft       Optimize LoginViewModel
+  planning       Optimize LoginViewModel
               Created: 2025-11-05 | Depends: #215
 
   [... more ...]
@@ -122,7 +124,7 @@ Quick actions:
 
 5. **If filtered, show what was applied:**
    ```
-   Showing: status=draft, platform=android (2 found)
+   Showing: status=planning, platform=android (2 found)
    ```
 
 6. **If no PRDs exist:**
@@ -165,7 +167,7 @@ Found 3 PRDs matching "auth0"
 
 1. Optimize LoginViewModel (android)
    File: android-optimize-loginviewmodel.md
-   Status: draft | Created: 2025-11-05
+   Status: planning | Created: 2025-11-05
 
    [Goal]
    Simplify LoginViewModel by calling Auth0Client directly
@@ -193,7 +195,7 @@ Found 3 PRDs matching "auth0"
 
 3. Add Biometric Authentication (ios)
    File: ios-biometric-auth.md
-   Status: draft | Created: 2025-11-02
+   Status: planning | Created: 2025-11-02
 
    [Approach]
    Integrate with existing Auth0 authentication flow using
@@ -207,7 +209,7 @@ Platforms: backend (1), android (1), ios (1)
 
 Actions:
   /prdx:show <slug>        View detailed status
-  /prdx:dev <slug>   Start working on one
+  /prdx:implement <slug>   Start working on one
 ```
 
 5. **If no results:**
@@ -325,15 +327,14 @@ Recommended:
   2. 📝 Review plan: Read ~/.claude/plans/android-optimize-loginviewmodel.md
 
 Quick commands:
-  /prdx:dev       Continue implementation
-  /prdx:update          Update PRD
+  /prdx:implement  Continue implementation
   /prdx:show            Back to list
 
 ╚═══════════════════════════════════════════════════════╝
 ```
 
 7. **Adapt display based on status:**
-   - **draft**: Show planning info, suggest publish or start
+   - **planning**: Show planning info, suggest publish or start
    - **in-progress**: Show detailed tasks, git status, next steps
    - **review**: Emphasize testing status, user confirms before PR
    - **completed**: Show summary, timeline, what's unblocked

@@ -14,8 +14,9 @@ Execute the following phases based on the argument provided:
 
 ### Step 1: Determine Entry Point
 
-**If the argument matches an existing PRD** (check `~/.claude/plans/`):
+**If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
 - Read PRD and check its `**Status:**` field
+- **Save last-used slug:** `mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug`
 - For multi-platform mobile PRDs, also check which platforms have been implemented (look for `## Implementation Notes (android)` and `## Implementation Notes (ios)` sections)
 - Resume from the appropriate phase:
   - `planning` → Continue planning (Phase 2)
@@ -29,8 +30,13 @@ Execute the following phases based on the argument provided:
 - Proceed to Phase 2 (planning)
 
 **If no argument provided**:
-- List existing PRDX plans using: `ls -la ~/.claude/plans/prdx-*.md 2>/dev/null`
-- Ask: "Start a new feature or continue an existing PRD?"
+- Check for last-used slug: `cat .prdx/last-slug 2>/dev/null`
+- If last slug exists and matching PRD file exists, offer it as the first option via AskUserQuestion:
+  - Option 1: "Continue {last-slug}" (Recommended) — Resume the last PRD you were working on
+  - Option 2: "Choose a different PRD" — List all PRDs to pick from
+  - Option 3: "Start a new feature" — Create a new PRD
+- If no last slug, list existing PRDX plans using: `ls -la ~/.claude/plans/prdx-*.md 2>/dev/null`
+  - Ask: "Start a new feature or continue an existing PRD?"
 
 ---
 

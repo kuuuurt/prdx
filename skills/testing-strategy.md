@@ -241,6 +241,75 @@ func testLoginFailure() async throws {
 - Framework behavior
 - Trivial code
 
+### Frontend (Web)
+
+**Discover test framework from:** `package.json`
+- Test runner: Vitest, Jest, Bun test
+- Component testing: Testing Library (React/Vue/Svelte), Enzyme (legacy)
+- E2E testing: Playwright, Cypress
+- Accessibility: axe-core, jest-axe
+
+**Unit Tests:**
+- Utility functions and helpers
+- Custom hooks/composables
+- Data transformations
+- Validation logic
+
+**Component Tests:**
+- User-facing behavior (clicks, input, navigation)
+- State rendering (loading, error, empty, success)
+- Form validation and submission
+- Accessibility (roles, labels, keyboard)
+
+**Integration/E2E Tests:**
+- Critical user flows (login, checkout, onboarding)
+- Navigation between pages
+- Form submissions with API calls
+- Error recovery flows
+
+**Testing Pattern (Given-When-Then):**
+
+```
+// Test user-facing behavior with Testing Library
+describe('LoginForm', () => {
+  test('submits with valid credentials', async () => {
+    // Given: Login form is rendered
+    render(<LoginForm />)
+
+    // When: User fills form and submits
+    await userEvent.type(screen.getByLabelText('Email'), 'user@example.com')
+    await userEvent.type(screen.getByLabelText('Password'), 'password123')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+
+    // Then: Success message shown
+    expect(await screen.findByText('Welcome')).toBeInTheDocument()
+  })
+
+  test('shows validation error for empty email', async () => {
+    // Given: Login form is rendered
+    // When: User submits without email
+    // Then: Validation error displayed
+  })
+})
+```
+
+**What to Test:**
+- User interactions (click, type, select)
+- Rendered output (text, visibility, state changes)
+- Accessibility (roles, labels, focus management)
+- Error handling (API failures, validation)
+
+**What NOT to Test:**
+- CSS/styling details
+- Framework internals (React re-renders, Vue reactivity)
+- Third-party library behavior
+- Implementation details (internal state, private methods)
+
+**Coverage Goals:**
+- Unit: >80% for utilities and hooks
+- Component: Critical interactive components
+- E2E: Core user flows (login, main features)
+
 ## Feature-Type Testing Strategies
 
 ### New API Endpoint

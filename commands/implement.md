@@ -93,15 +93,59 @@ This command orchestrates three agents in **isolated contexts**:
 
 **Store these values - you will need them when invoking the platform agent.**
 
-### Step 2: Load PRD
+#### Step 1a: Validate Configuration
 
-1. Find PRD file matching the slug:
-   ```bash
-   ls ~/.claude/plans/prdx-*{slug}*.md
-   # Or exact match: ~/.claude/plans/prdx-{slug}.md
+**If a config file was found, validate it:**
+
+1. **Check for malformed JSON:**
+   If the file cannot be parsed as valid JSON, display a warning and use defaults:
+   ```
+   ⚠️  prdx.json contains invalid JSON. Using default configuration.
+
+   Fix: Check prdx.json syntax (missing commas, trailing commas, etc.)
    ```
 
-2. If not found, show error and list available PRDs
+2. **Check for unrecognized values:**
+   - If `commits.format` is not "conventional" or "simple":
+     ```
+     ⚠️  Unrecognized commit format: "{value}". Expected: "conventional" or "simple". Using "conventional".
+     ```
+   - If unknown top-level keys exist, warn but continue:
+     ```
+     ⚠️  Unrecognized config key: "{key}". Ignoring.
+     ```
+
+3. **Display loaded config summary:**
+   ```
+   Config loaded:
+     Format: conventional | Co-author: Claude <noreply@anthropic.com> | Extended: yes | Claude Code link: yes
+   ```
+
+### Step 2: Load PRD
+
+**Resolve slug to PRD file using enhanced matching:**
+
+1. **Exact match (prefixed):** `~/.claude/plans/prdx-{slug}.md`
+2. **Exact match (unprefixed fallback):** `~/.claude/plans/{slug}.md` — for plans created without the `prdx-` prefix
+3. **Substring match:** `ls ~/.claude/plans/prdx-*{slug}*.md` — slug appears anywhere in prefixed filenames
+4. **Substring match (unprefixed fallback):** `ls ~/.claude/plans/*{slug}*.md` — search all plans if no prefixed match
+5. **Word-boundary match:** Split slug into words, find PRDs containing all words (in any order)
+6. **Disambiguation:** If multiple matches at any step, use AskUserQuestion to let user select:
+   ```
+   Multiple PRDs match "{slug}":
+     1. backend-auth
+     2. backend-auth-refresh
+   Which one?
+   ```
+   If exactly one match at any step, use it.
+
+7. If no match found at any step, show error and list available PRDs
+
+**Auto-rename unprefixed plans:** If a match is found without the `prdx-` prefix, rename it to add the prefix before proceeding:
+```bash
+mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-{slug}.md
+```
+Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 
 3. Read the PRD file and extract:
    - Platform (backend/android/ios/mobile)
@@ -113,6 +157,11 @@ This command orchestrates three agents in **isolated contexts**:
 
 4. **Update status to `in-progress`:**
    Edit the PRD file to change `**Status:** planning` to `**Status:** in-progress`
+
+5. **Save last-used slug** for context persistence:
+   ```bash
+   mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug
+   ```
 
 ### Step 2a: Determine Target Platform(s)
 
@@ -183,6 +232,11 @@ Run Steps 5a-5d for the current platform, then move to the next.
 
 #### Step 5a: Dev Planning (prdx:dev-planner)
 
+**Display progress:**
+```
+Phase 1/3: Dev Planning — Creating implementation plan...
+```
+
 Invoke the dev-planner agent using the Task tool:
 
 ```
@@ -209,6 +263,18 @@ Include `PREVIOUS_PLATFORM_NOTES` with:
 - Recommendations for this platform
 
 Wait for the agent to return the dev plan. Store it for the next phase.
+
+**If dev-planner fails or returns an error:**
+
+Use AskUserQuestion to offer recovery options:
+- Option 1: "Retry dev planning" — Re-invoke the dev-planner agent
+- Option 2: "Skip to manual implementation" — Proceed to platform agent without a dev plan (agent will explore codebase itself)
+- Option 3: "Stop implementation" — Halt and let user investigate
+
+Route based on choice:
+- Retry → Re-run Step 5a
+- Skip → Proceed to Step 5b with a note that no dev plan is available (platform agent should explore codebase independently)
+- Stop → End workflow, show how to resume with `/prdx:implement {slug}`
 
 #### Step 5b: Build Commit Instructions
 
@@ -326,8 +392,14 @@ Then add based on config:
 
 #### Step 5c: Invoke Platform Agent
 
+**Display progress:**
+```
+Phase 2/3: Implementation ({CURRENT_PLATFORM}) — Executing dev plan with TDD...
+```
+
 Determine agent based on current platform:
 - backend → `prdx:backend-developer`
+- frontend → `prdx:frontend-developer`
 - android → `prdx:android-developer`
 - ios → `prdx:ios-developer`
 
@@ -418,6 +490,18 @@ You MUST follow the commit configuration below. This is from the project's prdx.
 
 Wait for the platform agent to complete.
 
+**If platform agent fails or returns an error:**
+
+Use AskUserQuestion to offer recovery options:
+- Option 1: "Retry implementation" — Re-invoke the platform agent with the same dev plan
+- Option 2: "Continue manually" — Stop automated implementation, let user take over (status stays `in-progress`)
+- Option 3: "Stop implementation" — Halt workflow entirely
+
+Route based on choice:
+- Retry → Re-run Step 5c
+- Continue manually → Display what was accomplished so far, end workflow
+- Stop → End workflow, show how to resume with `/prdx:implement {slug}`
+
 #### Step 5d: Platform Completion
 
 After each platform completes:
@@ -454,6 +538,11 @@ After each platform completes:
 ---
 
 #### Step 5e: Code Review (prdx:code-reviewer)
+
+**Display progress:**
+```
+Phase 3/3: Code Review — Reviewing against acceptance criteria...
+```
 
 After all platform implementations are complete, run an automated code review before handing off to the user.
 
@@ -493,6 +582,18 @@ Return only a summary of fixes applied."
 ```
 
 3. After fixes, re-run the code reviewer to verify (max 2 review cycles to avoid loops)
+
+**If 2 review cycles exhausted and issues remain:**
+
+Use AskUserQuestion to offer options:
+- Option 1: "Proceed anyway" (Recommended) — Continue to Step 6 with remaining issues noted
+- Option 2: "Fix manually" — Stop here, let user fix remaining issues (status stays `in-progress`)
+- Option 3: "Stop implementation" — Halt workflow entirely
+
+Route based on choice:
+- Proceed → Continue to Step 6, include remaining issues in completion summary
+- Fix manually → Display remaining issues, end workflow
+- Stop → End workflow, show how to resume with `/prdx:prdx {slug}`
 
 **If no issues found (or after fixes verified):**
 - Continue to Step 6
@@ -587,6 +688,7 @@ Fix the issues and try again.
 | Platform | Agent | Specialization |
 |----------|-------|----------------|
 | backend | prdx:backend-developer | APIs, services, validation (discovers framework from codebase) |
+| frontend | prdx:frontend-developer | Components, state, data fetching (discovers framework from codebase) |
 | android | prdx:android-developer | Kotlin, Compose, MVVM (discovers DI/persistence from codebase) |
 | ios | prdx:ios-developer | Swift, SwiftUI, MVVM (discovers dependencies from codebase) |
 
