@@ -1,6 +1,6 @@
 ---
 description: "Create PRD using native plan mode"
-argument-hint: "[description]"
+argument-hint: "[--quick] [description]"
 ---
 
 # /prdx:plan - Create Product Requirements Document
@@ -23,6 +23,10 @@ Detailed implementation planning is done in `/prdx:implement` using the dev-plan
 /prdx:plan "add biometric authentication to Android app"
 /prdx:plan "fix user login failures on slow networks"
 /prdx:plan "improve checkout conversion rate"
+
+# Quick mode — lightweight template, ephemeral PRD
+/prdx:plan --quick "fix login validation"
+/prdx:plan --quick "address PR review comments on auth"
 ```
 
 ## MANDATORY: Use Isolated Exploration Agents
@@ -91,6 +95,10 @@ Options:
 
 ### Step 2: Enter Plan Mode
 
+**First, parse `--quick` flag:**
+- Strip `--quick` from arguments if present
+- If `--quick` is present: set `QUICK_MODE=true`
+
 Use **EnterPlanMode** tool to begin planning.
 
 Once in plan mode, explore the codebase using **ONLY the PRDX exploration agents** (see mandatory section above):
@@ -102,7 +110,40 @@ Task tool: subagent_type="prdx:docs-explorer", prompt="[your docs question]"
 
 **NEVER use:** `subagent_type: "Explore"`, Glob, Grep, or Read for exploration. These pollute the main context.
 
-**Then create a PRD following this exact format:**
+**If QUICK_MODE — use this lightweight template:**
+
+Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined template:
+
+```markdown
+# [Title]
+
+**Type:** bug-fix | feature | refactor
+**Platform:** {DETECTED_PLATFORM}
+**Quick:** true
+**Status:** planning
+**Created:** {TODAY's DATE}
+**Branch:** {BRANCH_NAME}
+
+## Problem
+
+[1-2 sentences — what's broken or what needs to change]
+
+## Goal
+
+[1 sentence — the desired outcome]
+
+## Acceptance Criteria
+
+- [ ] [Testable outcome]
+
+## Approach
+
+[1-2 sentences — how to fix/implement this]
+```
+
+**Filename convention for quick mode:** `prdx-quick-{slug}.md` (e.g., `prdx-quick-fix-login-validation.md`)
+
+**If NOT QUICK_MODE — use the full PRD template:**
 
 ```markdown
 # [Title]
@@ -148,7 +189,7 @@ Task tool: subagent_type="prdx:docs-explorer", prompt="[your docs question]"
 - [Technical/business risks and constraints]
 ```
 
-**Branch naming convention:**
+**Branch naming convention (both modes):**
 - feature → `feat/{slug}`
 - bug-fix → `fix/{slug}`
 - refactor → `refactor/{slug}`
@@ -171,17 +212,25 @@ When the user approves, call **ExitPlanMode** immediately.
 
 **CRITICAL — Plan File Naming:**
 
-The plan filename **MUST** be `prdx-{slug}.md` (e.g., `prdx-biometric-login.md`). This prefix is how all PRDX commands discover plans. Without it, the plan is invisible to the workflow.
+**Quick mode:** The filename **MUST** be `prdx-quick-{slug}.md` (e.g., `prdx-quick-fix-login-validation.md`).
+
+**Normal mode:** The filename **MUST** be `prdx-{slug}.md` (e.g., `prdx-biometric-login.md`).
+
+This prefix is how all PRDX commands discover plans. Without it, the plan is invisible to the workflow.
 
 - Derive `{slug}` from the title in kebab-case (e.g., "Add Biometric Login" → `biometric-login`)
-- The full path will be `~/.claude/plans/prdx-{slug}.md`
+- Quick mode full path: `~/.claude/plans/prdx-quick-{slug}.md`
+- Normal mode full path: `~/.claude/plans/prdx-{slug}.md`
 
 ### Step 5: Verify Plan File Naming
 
-**After ExitPlanMode**, verify the saved plan has the correct `prdx-` prefix:
+**After ExitPlanMode**, verify the saved plan has the correct prefix:
 
 1. Check if the plan was saved with the correct name:
    ```bash
+   # Quick mode:
+   ls ~/.claude/plans/prdx-quick-{slug}.md 2>/dev/null
+   # Normal mode:
    ls ~/.claude/plans/prdx-{slug}.md 2>/dev/null
    ```
 
@@ -195,18 +244,36 @@ The plan filename **MUST** be `prdx-{slug}.md` (e.g., `prdx-biometric-login.md`)
 
 3. If a non-prefixed plan is found, rename it:
    ```bash
+   # Quick mode:
+   mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-quick-{slug}.md
+   # Normal mode:
    mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-{slug}.md
    ```
 
 4. If no plan file is found at all, the plan may not have saved. Warn the user:
    ```
-   ⚠️  Plan file not found at expected path: ~/.claude/plans/prdx-{slug}.md
+   Plan file not found at expected path.
 
-   Check ~/.claude/plans/ for recently created files and rename if needed:
-     mv ~/.claude/plans/{actual-name}.md ~/.claude/plans/prdx-{slug}.md
+   Check ~/.claude/plans/ for recently created files and rename if needed.
    ```
 
 **Display summary:**
+
+**Quick mode:**
+```
+Quick plan created and saved
+
+PRD: ~/.claude/plans/prdx-quick-{slug}.md
+Platform: {PLATFORM}
+Status: planning
+Branch: {BRANCH}
+
+Next steps:
+- Run /prdx:implement quick-{slug} to start implementation
+- Or run /prdx:prdx quick-{slug} for guided workflow
+```
+
+**Normal mode:**
 ```
 PRD created and saved
 
@@ -240,6 +307,15 @@ Use AskUserQuestion to let user choose platform.
 
 ## Optional Flags
 
+### --quick
+
+Use lightweight template for ephemeral tasks:
+```bash
+/prdx:plan --quick "fix login validation"
+```
+
+Creates `prdx-quick-{slug}.md` with a streamlined template (Problem, Goal, AC, Approach only). No User Stories, Scope, or Risks sections. Brief codebase scan instead of deep exploration.
+
 ### --platform
 
 Override platform detection:
@@ -259,8 +335,9 @@ Valid types: `feature`, `bug-fix`, `refactor`, `spike`
 ## Key Points
 
 1. **Uses native plan mode** - Not a custom agent
-2. **Follow the PRD template exactly** - See CLAUDE.md for format
+2. **Follow the PRD template exactly** - Full template for normal mode, lightweight for `--quick`
 3. **Plans auto-save** - To `~/.claude/plans/` directory
-4. **Naming convention** - `prdx-{slug}.md` (e.g., `prdx-biometric-login.md`)
+4. **Naming convention** - `prdx-{slug}.md` (normal) or `prdx-quick-{slug}.md` (quick mode)
 5. **Status starts as `planning`** - Updated by implement/push commands
 6. **Branch name in PRD** - Used by implement command
+7. **Quick mode** - Adds `**Quick:** true` field, uses lightweight template, brief exploration

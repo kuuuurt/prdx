@@ -26,11 +26,13 @@ PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document)
 
 PRDX uses Claude's default plans directory (`~/.claude/plans/`).
 
-**Naming convention:** `prdx-{slug}.md` to distinguish PRDX plans from regular plans.
+**Naming convention:** `prdx-{slug}.md` for normal PRDs, `prdx-quick-{slug}.md` for quick mode (ephemeral).
 
 ## PRD Format (Plan Mode Template)
 
-**IMPORTANT:** When entering plan mode for PRDX workflows, use this exact format for plans:
+**IMPORTANT:** When entering plan mode for PRDX workflows, use the appropriate format based on mode:
+
+### Full Template (Normal Mode)
 
 ```markdown
 # [Title]
@@ -74,6 +76,37 @@ PRDX uses Claude's default plans directory (`~/.claude/plans/`).
 ## Risks & Considerations
 
 - [Technical/business risks and constraints]
+```
+
+### Quick Template (`--quick` Mode)
+
+Used for ephemeral tasks. Saved as `prdx-quick-{slug}.md` and cleaned up after workflow completes.
+
+```markdown
+# [Title]
+
+**Type:** bug-fix | feature | refactor
+**Platform:** {DETECTED}
+**Quick:** true
+**Status:** planning
+**Created:** [YYYY-MM-DD]
+**Branch:** fix/[slug] | feat/[slug] | refactor/[slug]
+
+## Problem
+
+[1-2 sentences]
+
+## Goal
+
+[1 sentence]
+
+## Acceptance Criteria
+
+- [ ] [Testable outcome]
+
+## Approach
+
+[1-2 sentences]
 ```
 
 **Branch naming convention:**
@@ -161,6 +194,32 @@ Review (test, fix bugs if needed)
 The `/prdx:prdx` command is the main entry point, orchestrating the workflow with decision points.
 
 **1 PRD = 1 Branch = 1 PR:** Each PRD gets a unique branch name at planning time. All implementation happens on that branch, and the PR is created from it.
+
+### Quick Mode (`--quick`)
+
+```
+/prdx:prdx --quick "fix login validation"
+↓
+Lightweight Plan Mode → Temp PRD saved → [Implement?] → Implement → [Create PR? / Done?] → Cleanup
+```
+
+Quick mode is for one-off tasks (bugfixes, PR review comments) that need the full pipeline rigor (dev-planner, code review) but don't need a permanent PRD artifact. The temporary PRD (`prdx-quick-{slug}.md`) flows through the existing pipeline unchanged, then gets cleaned up.
+
+| Aspect | `/prdx:bugfix` | `/prdx:prdx --quick` | `/prdx:prdx` |
+|--------|----------------|----------------------|--------------|
+| Planning | None | Lightweight plan mode | Full PRD |
+| Dev-planner | No | Yes | Yes |
+| Code review | Yes | Yes | Yes |
+| PRD artifact | None | Temporary (cleaned up) | Permanent |
+| Publish option | No | No | Yes |
+| Decision points | 1 | 2 | 4+ |
+
+**Key differences from normal mode:**
+- Lightweight PRD template (Problem, Goal, AC, Approach only)
+- No "Publish to GitHub" option
+- "Done" option (commit only, no PR) at review decision
+- Temporary PRD file deleted after workflow completes
+- Resume with `/prdx:prdx quick-{slug}` if interrupted
 
 ### Individual Commands
 
@@ -261,20 +320,23 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 ### /prdx:prdx (Main Entry Point)
 
 **What it does:**
-1. Determines entry point (new feature or existing PRD)
-2. Runs `/prdx:plan` for planning (uses native plan mode)
+1. Determines entry point (new feature, existing PRD, or quick mode)
+2. Runs `/prdx:plan` for planning (uses native plan mode; `--quick` uses lightweight template)
 3. Asks: Implement now? → runs `/prdx:implement`
 4. Asks: Create PR? → runs `/prdx:push`
+5. Quick mode only: Cleans up temporary PRD after workflow completes
 
 **Usage:**
 - `/prdx:prdx add user authentication` - Start new feature
 - `/prdx:prdx biometric-login` - Resume existing PRD
+- `/prdx:prdx --quick "fix login validation"` - Quick ephemeral task
 
 **Key features:**
 - Main entry point for all PRDX workflows
 - Decision points at each phase (never auto-proceeds)
 - Resumes from current status when given existing PRD
 - Shows context and next steps at each decision
+- `--quick` flag: lightweight plan, same pipeline, PRD cleaned up after
 
 ### /prdx:plan
 
@@ -282,7 +344,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 1. Detects platform from description/codebase
 2. Enters native plan mode
 3. Uses `prdx:code-explorer` and `prdx:docs-explorer` agents for codebase/docs exploration (keeps main context clean)
-4. Creates PRD using template format
+4. Creates PRD using template format (full or lightweight with `--quick`)
 5. Iterates with user until approval
 6. Calls ExitPlanMode immediately when user approves (do NOT ask "should I exit plan mode?")
 7. Plan auto-saved to `~/.claude/plans/`
@@ -292,6 +354,8 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 **Exploration:** MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents (NOT direct Glob/Grep/Read, NOT built-in Explore subagent)
 
 **Focus:** Recon, feasibility, business context, high-level approach (not detailed dev tasks)
+
+**`--quick` flag:** Uses lightweight template (`prdx-quick-{slug}.md`), brief codebase scan, adds `**Quick:** true` to PRD metadata
 
 ### /prdx:implement
 
@@ -622,6 +686,7 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 - User tests and can request bug fixes while in `review` status
 - `/prdx:push` confirms readiness, sets status to `implemented`, then creates PR
 - PR metadata added by `/prdx:push`
+- Quick PRDs (`**Quick:** true`) use a lightweight version of this structure and are cleaned up after workflow completes
 
 ## Development Guidelines
 

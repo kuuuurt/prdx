@@ -31,14 +31,17 @@ Complete PRD workflow system for feature development with AI agents.
 
 ### Main Entry Point
 
-**`/prdx:prdx [description or slug]`**
+**`/prdx:prdx [--quick] [description or slug]`**
 - Complete workflow: plan → implement → push
 - **Decision points**: Never auto-proceeds between phases
 - **Resumes from current status** when given existing PRD slug
+- **`--quick` flag**: Ephemeral mode — lightweight plan, same pipeline, PRD cleaned up after
 - Examples:
   ```bash
-  /prdx:prdx "add biometric login"    # New feature
-  /prdx:prdx biometric-login          # Resume existing PRD
+  /prdx:prdx "add biometric login"                # Full PRD workflow
+  /prdx:prdx biometric-login                      # Resume existing PRD
+  /prdx:prdx --quick "fix login validation"        # Quick: plan → implement → cleanup
+  /prdx:prdx --quick "address PR review comments"  # Quick: one-off task
   ```
 
 ### Planning & Discovery
@@ -232,6 +235,13 @@ Things that happen automatically:
 # ...test implementation...
 /prdx:push biometric-login       # Create PR
 /prdx:close biometric-login      # After PR merged
+```
+
+### Quick Fix Flow
+```bash
+/prdx:prdx --quick "fix login validation"
+# → Lightweight plan → Implement (dev-planner + code review) → PR → Cleanup
+# Same rigor as full workflow, but no permanent PRD artifact
 ```
 
 ### Bug Fix Flow

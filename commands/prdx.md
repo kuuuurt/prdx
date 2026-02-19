@@ -1,12 +1,13 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[feature description or PRD slug]"
+argument-hint: "[--quick] [feature description or PRD slug]"
 ---
 
 # /prdx:prdx - Complete Feature Workflow
 
 > **Main entry point for PRDX.**
 > Orchestrates the complete feature development workflow with decision points.
+> Use `--quick` for ephemeral tasks that need the full pipeline but not a permanent PRD.
 
 ## Workflow
 
@@ -14,8 +15,17 @@ Execute the following phases based on the argument provided:
 
 ### Step 1: Determine Entry Point
 
+**First, parse `--quick` flag:**
+- Strip `--quick` from arguments if present (can appear anywhere in the argument string)
+- If `--quick` is present:
+  - Remaining text MUST be a description (not a slug) — error if empty
+  - Error: `--quick requires a description. Usage: /prdx:prdx --quick "fix login validation"`
+  - Set `QUICK_MODE=true`, skip PRD matching, go directly to Phase 2 (planning)
+- If `--quick` is NOT present, continue with normal entry point logic below
+
 **If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
 - Read PRD and check its `**Status:**` field
+- **Detect quick mode from PRD:** If the PRD contains `**Quick:** true`, set `QUICK_MODE=true` internally
 - **Save last-used slug:** `mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug`
 - For multi-platform mobile PRDs, also check which platforms have been implemented (look for `## Implementation Notes (android)` and `## Implementation Notes (ios)` sections)
 - Resume from the appropriate phase:
@@ -41,6 +51,34 @@ Execute the following phases based on the argument provided:
 ---
 
 ### Step 2: Planning
+
+**If QUICK_MODE:**
+
+Run the planning command with the `--quick` flag:
+
+```
+/prdx:plan --quick [description]
+```
+
+This enters plan mode with a lightweight template (Problem, Goal, Acceptance Criteria, Approach only). The PRD is saved as `prdx-quick-{slug}.md`.
+
+> **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
+
+**IMPORTANT: Stop here and wait.** Plan mode is interactive. Do NOT proceed until:
+1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
+2. The PRD file exists in `~/.claude/plans/prdx-quick-{slug}.md`
+
+**After plan mode completes (quick mode), STOP and use AskUserQuestion:**
+- Option 1: "Implement now" (Recommended) — Start coding immediately
+- Option 2: "Stop here" — Review plan later
+
+Note: No "Publish to GitHub" option in quick mode — these are ephemeral tasks.
+
+Route based on choice:
+- Implement → Phase 3
+- Stop → End workflow, tell user they can resume with `/prdx:prdx quick-{slug}`
+
+**If NOT QUICK_MODE (normal mode):**
 
 Run the planning command with the feature description:
 
@@ -127,6 +165,17 @@ Implementation runs **sequentially** per platform to learn from the first implem
 
 Do NOT proceed to create PR automatically. The user must test the implementation first.
 
+**If QUICK_MODE:**
+- Option 1: "Create PR" (Recommended) — Ready for review
+- Option 2: "Done" — Commit only, no PR needed
+- Option 3: "Test first" — Let me verify first
+
+Route based on choice:
+- Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
+- Done → Proceed to Phase 5 (cleanup) immediately — no PR
+- Test first → Tell user to test and resume with `/prdx:prdx quick-{slug}` when ready
+
+**If NOT QUICK_MODE (normal mode):**
 - Option 1: "Test first" (Recommended) - Let me verify the implementation works
 - Option 2: "Create PR now" - Skip testing, go straight to PR
 
@@ -142,6 +191,17 @@ Route based on choice:
 
 The implementation is complete but user hasn't confirmed it's ready for PR. Use AskUserQuestion:
 
+**If QUICK_MODE:**
+- Option 1: "Create PR" (Recommended) — Ready for review
+- Option 2: "Done" — Commit only, no PR needed
+- Option 3: "Fix issues" — Found bugs or need changes
+
+Route:
+- Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
+- Done → Proceed to Phase 5 (cleanup) immediately
+- Fix issues → Same as normal mode below
+
+**If NOT QUICK_MODE (normal mode):**
 - Option 1: "Create PR" (Recommended) - Implementation looks good, ready for review
 - Option 2: "Fix issues" - Found bugs or need changes
 - Option 3: "View implementation summary" - Review what was done
@@ -173,7 +233,11 @@ If user confirms, run the push command:
 /prdx:push [slug]
 ```
 
-**After PR is created, display completion message:**
+**After PR is created:**
+
+**If QUICK_MODE:** Proceed to Phase 5 (cleanup), then display completion.
+
+**If NOT QUICK_MODE:** Display completion message:
 
 ```
 Feature complete!
@@ -183,6 +247,41 @@ PR: #[pr-number]
 
 The feature is ready for review.
 ```
+
+---
+
+### Step 5: Cleanup (Quick Mode Only)
+
+**This step only runs when QUICK_MODE is true.** It runs after the workflow completes (PR created, or user chose "Done").
+
+1. **Delete the temporary PRD file:**
+   ```bash
+   rm ~/.claude/plans/prdx-quick-{slug}.md
+   ```
+
+2. **Clear last-slug if it points to this quick task:**
+   ```bash
+   if [ "$(cat .prdx/last-slug 2>/dev/null)" = "quick-{slug}" ]; then
+     rm .prdx/last-slug
+   fi
+   ```
+
+3. **Display completion message:**
+
+   If PR was created:
+   ```
+   Done! PR: #[pr-number]
+
+   Quick task cleaned up — no PRD artifact left behind.
+   ```
+
+   If user chose "Done" (no PR):
+   ```
+   Done! Changes committed on branch {BRANCH}.
+
+   Quick task cleaned up — no PRD artifact left behind.
+   Push when ready: git push -u origin {BRANCH}
+   ```
 
 ---
 
