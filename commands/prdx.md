@@ -132,7 +132,7 @@ Do NOT proceed to create PR automatically. The user must test the implementation
 
 Route based on choice:
 - Test first → End workflow, tell user to test and resume with `/prdx:prdx [slug]` when ready
-- Create PR now → Proceed to Phase 4 (but ask for confirmation again in Phase 4)
+- Create PR now → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
 
 ---
 
@@ -147,7 +147,7 @@ The implementation is complete but user hasn't confirmed it's ready for PR. Use 
 - Option 3: "View implementation summary" - Review what was done
 
 **Route based on choice:**
-- Create PR → Phase 4
+- Create PR → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
 - Fix issues → Tell user to describe the issues. Claude will fix them in the current conversation (no need to re-run full implement). After fixes are committed, ask again.
 - View summary → Show the implementation notes from the PRD, then ask again
 
@@ -161,7 +161,7 @@ The implementation is complete but user hasn't confirmed it's ready for PR. Use 
 
 ### Step 4: Create Pull Request
 
-**IMPORTANT: Confirm before creating PR.**
+**Confirm before creating PR** — but only if the user hasn't already explicitly chosen "Create PR" or "Create PR now" in a previous step. If they have, skip this confirmation and run `/prdx:push` directly.
 
 Use AskUserQuestion to confirm:
 - Option 1: "Yes, create PR" - Ready to submit for review
@@ -191,9 +191,9 @@ The feature is ready for review.
 **CRITICAL: Never skip user decision points. ALWAYS use AskUserQuestion.**
 - After planning completes → STOP, ask before implementing
 - After implementing completes → STOP, ask before creating PR (recommend testing first)
-- Before running `/prdx:push` → STOP, ask for final confirmation
 - Each phase transition requires explicit user consent via AskUserQuestion
 - When in doubt, STOP and ask - never auto-proceed
+- **Never ask twice for the same decision.** If the user already chose "Create PR" in one step, do NOT ask for PR confirmation again. Respect prior choices within the same workflow run.
 
 **Use AskUserQuestion tool** at each decision point with clear options.
 
