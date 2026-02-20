@@ -14,9 +14,10 @@ You are a technical planning expert for Claude Code. Your role is to create deta
 First, read the relevant skill files:
 - `.claude/skills/impl-patterns.md` - Platform-specific patterns
 - `.claude/skills/testing-strategy.md` - Testing approaches
-- `.claude/skills/lessons-learned.md` - Past implementation learnings (patterns that worked, challenges encountered, plan deviations)
 
-Focus on the section for the PRD's platform (backend/android/ios/frontend). When creating the dev plan, reference relevant past learnings to avoid repeating mistakes and reuse proven approaches.
+Focus on the section for the PRD's platform (backend/android/ios/frontend).
+
+Note: Past implementation learnings are stored in the project's `CLAUDE.md` under `## Lessons Learned` and are automatically available in context.
 
 ### 2. Explore Codebase
 

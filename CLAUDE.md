@@ -151,6 +151,7 @@ prdx/
 │   ├── prd-review.md        # Review checklist
 │   ├── impl-patterns.md     # Implementation patterns
 │   └── testing-strategy.md  # Testing approaches
+│                            # Note: Lessons learned are stored in the project's CLAUDE.md
 ├── agents/                  # Specialized agents
 │   ├── dev-planner.md       # Technical planning (isolated context)
 │   ├── pr-author.md         # PR creation (isolated context)
@@ -395,7 +396,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 ### Other Commands
 
 - `/prdx:show` - List/search/view PRDs (bash + grep)
-- `/prdx:close` - Update PRD status to completed
+- `/prdx:close` - Update PRD status to completed, capture lessons in project CLAUDE.md
 - `/prdx:publish` - Create GitHub issue from PRD
 - `/prdx:sync` - Sync PRD with GitHub issue
 
@@ -413,7 +414,7 @@ Agents run in **isolated contexts** to minimize main conversation size.
 ### Workflow Agents
 
 **1. prdx:dev-planner**
-- Reads skills (impl-patterns.md, testing-strategy.md)
+- Reads skills (impl-patterns.md, testing-strategy.md) and project's CLAUDE.md lessons
 - Explores codebase for patterns
 - Creates detailed implementation plan
 - Maps tests to acceptance criteria
@@ -535,8 +536,10 @@ Skills are read by agents during execution:
 - UI testing strategies
 - Test coverage standards
 
+**Lessons learned** are stored in the project's own `CLAUDE.md` (under `## Lessons Learned`), not in a skill file. This makes them project-specific, version-controlled, and automatically available in context. `/prdx:close` appends learnings there after each PRD is completed.
+
 **How agents use them:**
-- `prdx:dev-planner` reads during technical planning
+- `prdx:dev-planner` reads skills during technical planning (lessons from CLAUDE.md are automatic)
 - Platform agents read during implementation
 - Natural skill lookup, no custom code
 

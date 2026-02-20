@@ -135,9 +135,9 @@ You are helping the user close a PRD after all implementation work is complete.
 
 ### Phase 3: Extract Learnings (Compound Learning)
 
-**Capture lessons from this implementation for future PRDs.**
+**Capture lessons from this implementation in the project's CLAUDE.md.**
 
-After updating status to completed, extract learnings from the PRD and append them to the lessons-learned skill file.
+After updating status to completed, extract learnings from the PRD and append them to the project's `CLAUDE.md`.
 
 1. **Gather learning sources:**
    - Read the `## Implementation Notes` section(s) from the PRD
@@ -181,25 +181,26 @@ Example output:
 Keep entries specific and actionable. Skip generic observations."
 ```
 
-3. **Append learnings to skill file:**
+3. **Append learnings to project's CLAUDE.md:**
 
-   Read `skills/lessons-learned.md` (relative to the plugin installation, check `.claude/skills/lessons-learned.md` or local `skills/lessons-learned.md`).
+   Read the project's `CLAUDE.md` (in the repository root).
 
-   Use Edit tool to append the learnings under the correct platform section. Insert before the `---` separator that follows the platform's "Deviations from Plan" section:
+   - If `CLAUDE.md` doesn't exist, create it with just the `## Lessons Learned` section
+   - If `CLAUDE.md` exists but has no `## Lessons Learned` section, append the section at the end of the file
+   - If the section already exists, append the new entry under it
+
+   Use Edit tool to append the entry:
 
    ```markdown
-   #### {TITLE} ({DATE})
+   ### {TITLE} ({DATE}) - {PLATFORM}
    {EXTRACTED_LEARNINGS}
    ```
 
+   If the `## Lessons Learned` section exceeds ~200 lines, trim the oldest entries to stay under the limit.
+
 4. **Display confirmation:**
    ```
-   Learnings captured in skills/lessons-learned.md
-   ```
-
-   If the skill file is not found, warn but continue:
-   ```
-   Learnings extraction skipped — skills/lessons-learned.md not found
+   Learnings captured in CLAUDE.md under "## Lessons Learned"
    ```
 
 ---
