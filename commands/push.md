@@ -104,25 +104,14 @@ Resolve slug using enhanced matching (exact → substring → word-boundary → 
 
 When a matching PRD is found, use the full PRDX workflow.
 
-### Phase 2a: Confirm Ready for PR
+### Phase 2a: Update Status
 
 **If PRD status is `review`:**
-
-Use AskUserQuestion to confirm the implementation is ready:
-
-- Option 1: "Yes, implementation is ready" (Recommended)
-- Option 2: "No, I found issues to fix"
-
-**If user confirms ready:**
 - Update PRD status to `implemented` by editing the `**Status:**` line in the PRD file
 - Continue to Phase 3
 
-**If user found issues:**
-- Tell user to describe the issues for fixing
-- End workflow (they can resume with `/prdx:prdx [slug]` after fixing)
-
 **If PRD status is already `implemented`:**
-- Skip confirmation, proceed to Phase 3
+- Proceed to Phase 3
 
 ### Phase 3a: Validate Git State (PRD Mode)
 
@@ -342,8 +331,7 @@ This keeps the main conversation context minimal.
 User: /prdx:push backend-auth
 
 → Finds PRD: ~/.claude/plans/prdx-backend-auth.md
-→ Status is "review" - confirms implementation is ready
-→ User confirms → Status updated to "implemented"
+→ Status is "review" → Updated to "implemented"
 → Validates git state
 → prdx:pr-author agent invoked (PRD mode)
 → Agent reads PRD, analyzes commits
