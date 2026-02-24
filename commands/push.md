@@ -19,6 +19,7 @@ The agent runs in an **isolated context** to minimize main conversation context 
 /prdx:push                    # Auto-detect: PRD mode if matching PRD found, standalone otherwise
 /prdx:push backend-auth       # PRD mode: specify PRD slug
 /prdx:push --draft            # Standalone draft PR from current branch
+/prdx:push backend-auth --draft  # PRD mode: draft PR
 ```
 
 ## How It Works
@@ -71,6 +72,12 @@ This command is a **thin wrapper** that:
 ---
 
 ### Phase 1: Detect Mode
+
+**First, parse `--draft` flag:**
+- Strip `--draft` from arguments if present (can appear anywhere in the argument string)
+- If `--draft` is present: set `DRAFT_FLAG=true`
+- If `--draft` is NOT present: set `DRAFT_FLAG=false`
+- Continue with remaining arguments for slug matching below
 
 **If slug provided:**
 
@@ -175,6 +182,7 @@ Return only the PR summary (number, URL, title)."
 
 ### Phase 5a: Display Summary (PRD Mode)
 
+**If DRAFT_FLAG is false:**
 ```
 Pull Request Created!
 
@@ -189,6 +197,19 @@ Next steps:
 4. Merge when approved
 5. Close PRD: /prdx:close {SLUG}
 
+To view PR: gh pr view {PR_NUMBER} --web
+```
+
+**If DRAFT_FLAG is true:**
+```
+Draft Pull Request Created!
+
+PRD: ~/.claude/plans/{SLUG}.md
+PR: #{PR_NUMBER} (Draft)
+URL: {PR_URL}
+
+Note: PR body includes notice that it has not been human-reviewed.
+To mark ready: gh pr ready {PR_NUMBER}
 To view PR: gh pr view {PR_NUMBER} --web
 ```
 
@@ -240,12 +261,25 @@ Return only the PR summary (number, URL, title)."
 
 ### Phase 4b: Display Summary (Standalone)
 
+**If DRAFT_FLAG is false:**
 ```
 Pull Request Created!
 
 PR: #{PR_NUMBER}
 URL: {PR_URL}
 
+To view PR: gh pr view {PR_NUMBER} --web
+```
+
+**If DRAFT_FLAG is true:**
+```
+Draft Pull Request Created!
+
+PR: #{PR_NUMBER} (Draft)
+URL: {PR_URL}
+
+Note: PR body includes notice that it has not been human-reviewed.
+To mark ready: gh pr ready {PR_NUMBER}
 To view PR: gh pr view {PR_NUMBER} --web
 ```
 
@@ -381,18 +415,42 @@ User: /prdx:push
 → (continues as PRD mode workflow)
 ```
 
-### Example 4: Draft PR
+### Example 4: Draft PR (Standalone)
 
 ```
 User: /prdx:push --draft
 
-→ Standalone mode (or PRD mode if PRD found)
-→ Creates draft PR
+→ Standalone mode (no PRD found)
+→ Draft: true → passes --draft to agent
+→ Agent adds "not human-reviewed" notice to PR body
+→ Creates draft PR via gh pr create --draft
 
 Draft Pull Request Created!
 
 PR: #44 (Draft)
 URL: https://github.com/user/repo/pull/44
 
+Note: PR body includes notice that it has not been human-reviewed.
 To mark ready: gh pr ready 44
+```
+
+### Example 5: Draft PR (PRD Mode)
+
+```
+User: /prdx:push backend-auth --draft
+
+→ Finds PRD: ~/.claude/plans/prdx-backend-auth.md
+→ Status is "review" → Updated to "implemented"
+→ Draft: true → passes --draft to agent
+→ Agent adds "not human-reviewed" notice to PR body
+→ Creates draft PR via gh pr create --draft
+
+Draft Pull Request Created!
+
+PRD: ~/.claude/plans/prdx-backend-auth.md
+PR: #45 (Draft)
+URL: https://github.com/user/repo/pull/45
+
+Note: PR body includes notice that it has not been human-reviewed.
+To mark ready: gh pr ready 45
 ```

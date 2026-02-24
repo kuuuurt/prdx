@@ -279,6 +279,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 /prdx:commit "fix typo"       # Commit with prdx.json config (format, co-author, etc.)
 /prdx:simplify src/auth/      # Code cleanup on any files
 /prdx:push                    # Create PR from current branch (auto-detects PRD if one exists)
+/prdx:push --draft            # Create draft PR (works with both PRD and standalone modes)
 ```
 
 **`/prdx:push` auto-detection:** When called without a slug, it checks if the current branch matches any PRD. If yes, uses PRD mode with full context. If no, uses standalone mode and creates a PR purely from commits/diff analysis.
@@ -381,15 +382,18 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 ### /prdx:push
 
 **What it does:**
-1. Auto-detects PRD mode or standalone mode
-2. Validates git state
-3. Invokes `prdx:pr-author` agent (isolated context)
-4. Agent creates PR via `gh` CLI
-5. Returns only PR URL and number (~100B)
+1. Parses `--draft` flag (strips from arguments before slug matching)
+2. Auto-detects PRD mode or standalone mode
+3. Validates git state
+4. Invokes `prdx:pr-author` agent (isolated context)
+5. Agent creates PR via `gh` CLI (with `--draft` if flag set)
+6. Returns only PR URL and number (~100B)
 
 **Modes:**
 - **PRD mode** (slug provided or matching PRD found): Full workflow with status updates, branch validation, PRD-enriched PR description
 - **Standalone mode** (no matching PRD): Creates PR from commits/diff analysis only, no PRD interaction
+
+**Draft PRs:** Pass `--draft` to create a draft PR. Works with both PRD and standalone modes. Draft PRs include a "not human-reviewed" notice in the PR body.
 
 **Agent used:** `prdx:pr-author` (isolated context)
 
@@ -405,7 +409,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 These work with or without a PRD:
 - `/prdx:commit` - Commit with prdx.json config (always standalone)
 - `/prdx:simplify` - Code cleanup (always standalone)
-- `/prdx:push` - Auto-detects PRD or standalone mode
+- `/prdx:push` - Auto-detects PRD or standalone mode (supports `--draft`)
 
 ## Agents
 

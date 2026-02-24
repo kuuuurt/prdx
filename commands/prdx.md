@@ -167,21 +167,25 @@ Do NOT proceed to create PR automatically. The user must test the implementation
 
 **If QUICK_MODE:**
 - Option 1: "Create PR" (Recommended) — Ready for review
-- Option 2: "Done" — Commit only, no PR needed
-- Option 3: "Test first" — Let me verify first
+- Option 2: "Create Draft PR" — Mark as draft, not human-reviewed yet
+- Option 3: "Done" — Commit only, no PR needed
+- Option 4: "Test first" — Let me verify first
 
 Route based on choice:
 - Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
+- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly, then proceed to Phase 5 (cleanup)
 - Done → Proceed to Phase 5 (cleanup) immediately — no PR
 - Test first → Tell user to test and resume with `/prdx:prdx quick-{slug}` when ready
 
 **If NOT QUICK_MODE (normal mode):**
 - Option 1: "Test first" (Recommended) - Let me verify the implementation works
 - Option 2: "Create PR now" - Skip testing, go straight to PR
+- Option 3: "Create Draft PR" — Mark as draft, not human-reviewed yet
 
 Route based on choice:
 - Test first → End workflow, tell user to test and resume with `/prdx:prdx [slug]` when ready
 - Create PR now → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
+- Create Draft PR → Run `/prdx:push [slug] --draft` directly (do NOT ask for confirmation again — user already confirmed)
 
 ---
 
@@ -193,21 +197,25 @@ The implementation is complete but user hasn't confirmed it's ready for PR. Use 
 
 **If QUICK_MODE:**
 - Option 1: "Create PR" (Recommended) — Ready for review
-- Option 2: "Done" — Commit only, no PR needed
-- Option 3: "Fix issues" — Found bugs or need changes
+- Option 2: "Create Draft PR" — Mark as draft, not human-reviewed yet
+- Option 3: "Done" — Commit only, no PR needed
+- Option 4: "Fix issues" — Found bugs or need changes
 
 Route:
 - Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
+- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly, then proceed to Phase 5 (cleanup)
 - Done → Proceed to Phase 5 (cleanup) immediately
 - Fix issues → Same as normal mode below
 
 **If NOT QUICK_MODE (normal mode):**
 - Option 1: "Create PR" (Recommended) - Implementation looks good, ready for review
-- Option 2: "Fix issues" - Found bugs or need changes
-- Option 3: "View implementation summary" - Review what was done
+- Option 2: "Create Draft PR" — Mark as draft, not human-reviewed yet
+- Option 3: "Fix issues" - Found bugs or need changes
+- Option 4: "View implementation summary" - Review what was done
 
 **Route based on choice:**
 - Create PR → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
+- Create Draft PR → Run `/prdx:push [slug] --draft` directly (do NOT ask for confirmation again — user already confirmed)
 - Fix issues → Tell user to describe the issues. Claude will fix them in the current conversation (no need to re-run full implement). After fixes are committed, ask again.
 - View summary → Show the implementation notes from the PRD, then ask again
 
@@ -221,17 +229,17 @@ Route:
 
 ### Step 4: Create Pull Request
 
-**Confirm before creating PR** — but only if the user hasn't already explicitly chosen "Create PR" or "Create PR now" in a previous step. If they have, skip this confirmation and run `/prdx:push` directly.
+**Confirm before creating PR** — but only if the user hasn't already explicitly chosen "Create PR", "Create PR now", or "Create Draft PR" in a previous step. If they have, skip this confirmation and run `/prdx:push` directly (with `--draft` if they chose draft).
 
 Use AskUserQuestion to confirm:
 - Option 1: "Yes, create PR" - Ready to submit for review
-- Option 2: "No, wait" - Need more time
+- Option 2: "Yes, create Draft PR" — Mark as draft, not human-reviewed yet
+- Option 3: "No, wait" - Need more time
 
-If user confirms, run the push command:
-
-```
-/prdx:push [slug]
-```
+Route based on choice:
+- Create PR → Run `/prdx:push [slug]`
+- Create Draft PR → Run `/prdx:push [slug] --draft`
+- Wait → End workflow
 
 **After PR is created:**
 
