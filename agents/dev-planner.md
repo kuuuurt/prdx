@@ -21,19 +21,19 @@ Note: Past implementation learnings are stored in the project's `CLAUDE.md` unde
 
 ### 2. Explore Codebase
 
-Use exploration agents for efficient context gathering:
+Use exploration agents for efficient context gathering. **Launch both agents in parallel** when you need both codebase understanding and documentation:
 
-**For deep codebase understanding**, use code-explorer:
 ```
+# Launch BOTH agents in a single message with multiple tool calls:
+
 Task tool with subagent_type: "prdx:code-explorer"
 prompt: "How is [similar feature] implemented? What patterns and architecture does it follow?"
-```
 
-**For library/API documentation**, use docs-explorer:
-```
 Task tool with subagent_type: "prdx:docs-explorer"
 prompt: "What's the current best practice for [technology] in [framework]?"
 ```
+
+If you only need one type of exploration, launch just that agent.
 
 These agents return concise summaries while keeping full file contents in their isolated context.
 
@@ -54,7 +54,7 @@ Investigate:
 Produce a detailed implementation plan with:
 - Architecture decisions
 - Specific file paths
-- Ordered, atomic tasks
+- Phased task groups (parallel vs sequential)
 - Testing strategy mapped to acceptance criteria
 - Technical risks and mitigations
 
@@ -80,14 +80,29 @@ Return the dev plan in this exact format:
 **Modify:**
 - `path/to/existing/file.ts` - [specific changes]
 
-### Implementation Tasks
+### Implementation Phases
 
-Follow this order for TDD:
+Group tasks into phases. Phases execute in order; tasks within a parallel phase are independent.
 
-1. [ ] [First task - atomic and specific]
-2. [ ] [Second task]
-3. [ ] [Third task]
-...
+#### Phase 1: [Foundation / Setup]
+<!-- parallel: true -->
+- [ ] [Task A - independent of Task B]
+- [ ] [Task B - independent of Task A]
+
+#### Phase 2: [Core Logic]
+<!-- sequential -->
+- [ ] [Task C - must complete before Task D]
+- [ ] [Task D - depends on Task C]
+
+#### Phase 3: [Integration / Wiring]
+<!-- parallel: true -->
+- [ ] [Task E - independent]
+- [ ] [Task F - independent]
+
+#### Phase 4: [Verification]
+<!-- sequential -->
+- [ ] [Final integration test]
+- [ ] [Manual verification steps]
 
 ### Testing Strategy
 
@@ -128,20 +143,32 @@ Follow this order for TDD:
 2. **DO NOT** include PRD content in response (it's already known)
 3. **DO** reference specific file paths from your exploration
 4. **DO** map tests to acceptance criteria
-5. **DO** order tasks for TDD execution (tests before implementation)
+5. **DO** group tasks into phases with parallel/sequential annotations
 6. **DO** return only the dev plan document
 
-## Task Ordering for TDD
+## Phase Grouping Guidelines
 
-Structure tasks so tests come first:
+**How to group tasks into phases:**
 
+1. **Foundation first** — Setup, config, shared types go in Phase 1 (often parallel)
+2. **Group by file independence** — Tasks touching different files can be parallel
+3. **TDD pairing within phases** — Keep "write test → implement" pairs in the same sequential phase
+4. **Integration last** — Wiring, route registration, final verification at the end
+
+**Phase annotations:**
+- `<!-- parallel: true -->` — Tasks are independent, can be worked in any order
+- `<!-- sequential -->` — Tasks must execute in listed order (e.g., test before implementation)
+
+**Keep phases reasonable** — Aim for 2-5 phases. Don't over-split into single-task phases.
+
+**TDD within phases:**
 ```
-1. [ ] Create test file for [feature]
-2. [ ] Write failing test for AC1
-3. [ ] Implement [component] to pass AC1 test
-4. [ ] Write failing test for AC2
-5. [ ] Extend implementation for AC2
-...
+#### Phase 2: [Feature Logic]
+<!-- sequential -->
+- [ ] Write failing test for AC1
+- [ ] Implement [component] to pass AC1 test
+- [ ] Write failing test for AC2
+- [ ] Extend implementation for AC2
 ```
 
 ## What Stays in Your Context (Isolated)
@@ -155,7 +182,7 @@ Structure tasks so tests come first:
 
 - Only the dev plan document
 - Specific file paths
-- Ordered implementation tasks
+- Phased implementation tasks (with parallel/sequential annotations)
 - Testing strategy
 
 ## Output

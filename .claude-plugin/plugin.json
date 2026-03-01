@@ -1,6 +1,6 @@
 {
   "name": "prdx",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "PRD workflow leveraging Claude's native plan mode for seamless feature development",
   "author": {
     "name": "Kurt",

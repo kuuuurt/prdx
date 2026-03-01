@@ -212,6 +212,30 @@ Any follow-up items
 
 Keep your final response under 2KB.
 
+## Phase Execution
+
+Dev plans use **phased task groups** instead of flat task lists. Each phase is annotated as parallel or sequential:
+
+```markdown
+#### Phase 1: [Foundation]
+<!-- parallel: true -->
+- [ ] Task A (independent)
+- [ ] Task B (independent)
+
+#### Phase 2: [Core Logic]
+<!-- sequential -->
+- [ ] Task C (must complete before D)
+- [ ] Task D (depends on C)
+```
+
+**How to execute phases:**
+1. **Complete all tasks in a phase before moving to the next phase**
+2. **Parallel phases** (`<!-- parallel: true -->`): Tasks are independent — work them in any order
+3. **Sequential phases** (`<!-- sequential -->`): Tasks must be done in listed order
+4. **Use TodoWrite** to track tasks per phase — mark phase tasks as in_progress/completed
+
+If you receive an older flat task list (no phase annotations), execute tasks in listed order as before.
+
 ## Agent Coordination & Memory
 
 **Cross-Agent Consultation:**

@@ -255,6 +255,7 @@ Platform: {CURRENT_PLATFORM}  (e.g., 'android' or 'ios')
 {PREVIOUS_PLATFORM_NOTES}  (if this is the second platform)
 
 Read the skills files and explore the codebase to create a comprehensive dev plan.
+Use phased task groups (### Implementation Phases) with <!-- parallel: true --> or <!-- sequential --> annotations.
 Return only the dev plan document."
 ```
 
@@ -437,9 +438,11 @@ You MUST follow the commit configuration below. This is from the project's prdx.
 **Implementation Instructions:**
 
 1. **Execute the Dev Plan:**
-   - Use TodoWrite to track tasks from the dev plan
-   - Mark each task as in_progress when starting
-   - Mark as completed when done
+   - The dev plan uses phased task groups — complete all tasks in a phase before moving to the next
+   - Parallel phases (<!-- parallel: true -->): tasks are independent, work in any order
+   - Sequential phases (<!-- sequential -->): tasks must be done in listed order
+   - Use TodoWrite to track tasks per phase
+   - Mark each task as in_progress when starting, completed when done
 
 2. **Test-Driven Development:**
    - Write tests FIRST for each acceptance criterion
