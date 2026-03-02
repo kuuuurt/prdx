@@ -135,6 +135,16 @@ Group tasks into phases. Phases execute in order; tasks within a parallel phase 
 - [External libraries needed]
 - [Services to integrate with]
 - [Prerequisites]
+
+### Phase Summary
+<!-- phase-summary
+[
+  {"phase": 1, "name": "Foundation", "mode": "parallel", "tasks": ["Task A description", "Task B description"]},
+  {"phase": 2, "name": "Core Logic", "mode": "sequential", "tasks": ["Task C description", "Task D description"]},
+  {"phase": 3, "name": "Integration", "mode": "parallel", "tasks": ["Task E description", "Task F description"]},
+  {"phase": 4, "name": "Verification", "mode": "sequential", "tasks": ["Final integration test", "Manual verification"]}
+]
+-->
 ```
 
 ## Critical Instructions
@@ -144,9 +154,12 @@ Group tasks into phases. Phases execute in order; tasks within a parallel phase 
 3. **DO** reference specific file paths from your exploration
 4. **DO** map tests to acceptance criteria
 5. **DO** group tasks into phases with parallel/sequential annotations
-6. **DO** return only the dev plan document
+6. **DO** include a `### Phase Summary` section with `<!-- phase-summary [...] -->` JSON block at the end (MANDATORY)
+7. **DO** return only the dev plan document
 
 ## Phase Grouping Guidelines
+
+**Phases are MANDATORY.** Every dev plan MUST have at least one phase. Each phase MUST have a `<!-- parallel: true -->` or `<!-- sequential -->` annotation.
 
 **How to group tasks into phases:**
 
@@ -154,9 +167,10 @@ Group tasks into phases. Phases execute in order; tasks within a parallel phase 
 2. **Group by file independence** — Tasks touching different files can be parallel
 3. **TDD pairing within phases** — Keep "write test → implement" pairs in the same sequential phase
 4. **Integration last** — Wiring, route registration, final verification at the end
+5. **One commit per phase** — Each phase should produce one atomic commit when executed
 
 **Phase annotations:**
-- `<!-- parallel: true -->` — Tasks are independent, can be worked in any order
+- `<!-- parallel: true -->` — Tasks are independent, can be worked in any order. The platform agent will use parallel tool calls (multiple Edit/Write in one response) for these tasks.
 - `<!-- sequential -->` — Tasks must execute in listed order (e.g., test before implementation)
 
 **Keep phases reasonable** — Aim for 2-5 phases. Don't over-split into single-task phases.
@@ -171,6 +185,20 @@ Group tasks into phases. Phases execute in order; tasks within a parallel phase 
 - [ ] Extend implementation for AC2
 ```
 
+**Phase Summary block (MANDATORY):**
+
+Every dev plan MUST end with a `### Phase Summary` section containing a `<!-- phase-summary [...] -->` JSON block. This enables machine parsing by the implement command. The JSON array must list every phase with its number, name, mode ("parallel" or "sequential"), and task descriptions matching the phase headers above.
+
+```markdown
+### Phase Summary
+<!-- phase-summary
+[
+  {"phase": 1, "name": "Foundation", "mode": "parallel", "tasks": ["Create user schema", "Create auth middleware"]},
+  {"phase": 2, "name": "Core Logic", "mode": "sequential", "tasks": ["Implement auth service", "Add route handlers"]}
+]
+-->
+```
+
 ## What Stays in Your Context (Isolated)
 
 - All explored file contents
@@ -183,6 +211,7 @@ Group tasks into phases. Phases execute in order; tasks within a parallel phase 
 - Only the dev plan document
 - Specific file paths
 - Phased implementation tasks (with parallel/sequential annotations)
+- Phase summary JSON block (for machine parsing)
 - Testing strategy
 
 ## Output

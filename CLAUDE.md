@@ -302,9 +302,9 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 - `prdx:pr-author`: PR creation with comprehensive description
 - Platform agents: TDD implementation execution
 
-**Three-Phase Implementation:**
-- Dev-planner agent first: Creates detailed technical plan
-- Platform agent second: Executes the plan using TDD
+**Three-Phase Implementation (with phased execution):**
+- Dev-planner agent first: Creates detailed technical plan with phase-summary JSON
+- Platform agent second: Executes the plan phase-by-phase (one agent call per phase, parallel tool calls for parallel phases)
 - Code reviewer third: Validates diff against acceptance criteria
 
 **Hooks for Validation:**
@@ -366,18 +366,27 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 2. Runs `pre-implement.sh` hook
 3. Sets up git branch
 4. Invokes `prdx:dev-planner` agent (isolated) for detailed planning
-5. Invokes platform agent (isolated) to execute dev plan
-6. Invokes `prdx:code-reviewer` agent (isolated) to validate implementation
-7. If issues found: platform agent fixes, re-review (max 2 cycles)
-8. Runs `post-implement.sh` hook (runs tests, updates status)
-9. Appends implementation summary to PRD
+5. Parses dev plan into phases (phase-summary JSON → header regex → single-phase fallback)
+6. Executes phases one at a time — platform agent invoked per phase with focused context
+7. Phase progress displayed: "Phase 2/4: Core Logic (sequential)..."
+8. Invokes `prdx:code-reviewer` agent (isolated) to validate implementation
+9. If issues found: platform agent fixes, re-review (max 2 cycles)
+10. Runs `post-implement.sh` hook (runs tests, updates status)
+11. Appends implementation summary to PRD
+
+**Phased execution:**
+- Dev plan is parsed into phases using three-layer fallback (phase-summary JSON → header regex → single phase)
+- Platform agent invoked once per phase with phase-scoped context + prior phase summaries
+- Parallel phases: agent uses parallel tool calls (multiple Edit/Write in one response)
+- Sequential phases: agent completes tasks in strict order
+- One atomic commit per phase
 
 **Agents used (all isolated):**
-- `prdx:dev-planner` → returns dev plan (~3KB)
-- Platform agent → returns summary (~1KB)
+- `prdx:dev-planner` → returns dev plan with phase-summary JSON (~3KB)
+- Platform agent → invoked N times (once per phase), returns summary per phase (~1KB each)
 - `prdx:code-reviewer` → returns review summary (~2KB)
 
-**Why three agents:** Dev-planner creates the roadmap; platform agent executes it; code reviewer catches issues before user handoff.
+**Why three agents:** Dev-planner creates the roadmap with phases; platform agent executes one phase at a time; code reviewer catches issues before user handoff.
 
 ### /prdx:push
 
@@ -777,7 +786,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 
 ✅ Use native plan mode for PRD creation
 ✅ Store status in plan file directly
-✅ One agent per implementation phase
+✅ Phased execution (one agent call per dev-plan phase, parallel tool calls for parallel phases)
 ✅ Hooks for validation gates
 ✅ Skills as passive knowledge bases
 ✅ TodoWrite for task visibility

@@ -46,11 +46,13 @@ This command orchestrates three agents in **isolated contexts**:
 - Creates implementation plan with specific tasks
 - Returns only the dev plan (~3KB)
 
-**Phase B: Development (Platform agent)**
-- Runs in isolated context
-- Executes the implementation plan
-- Follows TDD (tests first)
-- Returns only implementation summary (~1KB)
+**Phase B: Development (Platform agent — phased execution)**
+- Dev plan is parsed into phases (via phase-summary JSON, header regex fallback, or single-phase fallback)
+- Platform agent is invoked **once per phase** with focused, phase-scoped context
+- Prior phase summaries (files created, commits) are passed as context to subsequent phases
+- Each phase produces one atomic commit
+- Progress displayed: "Phase 2/4: Core Logic (sequential)..."
+- Returns only implementation summary per phase (~1KB each)
 
 **Phase C: Code Review (prdx:code-reviewer)**
 - Runs in isolated context
@@ -394,12 +396,40 @@ Then add based on config:
    NOTE: Only trailers (Co-Authored-By) appear, NO description paragraph.
 ```
 
-#### Step 5c: Invoke Platform Agent
+#### Step 5c: Parse Dev Plan into Phases
 
-**Display progress:**
+Parse the dev plan from Step 5a into individual phases for phase-by-phase execution.
+
+**Three-layer fallback parsing:**
+
+1. **Phase-summary JSON** (preferred): Look for `<!-- phase-summary [...] -->` in the dev plan. Extract the JSON array:
+   ```
+   <!-- phase-summary
+   [
+     {"phase": 1, "name": "Foundation", "mode": "parallel", "tasks": ["Task A", "Task B"]},
+     {"phase": 2, "name": "Core Logic", "mode": "sequential", "tasks": ["Task C", "Task D"]}
+   ]
+   -->
+   ```
+   Parse this JSON into a `PHASES` array. If JSON is malformed, fall through to layer 2.
+
+2. **Header regex** (fallback): Scan for `#### Phase N: [Name]` headers followed by `<!-- parallel: true -->` or `<!-- sequential -->` annotations. Extract phase number, name, mode, and task list (lines starting with `- [ ]`).
+
+3. **Single phase** (final fallback): If neither parsing method finds phases, wrap the entire dev plan as a single sequential phase:
+   ```
+   PHASES = [{"phase": 1, "name": "Full Implementation", "mode": "sequential", "tasks": ["Execute entire dev plan"]}]
+   ```
+
+For each parsed phase, also extract the **full phase content** from the dev plan (everything between one `#### Phase N:` header and the next, or end of `### Implementation Phases` section). This full content is passed to the platform agent.
+
+Store the result as `PHASES` array and `PHASE_CONTENTS` map (phase number → full markdown content).
+
+**Display parsing result:**
 ```
-Phase 2/3: Implementation ({CURRENT_PLATFORM}) — Executing dev plan with TDD...
+Parsed dev plan: {N} phases ({list of "Phase N: Name (mode)" entries})
 ```
+
+#### Step 5d: Phased Execution Loop
 
 Determine agent based on current platform:
 - backend → `prdx:backend-developer`
@@ -407,70 +437,67 @@ Determine agent based on current platform:
 - android → `prdx:android-developer`
 - ios → `prdx:ios-developer`
 
-Invoke using the Task tool:
+Initialize `COMPLETED_PHASES` as an empty list (stores summaries from each completed phase).
+
+**For each phase in PHASES (sequentially):**
+
+**Display progress:**
+```
+Phase {PHASE_NUM}/{TOTAL_PHASES}: {PHASE_NAME} ({PHASE_MODE})...
+```
+
+Invoke the platform agent using the Task tool with **phase-scoped context**:
 
 ```
 subagent_type: "{AGENT}"
 
-prompt: "Implement this feature using the dev plan provided.
+prompt: "Implement Phase {PHASE_NUM}/{TOTAL_PHASES}: {PHASE_NAME}
 
-PRD File: {PRD_FILE}
+## PRD (for reference)
 
-{PRD_CONTENT}
+**Title:** {PRD_TITLE}
+**Acceptance Criteria:**
+{ACCEPTANCE_CRITERIA from PRD}
 
----
+## Full Dev Plan (for reference)
 
-{DEV_PLAN from Step 5}
+{FULL_DEV_PLAN from Step 5a}
 
----
+## Completed Phases
 
-**YOUR ROLE:**
+{COMPLETED_PHASES summaries — or 'None (this is the first phase)' if empty}
 
-The PRD defines the **what** and **why**. The dev plan defines the **how**.
-Your job is to **execute** the dev plan using TDD.
+## YOUR PHASE — Phase {PHASE_NUM}: {PHASE_NAME}
+
+**Mode: {PHASE_MODE}**
+
+{PHASE_CONTENT — full markdown content for this phase from PHASE_CONTENTS}
+
+**Phase execution rules:**
+- This is a {PHASE_MODE} phase
+- {'PARALLEL: Tasks are independent. Use parallel tool calls — make multiple Edit/Write calls in a single response for different files.' if mode is 'parallel'}
+- {'SEQUENTIAL: Tasks depend on each other. Complete each task fully before starting the next.' if mode is 'sequential'}
+- Use TodoWrite to track tasks — mark in_progress when starting, completed when done
+- Commit your work at the end of this phase (one atomic commit per phase)
 
 **CRITICAL - COMMIT FORMAT:**
 
 You MUST follow the commit configuration below. This is from the project's prdx.json and OVERRIDES any defaults.
 
-{COMMIT_INSTRUCTIONS from Step 6}
+{COMMIT_INSTRUCTIONS from Step 5b}
 
 **Implementation Instructions:**
 
-1. **Execute the Dev Plan:**
-   - The dev plan uses phased task groups — complete all tasks in a phase before moving to the next
-   - Parallel phases (<!-- parallel: true -->): tasks are independent, work in any order
-   - Sequential phases (<!-- sequential -->): tasks must be done in listed order
-   - Use TodoWrite to track tasks per phase
-   - Mark each task as in_progress when starting, completed when done
-
-2. **Test-Driven Development:**
-   - Write tests FIRST for each acceptance criterion
-   - Ensure tests fail initially (red)
-   - Implement to make tests pass (green)
-
-3. **Follow Platform Patterns:**
-   - Read `.claude/skills/impl-patterns.md` for {PLATFORM} patterns
-   - Match existing codebase conventions
-
-4. **Testing Strategy:**
-   - Reference `.claude/skills/testing-strategy.md`
-   - Write unit tests for business logic
-   - Write integration tests for APIs/data flows
-
-5. **Code Quality:**
-   - Follow platform best practices
-   - Add error handling
-   - Keep code simple and readable
-
-7. **Verification:**
-   - Run full test suite
-   - Verify each acceptance criterion
+1. **Execute only YOUR PHASE tasks** — do not work ahead to future phases
+2. **Test-Driven Development:** Write tests FIRST, ensure they fail, then implement
+3. **Follow Platform Patterns:** Read `.claude/skills/impl-patterns.md` for {PLATFORM} patterns
+4. **Testing Strategy:** Reference `.claude/skills/testing-strategy.md`
+5. **Verification:** Run tests after implementation, ensure your phase's tasks pass
+6. **Commit:** Create one atomic commit for this phase's work
 
 **Return only a summary:**
 
-```markdown
-## Implementation Summary
+## Phase {PHASE_NUM} Summary
 
 ### Files Created
 - [List new files]
@@ -481,34 +508,40 @@ You MUST follow the commit configuration below. This is from the project's prdx.
 ### Tests Written
 - [List test files]
 
-### Acceptance Criteria Status
-- [x] AC1 - Verified
-- [x] AC2 - Verified
-
 ### Commits
 - [List commit messages]
 
 ### Test Results
 [Pass/fail summary]
-```
 "
 ```
 
 Wait for the platform agent to complete.
 
-**If platform agent fails or returns an error:**
+**After each phase completes:**
+1. Store the agent's response in `COMPLETED_PHASES` (append phase number, name, and summary)
+2. Display brief phase result:
+   ```
+   Phase {PHASE_NUM}/{TOTAL}: {PHASE_NAME} — Done
+   ```
+
+**If a phase fails or returns an error:**
 
 Use AskUserQuestion to offer recovery options:
-- Option 1: "Retry implementation" — Re-invoke the platform agent with the same dev plan
-- Option 2: "Continue manually" — Stop automated implementation, let user take over (status stays `in-progress`)
-- Option 3: "Stop implementation" — Halt workflow entirely
+- Option 1: "Retry this phase" — Re-invoke the platform agent for the same phase
+- Option 2: "Skip to next phase" — Mark phase as skipped, continue with remaining phases
+- Option 3: "Continue manually" — Stop automated implementation, let user take over (status stays `in-progress`)
+- Option 4: "Stop implementation" — Halt workflow entirely
 
 Route based on choice:
-- Retry → Re-run Step 5c
+- Retry → Re-run current phase
+- Skip → Add skip note to COMPLETED_PHASES, continue loop
 - Continue manually → Display what was accomplished so far, end workflow
 - Stop → End workflow, show how to resume with `/prdx:implement {slug}`
 
-#### Step 5d: Platform Completion
+**After all phases complete, continue to Step 5e.**
+
+#### Step 5e: Platform Completion
 
 After each platform completes:
 
@@ -539,11 +572,11 @@ After each platform completes:
    - **Loop back to Step 5a** for the next platform
 
 4. **When all platforms are done:**
-   - Continue to Step 5e (Code Review)
+   - Continue to Step 5f (Code Review)
 
 ---
 
-#### Step 5e: Code Review (prdx:code-reviewer)
+#### Step 5f: Code Review (prdx:code-reviewer)
 
 **Display progress:**
 ```

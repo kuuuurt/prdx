@@ -214,25 +214,38 @@ Keep your final response under 2KB.
 
 ## Phase Execution
 
-Dev plans use **phased task groups** instead of flat task lists. Each phase is annotated as parallel or sequential:
+You may be invoked in two modes:
 
-```markdown
-#### Phase 1: [Foundation]
-<!-- parallel: true -->
-- [ ] Task A (independent)
-- [ ] Task B (independent)
+### Single Phase Mode (from phased implement)
 
-#### Phase 2: [Core Logic]
-<!-- sequential -->
-- [ ] Task C (must complete before D)
-- [ ] Task D (depends on C)
-```
+When invoked by the phased implementation loop, you receive **one phase at a time** with focused context. The prompt will specify:
+- Your phase number and name (e.g., "Phase 2/4: Core Logic")
+- Phase mode: parallel or sequential
+- Phase tasks only (not the full plan's tasks)
+- Summaries of completed prior phases
 
-**How to execute phases:**
-1. **Complete all tasks in a phase before moving to the next phase**
-2. **Parallel phases** (`<!-- parallel: true -->`): Tasks are independent — work them in any order
-3. **Sequential phases** (`<!-- sequential -->`): Tasks must be done in listed order
-4. **Use TodoWrite** to track tasks per phase — mark phase tasks as in_progress/completed
+**In single phase mode:**
+1. Execute ONLY the tasks for your assigned phase
+2. Do NOT work ahead to future phases
+3. Commit your work at the end of the phase (one atomic commit)
+4. Return a phase summary (files created/modified, commit, test results)
+
+### Full Plan Mode (legacy)
+
+When invoked with a full dev plan (all phases), execute phases sequentially as before. Complete all tasks in a phase before moving to the next.
+
+### Parallel vs Sequential Execution
+
+**Parallel phases** (`<!-- parallel: true -->` or mode: "parallel"):
+- Tasks are independent and touch different files
+- **You MUST use parallel tool calls** — make multiple Edit/Write calls in a single response for different files
+- Example: If tasks are "Create user schema" and "Create auth middleware", write both files in one response with two Write tool calls
+- Use TodoWrite to mark all tasks as in_progress together, then completed together
+
+**Sequential phases** (`<!-- sequential -->` or mode: "sequential"):
+- Tasks depend on each other — complete each task fully before starting the next
+- Example: "Write failing test" must complete before "Implement to pass test"
+- Use TodoWrite to track each task individually (in_progress → completed)
 
 If you receive an older flat task list (no phase annotations), execute tasks in listed order as before.
 
