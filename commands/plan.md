@@ -54,44 +54,82 @@ This command enters **native plan mode** to:
 
 ### Step 1: Platform Detection
 
-Auto-detect platform from:
+Auto-detect ALL potential platforms from the description and codebase:
 
-**1. Description keywords:**
-- "backend", "API", "endpoint", "server" → backend
-- "frontend", "web", "UI", "React", "Vue", "Svelte", "Next.js" → frontend
-- "Android", "Kotlin", "Compose" → android
-- "iOS", "Swift", "SwiftUI" → ios
-- "mobile", "app" (without platform specifics) → mobile (needs platform selection)
+**1. Description keywords (track all matches):**
+- "backend", "API", "endpoint", "server" → `HAS_BACKEND`
+- "frontend", "web", "UI", "React", "Vue", "Svelte", "Next.js" → `HAS_FRONTEND`
+- "Android", "Kotlin", "Compose" → `HAS_ANDROID`
+- "iOS", "Swift", "SwiftUI" → `HAS_IOS`
+- "mobile", "app" (without platform specifics) → `HAS_ANDROID` + `HAS_IOS`
 
 **2. Directory structure:**
 ```bash
-if [ -d "backend" ]; then HAS_BACKEND=true; fi
+if [ -d "backend" ] || [ -d "server" ] || [ -d "api" ]; then HAS_BACKEND=true; fi
+if [ -d "frontend" ] || [ -d "web" ] || [ -d "client" ]; then HAS_FRONTEND=true; fi
 if [ -d "android" ]; then HAS_ANDROID=true; fi
 if [ -d "ios" ]; then HAS_IOS=true; fi
 ```
 
 **3. Config files:**
-- `package.json` + `tsconfig.json` → backend
-- `build.gradle.kts` → android
-- `Package.swift` → ios
+- `package.json` + `tsconfig.json` → `HAS_BACKEND` (or `HAS_FRONTEND` if React/Vue/etc. detected)
+- `build.gradle.kts` → `HAS_ANDROID`
+- `Package.swift` → `HAS_IOS`
 
-**4. Mobile Platform Selection:**
+**4. Multi-Platform Selection:**
 
-If detected platform is `mobile` OR codebase has both android and ios directories:
+If **multiple platform types detected** (e.g., backend + android, or android + ios):
 
-Use **AskUserQuestion** to ask which platforms this PRD should target:
+Use **AskUserQuestion** with `multiSelect: true` to ask which platforms this PRD should target. Only show detected platforms as options:
 
 ```
 Question: "Which platforms should this PRD cover?"
 Header: "Platforms"
-Options:
-  - Label: "Android & iOS (Recommended)"
-    Description: "Apply to both platforms - implement sequentially"
-  - Label: "Android only"
-    Description: "Platform-specific feature for Android"
-  - Label: "iOS only"
-    Description: "Platform-specific feature for iOS"
+multiSelect: true
+Options: [only the detected platforms from the list below]
+  - Label: "Backend"
+    Description: "API, server-side logic"
+  - Label: "Frontend"
+    Description: "Web UI"
+  - Label: "Android"
+    Description: "Android app"
+  - Label: "iOS"
+    Description: "iOS app"
 ```
+
+**5. Implementation Order (when 2+ platforms selected):**
+
+If user selected 2+ platforms, ask about implementation order using **AskUserQuestion**:
+
+Present smart defaults based on platform combination:
+- **Backend + mobile platforms** → "Backend first, then mobile platforms (Recommended)"
+- **Frontend + mobile platforms** → "Frontend first, then mobile platforms"
+- **Mobile only (android + ios)** → "Android first, then iOS (Recommended)"
+- **All same tier** → "All in parallel"
+
+```
+Question: "What implementation order?"
+Header: "Order"
+Options:
+  - Label: "{Smart default} (Recommended)"
+    Description: "{description of the default order}"
+  - Label: "All sequential"
+    Description: "One at a time in listed order"
+  - Label: "Custom"
+    Description: "You specify the order"
+```
+
+If user picks "Custom", ask them to describe the order (they'll type it in the "Other" field).
+
+Parse the result into the `**Implementation Order:**` field format:
+```
+**Implementation Order:**
+1. backend
+2. android, ios
+```
+Numbered steps. Platforms on the same step separated by commas. Steps execute sequentially.
+
+**6. Single platform detected clearly** → use it directly (no selection needed)
 
 ### Step 2: Enter Plan Mode
 
@@ -149,8 +187,11 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
-**Platform:** {DETECTED_PLATFORM}
-**Platforms:** {PLATFORMS_LIST} (only for mobile)
+**Platform:** {DETECTED_PLATFORM}   ← single platform only
+**Platforms:** {PLATFORMS_LIST}      ← multiple platforms only (omit Platform)
+**Implementation Order:**            ← only when Platforms has 2+ entries
+1. {first step platforms}
+2. {second step platforms}
 **Status:** planning
 **Created:** {TODAY's DATE}
 **Branch:** {BRANCH_NAME}
@@ -188,6 +229,10 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 - [Technical/business risks and constraints]
 ```
+
+**Field rules:**
+- **Single platform:** Include `**Platform:**`, omit `**Platforms:**` and `**Implementation Order:**`
+- **Multiple platforms:** Include `**Platforms:**` and `**Implementation Order:**`, omit `**Platform:**`
 
 **Branch naming convention (both modes):**
 - feature → `feat/{slug}`
@@ -273,12 +318,27 @@ Next steps:
 - Or run /prdx:prdx quick-{slug} for guided workflow
 ```
 
-**Normal mode:**
+**Normal mode (single platform):**
 ```
 PRD created and saved
 
 PRD: ~/.claude/plans/prdx-{slug}.md
 Platform: {PLATFORM}
+Status: planning
+Branch: {BRANCH}
+
+Next steps:
+- Run /prdx:implement {slug} to start implementation
+- Or run /prdx:prdx {slug} for guided workflow
+```
+
+**Normal mode (multi-platform):**
+```
+PRD created and saved
+
+PRD: ~/.claude/plans/prdx-{slug}.md
+Platforms: {PLATFORMS_LIST}
+Implementation Order: {ORDER_SUMMARY}
 Status: planning
 Branch: {BRANCH}
 

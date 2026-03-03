@@ -23,7 +23,7 @@ Both agents run in **isolated contexts** to minimize main conversation context u
 
 **PRDs are read from `~/.claude/plans/`** (created by native plan mode).
 
-**For mobile PRDs with multiple platforms:** Implementation runs **sequentially** per platform.
+**For PRDs with multiple platforms:** Implementation runs per the PRD's `**Implementation Order:**`.
 
 ## Usage
 
@@ -31,9 +31,9 @@ Both agents run in **isolated contexts** to minimize main conversation context u
 /prdx:implement backend-auth
 /prdx:implement android-biometric-login
 /prdx:implement ios-profile-screen
-/prdx:implement mobile-biometric-login          # Implements Android first, then iOS
-/prdx:implement mobile-biometric-login android  # Implement Android only
-/prdx:implement mobile-biometric-login ios      # Implement iOS only (after Android is done)
+/prdx:implement fullstack-auth                  # Follows Implementation Order from PRD
+/prdx:implement fullstack-auth backend          # Implement backend only
+/prdx:implement fullstack-auth android          # Implement Android only
 ```
 
 ## How It Works
@@ -61,11 +61,11 @@ This command orchestrates three agents in **isolated contexts**:
 - If issues found: platform agent fixes, then re-review (max 2 cycles)
 - Returns only review summary (~2KB)
 
-**For Multi-Platform Mobile PRDs:**
-- Runs Phase A + B for the first platform (Android by default)
+**For Multi-Platform PRDs:**
+- Follows `**Implementation Order:**` from PRD (e.g., backend first, then mobile platforms)
+- Runs Phase A + B for each platform sequentially
 - Learns from implementation, commits, and updates PRD
-- Then runs Phase A + B for the second platform (iOS)
-- Each platform implementation benefits from lessons learned
+- Each subsequent platform benefits from lessons learned
 
 ## Workflow
 
@@ -153,8 +153,9 @@ mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-{slug}.md
 Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 
 3. Read the PRD file and extract:
-   - Platform (backend/android/ios/mobile)
-   - **Platforms** (for mobile only - e.g., "android, ios" or just "android")
+   - **Platform** (single-platform PRDs: backend/frontend/android/ios)
+   - **Platforms** (multi-platform PRDs: e.g., "backend, android, ios")
+   - **Implementation Order** (multi-platform PRDs: ordered steps)
    - Type (feature/bug-fix/refactor/spike)
    - Branch name from `**Branch:**` field
    - Status from `**Status:**` field
@@ -172,21 +173,22 @@ Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 
 **Parse the command arguments:**
 - `{slug}` only → Use PRD's platform(s)
-- `{slug} android` → Override to Android only
-- `{slug} ios` → Override to iOS only
+- `{slug} {platform}` → Override to that platform only (e.g., `{slug} backend`, `{slug} android`, `{slug} ios`)
 
-**For mobile PRDs with multiple platforms:**
+**For multi-platform PRDs:**
 
-1. Check if PRD has `**Platforms:**` field with multiple platforms (e.g., "android, ios")
+1. Check if PRD has `**Platforms:**` field with multiple platforms (e.g., "backend, android, ios")
 2. Parse the `Platforms` field into a list: `TARGET_PLATFORMS`
-3. If second argument provided (android/ios), filter to just that platform
+3. If `**Implementation Order:**` exists, parse into `IMPLEMENTATION_STEPS` (ordered list of platform groups)
+4. If second argument provided (e.g., "backend"), filter to just that platform
+5. If no Implementation Order, treat all platforms as one step (implement in listed order)
 
 **Determine implementation order:**
-- If `TARGET_PLATFORMS` = ["android", "ios"] → Implement Android first, then iOS
-- If `TARGET_PLATFORMS` = ["android"] → Implement Android only
-- If `TARGET_PLATFORMS` = ["ios"] → Implement iOS only
+- Use `IMPLEMENTATION_STEPS` from PRD (e.g., step 1: ["backend"], step 2: ["android", "ios"])
+- Platforms within a step are independent but still implemented one at a time
+- Steps execute sequentially
 
-**For non-mobile or single-platform PRDs:**
+**For single-platform PRDs:**
 - Set `TARGET_PLATFORMS` = ["{PLATFORM}"]
 
 ### Step 3: Run Pre-Implement Hook
@@ -225,13 +227,13 @@ If hook fails (non-zero exit), stop and show the error.
 
 ### Step 5: Platform Implementation Loop
 
-**For each platform in TARGET_PLATFORMS (sequentially):**
+**For each platform in TARGET_PLATFORMS (following Implementation Order):**
 
 Run Steps 5a-5d for the current platform, then move to the next.
 
-**For multi-platform mobile PRDs:**
-- First platform (Android): Full implementation from scratch
-- Second platform (iOS): Benefits from lessons learned, can reference Android implementation patterns
+**For multi-platform PRDs:**
+- First platform: Full implementation from scratch
+- Subsequent platforms: Benefit from lessons learned, can reference prior implementation patterns
 
 ---
 
@@ -261,9 +263,9 @@ Use phased task groups (### Implementation Phases) with <!-- parallel: true --> 
 Return only the dev plan document."
 ```
 
-**For the second platform in a multi-platform PRD:**
+**For subsequent platforms in a multi-platform PRD:**
 Include `PREVIOUS_PLATFORM_NOTES` with:
-- Summary of first platform's implementation
+- Summary of previously completed platform(s) implementation
 - Key patterns established
 - Any issues encountered and solutions
 - Recommendations for this platform
@@ -561,15 +563,15 @@ After each platform completes:
 3. **For multi-platform PRDs with remaining platforms:**
    - Display completion for current platform:
      ```
-     ✅ {CURRENT_PLATFORM} implementation complete!
+     ✅ {CURRENT_PLATFORM} implementation complete! ({completed_count}/{total_platforms})
 
      Moving to {NEXT_PLATFORM}...
      ```
    - Store learnings as `PREVIOUS_PLATFORM_NOTES`:
-     - What patterns were established
+     - What patterns were established in completed platform(s)
      - What worked well
      - What could be improved for the next platform
-   - **Loop back to Step 5a** for the next platform
+   - **Loop back to Step 5a** for the next platform (following Implementation Order)
 
 4. **When all platforms are done:**
    - Continue to Step 5f (Code Review)
@@ -668,7 +670,7 @@ Next steps:
 3. When ready: /prdx:push {slug}
 ```
 
-**For multi-platform mobile PRDs:**
+**For multi-platform PRDs:**
 ```
 ✅ All platforms implemented!
 
@@ -677,11 +679,12 @@ Next steps:
 📋 Status: review
 
 Platforms completed:
-  ✅ Android - {ANDROID_SUMMARY}
-  ✅ iOS - {IOS_SUMMARY}
+  ✅ {platform_1} - {PLATFORM_1_SUMMARY}
+  ✅ {platform_2} - {PLATFORM_2_SUMMARY}
+  ✅ {platform_N} - {PLATFORM_N_SUMMARY}
 
 Next steps:
-1. Test the implementation on both platforms
+1. Test the implementation on all platforms
 2. If bugs found: describe them and I'll fix them
 3. When ready: /prdx:push {slug}
 ```
@@ -742,6 +745,6 @@ Fix the issues and try again.
 5. **Pass commit instructions to agent** - Include in the prompt
 6. **Agents run isolated** - They don't have access to main conversation context
 7. **Return summaries only** - File contents stay in agent context
-8. **Multi-platform mobile runs sequentially** - Android first, then iOS
+8. **Multi-platform runs per Implementation Order** - Follows steps defined in PRD
 9. **Pass learnings between platforms** - Include previous platform notes
 10. **Code review before handoff** - prdx:code-reviewer runs after implementation, fixes issues automatically (max 2 cycles)

@@ -38,8 +38,11 @@ PRDX uses Claude's default plans directory (`~/.claude/plans/`).
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
-**Platform:** backend | android | ios | mobile
-**Platforms:** android, ios (only for mobile - list target platforms)
+**Platform:** backend | frontend | android | ios
+**Platforms:** backend, android, ios (when multiple platforms)
+**Implementation Order:**
+1. backend
+2. android, ios
 **Status:** planning | in-progress | review | implemented | completed
 **Created:** [YYYY-MM-DD]
 **Branch:** feat/[slug] | fix/[slug] | refactor/[slug] | chore/[slug]
@@ -78,6 +81,11 @@ PRDX uses Claude's default plans directory (`~/.claude/plans/`).
 - [Technical/business risks and constraints]
 ```
 
+Rules for Platform fields:
+- **Single platform:** Use `**Platform:**` only (e.g., `**Platform:** android`). Omit `**Platforms:**` and `**Implementation Order:**`.
+- **Multiple platforms:** Use `**Platforms:**` with all platforms listed. Omit `**Platform:**`.
+- **Implementation Order:** Only present when `**Platforms:**` has 2+ entries. Numbered steps. Platforms on the same step are independent (can be done in any order). Steps execute sequentially.
+
 ### Quick Template (`--quick` Mode)
 
 Used for ephemeral tasks. Saved as `prdx-quick-{slug}.md` and cleaned up after workflow completes.
@@ -86,7 +94,7 @@ Used for ephemeral tasks. Saved as `prdx-quick-{slug}.md` and cleaned up after w
 # [Title]
 
 **Type:** bug-fix | feature | refactor
-**Platform:** {DETECTED}
+**Platform:** {DETECTED_PLATFORM}
 **Quick:** true
 **Status:** planning
 **Created:** [YYYY-MM-DD]
@@ -175,17 +183,17 @@ prdx/
 Plan Mode → PRD saved → [Publish?] → Publish → [Implement?] → Implement → Review → [Ready?] → PR
 ```
 
-**For mobile features targeting both platforms:**
+**For multi-platform features (e.g., backend + mobile):**
 ```
 /prdx:prdx "add biometric authentication"
 ↓
-Plan Mode (asks: Android & iOS, Android only, or iOS only?)
+Plan Mode (asks: which platforms? what order?)
 ↓
 PRD saved to ~/.claude/plans/
 ↓
 [Publish?] → Publish (optional)
 ↓
-[Implement?] → Implement Android → [Continue to iOS?] → Implement iOS
+[Implement?] → Implement backend → [Continue?] → Implement android → [Continue?] → Implement ios
 ↓
 Review (test, fix bugs if needed)
 ↓
@@ -244,6 +252,7 @@ Quick mode is for one-off tasks (bugfixes, PR review comments) that need the ful
 
 3. Implement Feature
    /prdx:implement {slug}
+   /prdx:implement {slug} backend  (for multi-platform: backend only)
    /prdx:implement {slug} android  (for multi-platform: Android only)
    /prdx:implement {slug} ios      (for multi-platform: iOS only)
    ↓
@@ -626,8 +635,11 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
-**Platform:** backend | android | ios | mobile
-**Platforms:** android, ios (only for mobile - lists target platforms)
+**Platform:** backend | frontend | android | ios
+**Platforms:** backend, android, ios (when multiple platforms)
+**Implementation Order:**
+1. backend
+2. android, ios
 **Status:** planning | in-progress | review | implemented | completed
 **Created:** [DATE]
 **Branch:** [BRANCH_NAME]
@@ -670,20 +682,12 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 - [Dependency or constraint]
 
 ---
-## Implementation Notes (android)
+## Implementation Notes ({platform})
 
 **Branch:** [BRANCH]
 **Implemented:** [DATE]
 
-[Added by Android agent after implementation]
-
----
-## Implementation Notes (ios)
-
-**Branch:** [BRANCH]
-**Implemented:** [DATE]
-
-[Added by iOS agent after implementation - only for multi-platform mobile PRDs]
+[Added by platform agent after implementation — one section per platform]
 
 ---
 ## Pull Request

@@ -27,11 +27,11 @@ Execute the following phases based on the argument provided:
 - Read PRD and check its `**Status:**` field
 - **Detect quick mode from PRD:** If the PRD contains `**Quick:** true`, set `QUICK_MODE=true` internally
 - **Save last-used slug:** `mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug`
-- For multi-platform mobile PRDs, also check which platforms have been implemented (look for `## Implementation Notes (android)` and `## Implementation Notes (ios)` sections)
+- For multi-platform PRDs, also check which platforms have been implemented (look for `## Implementation Notes ({platform})` sections for each platform listed in `**Platforms:**`)
 - Resume from the appropriate phase:
   - `planning` → Continue planning (Phase 2)
   - `in-progress` → Continue implementation (Phase 3)
-    - For multi-platform: Check which platforms are done, resume with remaining platform
+    - For multi-platform: Check which platforms are done (have Implementation Notes sections), resume with next platform per Implementation Order
   - `review` → Ask user: Fix issues OR Create PR? (Phase 3a)
   - `implemented` → PR already created, inform user and show PR link from PRD
   - `completed` → Inform user the PRD is done
@@ -126,9 +126,9 @@ Route based on choice:
 
 ### Step 3: Implementation
 
-**Check if this is a multi-platform mobile PRD:**
+**Check if this is a multi-platform PRD:**
 
-Read the PRD and check for `**Platforms:**` field with multiple platforms (e.g., "android, ios").
+Read the PRD and check for `**Platforms:**` field with multiple platforms.
 
 **For single-platform PRDs:**
 ```
@@ -136,30 +136,35 @@ Read the PRD and check for `**Platforms:**` field with multiple platforms (e.g.,
 ```
 Wait for implementation to complete, then proceed to review decision.
 
-**For multi-platform mobile PRDs:**
+**For multi-platform PRDs:**
 
-Implementation runs **sequentially** per platform to learn from the first implementation.
+Parse `**Implementation Order:**` from PRD into ordered steps.
+If no Implementation Order field, treat all platforms as one parallel step (implement in listed order).
 
-1. **First Platform (Android):**
-   - Display: "Starting Android implementation..."
-   - Run: `/prdx:implement [slug] android`
-   - Wait for completion
+For each step in Implementation Order, for each platform in the step:
 
-2. **Between Platforms - Ask User:**
+1. **Display progress:**
+   ```
+   Starting {platform} implementation ({step_num}/{total_steps})...
+   ```
+
+2. **Run implementation:**
+   ```
+   /prdx:implement [slug] {platform}
+   ```
+
+3. **Wait for completion.**
+
+4. **If more platforms remain (in this step or next steps), ask user:**
    Use AskUserQuestion:
-   - Option 1: "Continue to iOS" (Recommended)
-   - Option 2: "Stop here, I'll continue iOS later"
-   - Option 3: "Skip iOS, Android only"
+   - Option 1: "Continue to {next_platform}" (Recommended)
+   - Option 2: "Stop here, I'll continue later"
+   - Option 3: "Skip {next_platform}"
 
    Route based on choice:
-   - Continue → Proceed to iOS
+   - Continue → Proceed to next platform
    - Stop → End workflow, tell user to resume with `/prdx:prdx [slug]`
-   - Skip → Update PRD to remove iOS from Platforms, proceed to review
-
-3. **Second Platform (iOS):**
-   - Display: "Starting iOS implementation (applying learnings from Android)..."
-   - Run: `/prdx:implement [slug] ios`
-   - Wait for completion
+   - Skip → Skip that platform, continue with remaining platforms (or proceed to review if none left)
 
 **IMPORTANT: After implementation completes, STOP and use AskUserQuestion:**
 
