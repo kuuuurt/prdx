@@ -6,8 +6,8 @@ load helpers/test_helper
 @test "prdx.md contains post-plan decision gate" {
     local prdx_cmd="$REPO_ROOT/commands/prdx.md"
 
-    # Should have decision gate after planning completes
-    run grep -A 3 "After plan mode completes" "$prdx_cmd"
+    # Should have post-planning decision gate via workflow.json resume
+    run grep "post-planning" "$prdx_cmd"
     [ "$status" -eq 0 ]
 
     # Should mention AskUserQuestion
@@ -16,6 +16,11 @@ load helpers/test_helper
 
     # Should have Publish/Implement/Stop options
     run grep -E "(Publish to GitHub|Implement now|Stop here)" "$prdx_cmd"
+    [ "$status" -eq 0 ]
+
+    # plan.md should also have the decision point
+    local plan_cmd="$REPO_ROOT/commands/plan.md"
+    run grep "post-planning" "$plan_cmd"
     [ "$status" -eq 0 ]
 }
 

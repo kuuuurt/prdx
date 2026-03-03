@@ -347,6 +347,48 @@ Next steps:
 - Or run /prdx:prdx {slug} for guided workflow
 ```
 
+### Step 5.5: Save Workflow State and Decision Point
+
+**Save last-used slug:**
+```bash
+mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug
+```
+(Use `quick-{slug}` for quick mode, e.g., `echo "quick-fix-login" > .prdx/last-slug`)
+
+**Check if this was called from a `/prdx:prdx` workflow:**
+
+Read `.prdx/workflow.json`:
+```bash
+cat .prdx/workflow.json 2>/dev/null
+```
+
+**If `.prdx/workflow.json` exists with `"phase": "planning"`** (this was called from `/prdx:prdx`):
+
+1. Update workflow.json with the final slug and phase:
+   ```bash
+   cat > .prdx/workflow.json << EOF
+   {"slug": "{SLUG}", "phase": "post-planning", "quick": {QUICK_VALUE}}
+   EOF
+   ```
+   (Use the final `{SLUG}` — for quick mode, use `quick-{slug}`. `{QUICK_VALUE}` is `true` or `false` from the existing workflow.json.)
+
+2. Show the decision point via **AskUserQuestion**:
+
+   **Normal mode** (quick field is false):
+   - Option 1: "Publish to GitHub" — Create issue for team visibility
+   - Option 2: "Implement now" — Start coding immediately
+   - Option 3: "Stop here" — Review PRD later
+
+   **Quick mode** (quick field is true):
+   - Option 1: "Implement now" (Recommended) — Start coding immediately
+   - Option 2: "Stop here" — Review plan later
+
+3. **Do NOT proceed beyond this AskUserQuestion.** Display the user's choice and stop. The `/prdx:prdx` workflow (if still in context) or the user's next invocation will handle routing based on the choice.
+
+**If `.prdx/workflow.json` does NOT exist** (standalone `/prdx:plan` call):
+
+Just display the summary above and end. No decision point needed. No workflow.json interaction.
+
 ## Error Handling
 
 ### No Description Provided
