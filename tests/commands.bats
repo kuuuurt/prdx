@@ -63,11 +63,11 @@ load helpers/test_helper
     local prdx_cmd="$REPO_ROOT/commands/prdx.md"
 
     # Should have decision gate between platforms
-    run grep "Between Platforms - Ask User" "$prdx_cmd"
+    run grep "more platforms remain" "$prdx_cmd"
     [ "$status" -eq 0 ]
 
     # Should have Continue/Stop/Skip options
-    run grep -E "(Continue to iOS|Stop here|Skip iOS)" "$prdx_cmd"
+    run grep -E "(Continue to \{next_platform\}|Stop here|Skip \{next_platform\})" "$prdx_cmd"
     [ "$status" -eq 0 ]
 }
 
