@@ -67,12 +67,12 @@ load helpers/test_helper
 @test "prdx.md contains multi-platform decision gate" {
     local prdx_cmd="$REPO_ROOT/commands/prdx.md"
 
-    # Should have decision gate between platforms
-    run grep "more platforms remain" "$prdx_cmd"
+    # Should have decision gate between steps
+    run grep "more steps remain" "$prdx_cmd"
     [ "$status" -eq 0 ]
 
     # Should have Continue/Stop/Skip options
-    run grep -E "(Continue to \{next_platform\}|Stop here|Skip \{next_platform\})" "$prdx_cmd"
+    run grep -E "(Continue to step|Stop here|Skip step)" "$prdx_cmd"
     [ "$status" -eq 0 ]
 }
 
