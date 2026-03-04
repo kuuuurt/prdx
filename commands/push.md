@@ -111,18 +111,24 @@ Resolve slug using enhanced matching (exact → substring → word-boundary → 
 
 When a matching PRD is found, use the full PRDX workflow.
 
-### Phase 2a: Update Status
+### Phase 2a: Verify Status
 
-**If PRD status is `review`:**
-- Update PRD status to `implemented` by editing the `**Status:**` line in the PRD file
-- Continue to Phase 3
+**If PRD status is `review` or `implemented`:**
+- Continue to Phase 3 (status update happens after successful PR creation in Phase 5a)
 
-**If PRD status is already `implemented`:**
-- Proceed to Phase 3
+**If PRD status is `planning` or `in-progress`:**
+- Warn: "PRD status is `{status}`. Implementation may not be complete. Continue anyway?"
+- If user confirms, continue to Phase 3
 
 ### Phase 3a: Validate Git State (PRD Mode)
 
 ```bash
+# Detect default branch
+DEFAULT_BRANCH=$(cat prdx.json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('defaultBranch',''))" 2>/dev/null || true)
+if [ -z "$DEFAULT_BRANCH" ]; then
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
+fi
+
 # Get current branch
 CURRENT_BRANCH=$(git branch --show-current)
 
@@ -144,14 +150,14 @@ if [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ]; then
   exit 1
 fi
 
-# Check not on main
-if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
+# Check not on default branch
+if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ]; then
   echo "Cannot create PR from default branch"
   exit 1
 fi
 
 # Check for commits
-COMMITS=$(git log main..HEAD --oneline)
+COMMITS=$(git log "$DEFAULT_BRANCH"..HEAD --oneline)
 if [ -z "$COMMITS" ]; then
   echo "No commits on this branch"
   exit 1
@@ -172,6 +178,7 @@ Mode: prd
 PRD Slug: {SLUG}
 PRD File: {PRD_FILE}
 Branch: {BRANCH}
+Base Branch: {DEFAULT_BRANCH}
 Draft: {DRAFT_FLAG}
 
 Read the PRD, analyze commits, create comprehensive PR description,
@@ -180,7 +187,11 @@ execute gh pr create, and update PRD with PR metadata.
 Return only the PR summary (number, URL, title)."
 ```
 
-### Phase 5a: Display Summary (PRD Mode)
+### Phase 5a: Update Status and Display Summary (PRD Mode)
+
+**After successful PR creation, update status:**
+- If PRD status is not already `implemented`: Update PRD status to `implemented` by editing the `**Status:**` line in the PRD file
+- If PR creation failed: Do NOT update status — it stays at `review`
 
 **If DRAFT_FLAG is false:**
 ```
@@ -222,17 +233,23 @@ When no PRD exists, create a PR purely from branch analysis.
 ### Phase 2b: Validate Git State (Standalone)
 
 ```bash
+# Detect default branch
+DEFAULT_BRANCH=$(cat prdx.json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('defaultBranch',''))" 2>/dev/null || true)
+if [ -z "$DEFAULT_BRANCH" ]; then
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
+fi
+
 # Get current branch
 CURRENT_BRANCH=$(git branch --show-current)
 
-# Check not on main
-if [ "$CURRENT_BRANCH" = "main" ] || [ "$CURRENT_BRANCH" = "master" ]; then
+# Check not on default branch
+if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ]; then
   echo "Cannot create PR from default branch"
   exit 1
 fi
 
 # Check for commits
-COMMITS=$(git log main..HEAD --oneline)
+COMMITS=$(git log "$DEFAULT_BRANCH"..HEAD --oneline)
 if [ -z "$COMMITS" ]; then
   echo "No commits on this branch"
   exit 1
@@ -251,6 +268,7 @@ prompt: "Create a pull request from branch analysis (no PRD).
 
 Mode: standalone
 Branch: {BRANCH}
+Base Branch: {DEFAULT_BRANCH}
 Draft: {DRAFT_FLAG}
 
 Analyze commits and changes to create a clear PR description.
@@ -365,7 +383,7 @@ This keeps the main conversation context minimal.
 User: /prdx:push backend-auth
 
 → Finds PRD: ~/.claude/plans/prdx-backend-auth.md
-→ Status is "review" → Updated to "implemented"
+→ Status is "review" → will update to "implemented" after PR creation
 → Validates git state
 → prdx:pr-author agent invoked (PRD mode)
 → Agent reads PRD, analyzes commits
@@ -440,7 +458,7 @@ To mark ready: gh pr ready 44
 User: /prdx:push backend-auth --draft
 
 → Finds PRD: ~/.claude/plans/prdx-backend-auth.md
-→ Status is "review" → Updated to "implemented"
+→ Status is "review" → will update to "implemented" after PR creation
 → Draft: true → passes --draft to agent
 → Agent adds "not human-reviewed" notice to PR body
 → Creates draft PR via gh pr create --draft

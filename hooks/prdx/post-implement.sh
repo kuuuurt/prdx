@@ -11,8 +11,29 @@ if [ -z "$PRD_SLUG" ]; then
     exit 1
 fi
 
-# Find PRD file (prdx-* naming convention)
-PRD_FILE=$(ls ~/.claude/plans/prdx-*${PRD_SLUG}*.md 2>/dev/null | head -1)
+# Find PRD file — exact match first, then quick, then substring with ambiguity check
+PRD_FILE=""
+
+# 1. Exact match: prdx-{slug}.md
+if [ -f ~/.claude/plans/prdx-${PRD_SLUG}.md ]; then
+    PRD_FILE=~/.claude/plans/prdx-${PRD_SLUG}.md
+# 2. Exact match: prdx-quick-{slug}.md
+elif [ -f ~/.claude/plans/prdx-quick-${PRD_SLUG}.md ]; then
+    PRD_FILE=~/.claude/plans/prdx-quick-${PRD_SLUG}.md
+else
+    # 3. Substring match with ambiguity check
+    MATCHES=$(ls ~/.claude/plans/prdx-*${PRD_SLUG}*.md 2>/dev/null)
+    MATCH_COUNT=$(echo "$MATCHES" | grep -c . 2>/dev/null || echo 0)
+
+    if [ "$MATCH_COUNT" -eq 1 ]; then
+        PRD_FILE="$MATCHES"
+    elif [ "$MATCH_COUNT" -gt 1 ]; then
+        echo "Warning: Ambiguous slug '$PRD_SLUG' matches multiple PRDs:"
+        echo "$MATCHES" | xargs -I{} basename {} .md | sed 's/^prdx-//'
+        echo "Skipping post-implement updates."
+        exit 0
+    fi
+fi
 
 if [ -z "$PRD_FILE" ]; then
     echo "PRD not found: $PRD_SLUG"
@@ -26,6 +47,8 @@ TEST_CMD=""
 
 if [ -f "Makefile" ] && grep -q "^test:" Makefile 2>/dev/null; then
     TEST_CMD="make test"
+elif [ -f "bun.lockb" ] || [ -f "bunfig.toml" ]; then
+    TEST_CMD="bun test"
 elif [ -f "package.json" ] && grep -q '"test"' package.json 2>/dev/null; then
     TEST_CMD="npm test"
 elif [ -f "build.gradle.kts" ] || [ -f "build.gradle" ]; then
@@ -34,6 +57,20 @@ elif [ -f "Cargo.toml" ]; then
     TEST_CMD="cargo test"
 elif [ -f "go.mod" ]; then
     TEST_CMD="go test ./..."
+elif [ -f "Package.swift" ] || ls *.xcodeproj 1>/dev/null 2>&1; then
+    # Swift/Xcode: try swift test first (SPM), fall back to xcodebuild
+    if [ -f "Package.swift" ]; then
+        TEST_CMD="swift test"
+    else
+        # Find the first .xcodeproj and extract scheme
+        XCODEPROJ=$(ls -d *.xcodeproj 2>/dev/null | head -1)
+        SCHEME=$(xcodebuild -list -project "$XCODEPROJ" 2>/dev/null | awk '/Schemes:/{found=1; next} found && /^$/{exit} found{gsub(/^[[:space:]]+/,""); print; exit}')
+        if [ -n "$SCHEME" ]; then
+            TEST_CMD="xcodebuild test -project $XCODEPROJ -scheme $SCHEME -destination 'platform=iOS Simulator,name=iPhone 16'"
+        fi
+    fi
+elif [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "setup.cfg" ]; then
+    TEST_CMD="pytest"
 fi
 
 if [ -n "$TEST_CMD" ]; then
@@ -56,7 +93,7 @@ sed -i.bak 's/^\*\*Status:\*\* .*/\*\*Status:\*\* review/' "$PRD_FILE"
 rm "${PRD_FILE}.bak"
 
 # Add implementation timestamp if not present
-if ! grep -q "^**Implemented:**" "$PRD_FILE"; then
+if ! grep -qF "**Implemented:**" "$PRD_FILE"; then
     CURRENT_DATE=$(date +%Y-%m-%d)
     # Add after Implementation Notes header
     if grep -q "^## Implementation Notes" "$PRD_FILE"; then

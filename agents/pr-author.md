@@ -29,14 +29,24 @@ Skip PRD lookup entirely. All context comes from git.
 
 ### 2. Analyze Implementation
 
+**Detect default branch:**
+```bash
+DEFAULT_BRANCH=$(cat prdx.json 2>/dev/null | grep -o '"defaultBranch"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"defaultBranch"[[:space:]]*:[[:space:]]*"//' | sed 's/"//' || true)
+if [ -z "$DEFAULT_BRANCH" ]; then
+  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
+fi
+```
+
+If a `Base Branch:` field is provided in the prompt, use that value instead of detecting it yourself.
+
 Gather commit and change information:
 
 ```bash
 # Get commits on this branch
-git log main..HEAD --oneline
+git log {DEFAULT_BRANCH}..HEAD --oneline
 
 # Get change summary
-git diff main..HEAD --stat
+git diff {DEFAULT_BRANCH}..HEAD --stat
 
 # Get current branch
 git branch --show-current
@@ -237,7 +247,7 @@ Before creating PR:
 2. Verify not on default branch:
    ```bash
    CURRENT=$(git branch --show-current)
-   if [ "$CURRENT" = "main" ] || [ "$CURRENT" = "master" ]; then
+   if [ "$CURRENT" = "$DEFAULT_BRANCH" ]; then
      echo "Cannot create PR from default branch"
      exit 1
    fi

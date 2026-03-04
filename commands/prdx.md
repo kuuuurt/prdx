@@ -185,13 +185,15 @@ Wait for implementation to complete, then proceed to review decision.
 **For multi-platform PRDs:**
 
 Parse `**Implementation Order:**` from PRD into ordered steps.
-If no Implementation Order field, treat all platforms as one parallel step (implement in listed order).
+If no Implementation Order field, treat all platforms as one step (implement them all).
 
-For each step in Implementation Order, for each platform in the step:
+**For each step in Implementation Order:**
+
+**If the step has one platform:**
 
 1. **Display progress:**
    ```
-   Starting {platform} implementation ({step_num}/{total_steps})...
+   Starting {platform} implementation (step {step_num}/{total_steps})...
    ```
 
 2. **Run implementation:**
@@ -201,16 +203,31 @@ For each step in Implementation Order, for each platform in the step:
 
 3. **Wait for completion.**
 
-4. **If more platforms remain (in this step or next steps), ask user:**
-   Use AskUserQuestion:
-   - Option 1: "Continue to {next_platform}" (Recommended)
-   - Option 2: "Stop here, I'll continue later"
-   - Option 3: "Skip {next_platform}"
+**If the step has multiple platforms (e.g., "android, ios"):**
 
-   Route based on choice:
-   - Continue → Proceed to next platform
-   - Stop → Delete `.prdx/workflow.json` and end workflow, tell user to resume with `/prdx:prdx [slug]`
-   - Skip → Skip that platform, continue with remaining platforms (or proceed to review if none left)
+1. **Display progress:**
+   ```
+   Starting parallel implementation: {platform_list} (step {step_num}/{total_steps})...
+   ```
+
+2. **Launch ALL platform implementations concurrently** — use multiple Agent tool calls in a single message:
+   ```
+   /prdx:implement [slug] {platform_1}   (Agent call 1)
+   /prdx:implement [slug] {platform_2}   (Agent call 2)
+   ```
+
+3. **Wait for ALL to complete.** Collect results from each.
+
+**After each step completes (regardless of parallelism), if more steps remain, ask user:**
+Use AskUserQuestion:
+- Option 1: "Continue to step {next_step}" (Recommended) — which platforms are next
+- Option 2: "Stop here, I'll continue later"
+- Option 3: "Skip step {next_step}"
+
+Route based on choice:
+- Continue → Proceed to next step
+- Stop → Delete `.prdx/workflow.json` and end workflow, tell user to resume with `/prdx:prdx [slug]`
+- Skip → Skip that step, continue with remaining steps (or proceed to review if none left)
 
 **After implementation completes, update workflow state:**
 ```bash

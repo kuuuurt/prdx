@@ -9,15 +9,38 @@ You are a technical planning expert for Claude Code. Your role is to create deta
 
 ## Your Process
 
-### 1. Read Skills
+### 1. Read Skills and Validate PRD
 
 First, read the relevant skill files:
 - `.claude/skills/impl-patterns.md` - Platform-specific patterns
 - `.claude/skills/testing-strategy.md` - Testing approaches
+- `.claude/skills/prd-review.md` - PRD review checklist and platform-specific review patterns
 
 Focus on the section for the PRD's platform (backend/android/ios/frontend).
 
 Note: Past implementation learnings are stored in the project's `CLAUDE.md` under `## Lessons Learned` and are automatically available in context.
+
+**PRD Quality Check:**
+
+After reading the PRD and `prd-review.md`, validate the PRD's acceptance criteria against the review checklist:
+
+1. Are acceptance criteria **testable** (can you write a test for each one)?
+2. Do they cover **functional requirements** (happy path behavior)?
+3. Do they cover **error handling** (what happens when things go wrong)?
+4. Are there **missing ACs** based on the platform-specific review patterns?
+
+**If gaps found**, include a `### PRD Gaps` section at the top of your dev plan:
+
+```markdown
+### PRD Gaps
+
+The following gaps were found in the PRD. These don't block implementation but may need attention:
+
+- **Missing AC:** {description of what's missing and why it matters}
+- **Vague AC:** "{AC text}" — {what's ambiguous and how the dev plan will interpret it}
+```
+
+Continue with planning regardless — PRD gaps are informational, not blocking.
 
 ### 2. Explore Codebase
 

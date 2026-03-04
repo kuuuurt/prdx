@@ -52,6 +52,13 @@ This command enters **native plan mode** to:
 
 ## Workflow
 
+### Step 0: Parse Flags
+
+**Parse `--quick` flag FIRST (before platform detection):**
+- Strip `--quick` from arguments if present
+- If `--quick` is present: set `QUICK_MODE=true`
+- If `--quick` is NOT present: set `QUICK_MODE=false`
+
 ### Step 1: Platform Detection
 
 Auto-detect ALL potential platforms from the description and codebase:
@@ -78,7 +85,9 @@ if [ -d "ios" ]; then HAS_IOS=true; fi
 
 **4. Multi-Platform Selection:**
 
-If **multiple platform types detected** (e.g., backend + android, or android + ios):
+**If QUICK_MODE is true:** Skip multi-platform selection entirely. Auto-detect the single most relevant platform from the description (prefer the most specific match). Quick mode always targets a single platform — omit `**Platforms:**` and `**Implementation Order:**` fields.
+
+If **multiple platform types detected** AND **QUICK_MODE is false** (e.g., backend + android, or android + ios):
 
 Use **AskUserQuestion** with `multiSelect: true` to ask which platforms this PRD should target. Only show detected platforms as options:
 
@@ -133,11 +142,7 @@ Numbered steps. Platforms on the same step separated by commas. Steps execute se
 
 ### Step 2: Enter Plan Mode
 
-**First, parse `--quick` flag:**
-- Strip `--quick` from arguments if present
-- If `--quick` is present: set `QUICK_MODE=true`
-
-Use **EnterPlanMode** tool to begin planning.
+Use **EnterPlanMode** tool to begin planning. (`QUICK_MODE` was already parsed in Step 0.)
 
 Once in plan mode, explore the codebase using **ONLY the PRDX exploration agents** (see mandatory section above):
 

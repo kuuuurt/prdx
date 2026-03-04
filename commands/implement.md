@@ -11,6 +11,15 @@ echo "Branch: $(git branch --show-current)"
 echo "Default: $(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')"
 git status --short
 echo ""
+echo "=== Config ==="
+# Walk up to find prdx.json
+DIR="$PWD"; while [ "$DIR" != "/" ]; do
+  [ -f "$DIR/prdx.json" ] && echo "Config: $DIR/prdx.json" && break
+  [ -f "$DIR/.prdx/prdx.json" ] && echo "Config: $DIR/.prdx/prdx.json" && break
+  DIR=$(dirname "$DIR")
+done
+[ "$DIR" = "/" ] && echo "Config: (defaults)"
+echo ""
 echo "=== Available PRDs ==="
 ls -1 ~/.claude/plans/prdx-*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
 ```
@@ -126,165 +135,9 @@ This command orchestrates three agents in **isolated contexts**:
      Format: conventional | Co-author: Claude <noreply@anthropic.com> | Extended: yes | Claude Code link: yes
    ```
 
-### Step 2: Load PRD
+#### Step 1b: Build Commit Instructions
 
-**Resolve slug to PRD file using enhanced matching:**
-
-1. **Exact match (prefixed):** `~/.claude/plans/prdx-{slug}.md`
-2. **Exact match (unprefixed fallback):** `~/.claude/plans/{slug}.md` — for plans created without the `prdx-` prefix
-3. **Substring match:** `ls ~/.claude/plans/prdx-*{slug}*.md` — slug appears anywhere in prefixed filenames
-4. **Substring match (unprefixed fallback):** `ls ~/.claude/plans/*{slug}*.md` — search all plans if no prefixed match
-5. **Word-boundary match:** Split slug into words, find PRDs containing all words (in any order)
-6. **Disambiguation:** If multiple matches at any step, use AskUserQuestion to let user select:
-   ```
-   Multiple PRDs match "{slug}":
-     1. backend-auth
-     2. backend-auth-refresh
-   Which one?
-   ```
-   If exactly one match at any step, use it.
-
-7. If no match found at any step, show error and list available PRDs
-
-**Auto-rename unprefixed plans:** If a match is found without the `prdx-` prefix, rename it to add the prefix before proceeding:
-```bash
-mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-{slug}.md
-```
-Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
-
-3. Read the PRD file and extract:
-   - **Platform** (single-platform PRDs: backend/frontend/android/ios)
-   - **Platforms** (multi-platform PRDs: e.g., "backend, android, ios")
-   - **Implementation Order** (multi-platform PRDs: ordered steps)
-   - Type (feature/bug-fix/refactor/spike)
-   - Branch name from `**Branch:**` field
-   - Status from `**Status:**` field
-   - Full PRD content
-
-4. **Update status to `in-progress`:**
-   Edit the PRD file to change `**Status:** planning` to `**Status:** in-progress`
-
-5. **Save last-used slug** for context persistence:
-   ```bash
-   mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug
-   ```
-
-### Step 2a: Determine Target Platform(s)
-
-**Parse the command arguments:**
-- `{slug}` only → Use PRD's platform(s)
-- `{slug} {platform}` → Override to that platform only (e.g., `{slug} backend`, `{slug} android`, `{slug} ios`)
-
-**For multi-platform PRDs:**
-
-1. Check if PRD has `**Platforms:**` field with multiple platforms (e.g., "backend, android, ios")
-2. Parse the `Platforms` field into a list: `TARGET_PLATFORMS`
-3. If `**Implementation Order:**` exists, parse into `IMPLEMENTATION_STEPS` (ordered list of platform groups)
-4. If second argument provided (e.g., "backend"), filter to just that platform
-5. If no Implementation Order, treat all platforms as one step (implement in listed order)
-
-**Determine implementation order:**
-- Use `IMPLEMENTATION_STEPS` from PRD (e.g., step 1: ["backend"], step 2: ["android", "ios"])
-- Platforms within a step are independent but still implemented one at a time
-- Steps execute sequentially
-
-**For single-platform PRDs:**
-- Set `TARGET_PLATFORMS` = ["{PLATFORM}"]
-
-### Step 3: Run Pre-Implement Hook
-
-Check if hook exists and run it:
-
-```bash
-if [ -f hooks/prdx/pre-implement.sh ]; then
-  ./hooks/prdx/pre-implement.sh "{slug}"
-fi
-```
-
-If hook fails (non-zero exit), stop and show the error.
-
-### Step 4: Git Setup
-
-1. Get current branch: `git branch --show-current`
-2. Determine default branch (main or master)
-3. **Read branch from PRD** - The PRD's `**Branch:**` field contains the designated branch
-   - If Branch field is missing, error: "PRD missing Branch field. Re-run /prdx:plan to regenerate."
-
-4. If on default branch, checkout/create the feature branch:
-   ```bash
-   git checkout -b {BRANCH_FROM_PRD} 2>/dev/null || git checkout {BRANCH_FROM_PRD}
-   ```
-
-5. If already on a different feature branch, warn user:
-   ```
-   ⚠️  Currently on branch '{CURRENT}' but PRD expects '{BRANCH_FROM_PRD}'
-
-   Each PRD corresponds to exactly one branch.
-   Switch to the correct branch? (y/n)
-   ```
-
-**Important:** Each PRD = 1 branch = 1 PR. Do not create new branches for existing PRDs.
-
-### Step 5: Platform Implementation Loop
-
-**For each platform in TARGET_PLATFORMS (following Implementation Order):**
-
-Run Steps 5a-5d for the current platform, then move to the next.
-
-**For multi-platform PRDs:**
-- First platform: Full implementation from scratch
-- Subsequent platforms: Benefit from lessons learned, can reference prior implementation patterns
-
----
-
-#### Step 5a: Dev Planning (prdx:dev-planner)
-
-**Display progress:**
-```
-Phase 1/3: Dev Planning — Creating implementation plan...
-```
-
-Invoke the dev-planner agent using the Task tool:
-
-```
-subagent_type: "prdx:dev-planner"
-
-prompt: "Create a detailed implementation plan for this PRD.
-
-PRD File: {PRD_FILE}
-Platform: {CURRENT_PLATFORM}  (e.g., 'android' or 'ios')
-
-{PRD_CONTENT}
-
-{PREVIOUS_PLATFORM_NOTES}  (if this is the second platform)
-
-Read the skills files and explore the codebase to create a comprehensive dev plan.
-Use phased task groups (### Implementation Phases) with <!-- parallel: true --> or <!-- sequential --> annotations.
-Return only the dev plan document."
-```
-
-**For subsequent platforms in a multi-platform PRD:**
-Include `PREVIOUS_PLATFORM_NOTES` with:
-- Summary of previously completed platform(s) implementation
-- Key patterns established
-- Any issues encountered and solutions
-- Recommendations for this platform
-
-Wait for the agent to return the dev plan. Store it for the next phase.
-
-**If dev-planner fails or returns an error:**
-
-Use AskUserQuestion to offer recovery options:
-- Option 1: "Retry dev planning" — Re-invoke the dev-planner agent
-- Option 2: "Skip to manual implementation" — Proceed to platform agent without a dev plan (agent will explore codebase itself)
-- Option 3: "Stop implementation" — Halt and let user investigate
-
-Route based on choice:
-- Retry → Re-run Step 5a
-- Skip → Proceed to Step 5b with a note that no dev plan is available (platform agent should explore codebase independently)
-- Stop → End workflow, show how to resume with `/prdx:implement {slug}`
-
-#### Step 5b: Build Commit Instructions
+**Build commit instructions immediately after config loading.** These are purely config-derived and don't depend on the PRD or dev plan, so computing them once here avoids repeating work in the per-platform loop.
 
 **CRITICAL: Build these instructions based on the config values from Step 1.**
 
@@ -398,7 +251,182 @@ Then add based on config:
    NOTE: Only trailers (Co-Authored-By) appear, NO description paragraph.
 ```
 
-#### Step 5c: Parse Dev Plan into Phases
+**Store the result as `COMMIT_INSTRUCTIONS`.** This will be passed to all platform agent invocations.
+
+### Step 2: Load PRD
+
+**Resolve slug to PRD file using enhanced matching:**
+
+1. **Exact match (prefixed):** `~/.claude/plans/prdx-{slug}.md`
+2. **Exact match (unprefixed fallback):** `~/.claude/plans/{slug}.md` — for plans created without the `prdx-` prefix
+3. **Substring match:** `ls ~/.claude/plans/prdx-*{slug}*.md` — slug appears anywhere in prefixed filenames
+4. **Substring match (unprefixed fallback):** `ls ~/.claude/plans/*{slug}*.md` — search all plans if no prefixed match
+5. **Word-boundary match:** Split slug into words, find PRDs containing all words (in any order)
+6. **Disambiguation:** If multiple matches at any step, use AskUserQuestion to let user select:
+   ```
+   Multiple PRDs match "{slug}":
+     1. backend-auth
+     2. backend-auth-refresh
+   Which one?
+   ```
+   If exactly one match at any step, use it.
+
+7. If no match found at any step, show error and list available PRDs
+
+**Auto-rename unprefixed plans:** If a match is found without the `prdx-` prefix, rename it to add the prefix before proceeding:
+```bash
+mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-{slug}.md
+```
+Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
+
+3. Read the PRD file and extract:
+   - **Platform** (single-platform PRDs: backend/frontend/android/ios)
+   - **Platforms** (multi-platform PRDs: e.g., "backend, android, ios")
+   - **Implementation Order** (multi-platform PRDs: ordered steps)
+   - Type (feature/bug-fix/refactor/spike)
+   - Branch name from `**Branch:**` field
+   - Status from `**Status:**` field
+   - Full PRD content
+
+4. **Update status to `in-progress`:**
+   Edit the PRD file to change `**Status:** planning` to `**Status:** in-progress`
+
+5. **Save last-used slug** for context persistence:
+   ```bash
+   mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug
+   ```
+
+### Step 2a: Determine Target Platform(s)
+
+**Parse the command arguments:**
+- `{slug}` only → Use PRD's platform(s)
+- `{slug} {platform}` → Override to that platform only (e.g., `{slug} backend`, `{slug} android`, `{slug} ios`)
+
+**For multi-platform PRDs:**
+
+1. Check if PRD has `**Platforms:**` field with multiple platforms (e.g., "backend, android, ios")
+2. Parse the `Platforms` field into a list: `TARGET_PLATFORMS`
+3. If `**Implementation Order:**` exists, parse into `IMPLEMENTATION_STEPS` (ordered list of platform groups)
+4. If second argument provided (e.g., "backend"), filter to just that platform
+5. If no Implementation Order, treat all platforms as one step (implement in listed order)
+
+**Determine implementation order:**
+- Use `IMPLEMENTATION_STEPS` from PRD (e.g., step 1: ["backend"], step 2: ["android", "ios"])
+- Platforms within a step are independent but still implemented one at a time
+- Steps execute sequentially
+
+**For single-platform PRDs:**
+- Set `TARGET_PLATFORMS` = ["{PLATFORM}"]
+
+### Step 3: Run Pre-Implement Hook
+
+Check if hook exists and run it:
+
+```bash
+if [ -f hooks/prdx/pre-implement.sh ]; then
+  ./hooks/prdx/pre-implement.sh "{slug}"
+fi
+```
+
+If hook fails (non-zero exit), stop and show the error.
+
+### Step 4: Git Setup
+
+1. Get current branch: `git branch --show-current`
+2. Determine default branch (main or master)
+3. **Read branch from PRD** - The PRD's `**Branch:**` field contains the designated branch
+   - If Branch field is missing, error: "PRD missing Branch field. Re-run /prdx:plan to regenerate."
+
+4. If on default branch, checkout/create the feature branch:
+   ```bash
+   git checkout -b {BRANCH_FROM_PRD} 2>/dev/null || git checkout {BRANCH_FROM_PRD}
+   ```
+
+5. If already on a different feature branch, warn user:
+   ```
+   ⚠️  Currently on branch '{CURRENT}' but PRD expects '{BRANCH_FROM_PRD}'
+
+   Each PRD corresponds to exactly one branch.
+   Switch to the correct branch? (y/n)
+   ```
+
+**Important:** Each PRD = 1 branch = 1 PR. Do not create new branches for existing PRDs.
+
+### Step 5: Platform Implementation Loop
+
+**For each step in IMPLEMENTATION_STEPS (following Implementation Order):**
+
+If the current step has **one platform**: Run Steps 5a-5d sequentially for that platform.
+
+If the current step has **multiple platforms** (e.g., `2. android, ios`): These platforms are **independent** and should run in **parallel**:
+
+1. Launch dev-planner agents for ALL platforms in this step **concurrently** (multiple Agent tool calls in a single message)
+2. Once all dev-planners return, launch platform agents for ALL platforms **concurrently** (parse phases and execute per platform)
+3. Wait for ALL platform agents to complete
+4. Collect summaries from all platforms, then continue to next step
+
+**Parallel platform rules:**
+- Platforms within the same step CANNOT share `PREVIOUS_PLATFORM_NOTES` (they run concurrently)
+- Each platform gets its own dev-planner, phase execution loop, and phase summaries
+- If one platform fails, the other continues — failure is handled per-platform
+- After all parallel platforms complete, their combined summaries become `PREVIOUS_PLATFORM_NOTES` for the next step
+
+**For single-platform PRDs:** Set `IMPLEMENTATION_STEPS` = [["{PLATFORM}"]] (one step, one platform).
+
+**For multi-platform PRDs (sequential steps):**
+- First step: Full implementation from scratch
+- Subsequent steps: Benefit from lessons learned via `PREVIOUS_PLATFORM_NOTES`
+
+---
+
+#### Step 5a: Dev Planning (prdx:dev-planner)
+
+**Display progress:**
+```
+Phase 1/3: Dev Planning — Creating implementation plan...
+```
+
+Invoke the dev-planner agent using the Task tool:
+
+```
+subagent_type: "prdx:dev-planner"
+
+prompt: "Create a detailed implementation plan for this PRD.
+
+PRD File: {PRD_FILE}
+Platform: {CURRENT_PLATFORM}  (e.g., 'android' or 'ios')
+
+{PRD_CONTENT}
+
+{PREVIOUS_PLATFORM_NOTES}  (if this is the second platform)
+
+Read the skills files and explore the codebase to create a comprehensive dev plan.
+Use phased task groups (### Implementation Phases) with <!-- parallel: true --> or <!-- sequential --> annotations.
+Return only the dev plan document."
+```
+
+**For subsequent platforms in a multi-platform PRD:**
+Include `PREVIOUS_PLATFORM_NOTES` with:
+- Summary of previously completed platform(s) implementation
+- Key patterns established
+- Any issues encountered and solutions
+- Recommendations for this platform
+
+Wait for the agent to return the dev plan. Store it for the next phase.
+
+**If dev-planner fails or returns an error:**
+
+Use AskUserQuestion to offer recovery options:
+- Option 1: "Retry dev planning" — Re-invoke the dev-planner agent
+- Option 2: "Skip to manual implementation" — Proceed to platform agent without a dev plan (agent will explore codebase itself)
+- Option 3: "Stop implementation" — Halt and let user investigate
+
+Route based on choice:
+- Retry → Re-run Step 5a
+- Skip → Proceed to Step 5b with a note that no dev plan is available (platform agent should explore codebase independently)
+- Stop → End workflow, show how to resume with `/prdx:implement {slug}`
+
+#### Step 5b: Parse Dev Plan into Phases
 
 Parse the dev plan from Step 5a into individual phases for phase-by-phase execution.
 
@@ -431,7 +459,7 @@ Store the result as `PHASES` array and `PHASE_CONTENTS` map (phase number → fu
 Parsed dev plan: {N} phases ({list of "Phase N: Name (mode)" entries})
 ```
 
-#### Step 5d: Phased Execution Loop
+#### Step 5c: Phased Execution Loop
 
 Determine agent based on current platform:
 - backend → `prdx:backend-developer`
@@ -486,7 +514,7 @@ prompt: "Implement Phase {PHASE_NUM}/{TOTAL_PHASES}: {PHASE_NAME}
 
 You MUST follow the commit configuration below. This is from the project's prdx.json and OVERRIDES any defaults.
 
-{COMMIT_INSTRUCTIONS from Step 5b}
+{COMMIT_INSTRUCTIONS from Step 1b}
 
 **Implementation Instructions:**
 
@@ -541,9 +569,9 @@ Route based on choice:
 - Continue manually → Display what was accomplished so far, end workflow
 - Stop → End workflow, show how to resume with `/prdx:implement {slug}`
 
-**After all phases complete, continue to Step 5e.**
+**After all phases complete, continue to Step 5d.**
 
-#### Step 5e: Platform Completion
+#### Step 5d: Platform Completion
 
 After each platform completes:
 
@@ -574,11 +602,11 @@ After each platform completes:
    - **Loop back to Step 5a** for the next platform (following Implementation Order)
 
 4. **When all platforms are done:**
-   - Continue to Step 5f (Code Review)
+   - Continue to Step 5e (Code Review)
 
 ---
 
-#### Step 5f: Code Review (prdx:code-reviewer)
+#### Step 5e: Code Review (prdx:code-reviewer)
 
 **Display progress:**
 ```
@@ -595,11 +623,13 @@ subagent_type: "prdx:code-reviewer"
 prompt: "Review the implementation for this PRD.
 
 PRD Slug: {SLUG}
+Base Branch: {DEFAULT_BRANCH}
+Platform: {CURRENT_PLATFORM}
 
 Acceptance Criteria:
 {ACCEPTANCE_CRITERIA from PRD}
 
-Review the diff (git diff main..HEAD) against the acceptance criteria.
+Review the diff (git diff {DEFAULT_BRANCH}..HEAD) against the acceptance criteria.
 Flag bugs, security issues, quality problems, and unmet criteria.
 Only report high-confidence issues.
 
@@ -608,16 +638,35 @@ Return only the review summary."
 
 **If issues found:**
 1. Display the review summary to the conversation
-2. Feed each issue back to the platform agent for fixing:
+2. Feed each issue back to the platform agent for fixing with full context:
 
 ```
 subagent_type: "{PLATFORM_AGENT}"
 
 prompt: "Fix the following code review issues.
 
+## Review Issues
+
 {REVIEW_ISSUES}
 
-Fix each issue, run tests to verify, and commit the fixes.
+## Context
+
+**Changed files:**
+{OUTPUT of: git diff {DEFAULT_BRANCH}..HEAD --name-only}
+
+**Recent commits:**
+{OUTPUT of: git log {DEFAULT_BRANCH}..HEAD --oneline}
+
+**Acceptance Criteria (from PRD):**
+{ACCEPTANCE_CRITERIA from PRD}
+
+## Instructions
+
+1. Fix each issue listed above
+2. Run tests to verify fixes
+3. Commit the fixes using the commit format below
+
+{COMMIT_INSTRUCTIONS from Step 1b}
 
 Return only a summary of fixes applied."
 ```
@@ -641,17 +690,20 @@ Route based on choice:
 
 ---
 
-### Step 6: Update Status and Post-Implement Hook
+### Step 6: Post-Implement Hook and Status Update
 
-1. **Update status to `review`:**
-   Edit the PRD file to change `**Status:** in-progress` to `**Status:** review`
-
-2. Run the post-implement hook (optional):
+1. **Run the post-implement hook** (handles test verification and status update):
    ```bash
    if [ -f hooks/prdx/post-implement.sh ]; then
      ./hooks/prdx/post-implement.sh "{slug}"
    fi
    ```
+
+2. **Fallback status update** (only if hook doesn't exist):
+   If the hook file doesn't exist, update status directly:
+   Edit the PRD file to change `**Status:** in-progress` to `**Status:** review`
+
+   The hook is the single owner of status updates. The command only updates status as a fallback when the hook is absent.
 
 ### Step 7: Display Completion
 

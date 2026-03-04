@@ -11,8 +11,30 @@ if [ -z "$PRD_SLUG" ]; then
     exit 1
 fi
 
-# Find PRD file (prdx-* naming convention)
-PRD_FILE=$(ls ~/.claude/plans/prdx-*${PRD_SLUG}*.md 2>/dev/null | head -1)
+# Find PRD file — exact match first, then quick, then substring with ambiguity check
+PRD_FILE=""
+
+# 1. Exact match: prdx-{slug}.md
+if [ -f ~/.claude/plans/prdx-${PRD_SLUG}.md ]; then
+    PRD_FILE=~/.claude/plans/prdx-${PRD_SLUG}.md
+# 2. Exact match: prdx-quick-{slug}.md
+elif [ -f ~/.claude/plans/prdx-quick-${PRD_SLUG}.md ]; then
+    PRD_FILE=~/.claude/plans/prdx-quick-${PRD_SLUG}.md
+else
+    # 3. Substring match with ambiguity check
+    MATCHES=$(ls ~/.claude/plans/prdx-*${PRD_SLUG}*.md 2>/dev/null)
+    MATCH_COUNT=$(echo "$MATCHES" | grep -c . 2>/dev/null || echo 0)
+
+    if [ "$MATCH_COUNT" -eq 1 ]; then
+        PRD_FILE="$MATCHES"
+    elif [ "$MATCH_COUNT" -gt 1 ]; then
+        echo "Ambiguous slug '$PRD_SLUG' matches multiple PRDs:"
+        echo "$MATCHES" | xargs -I{} basename {} .md | sed 's/^prdx-//'
+        echo ""
+        echo "Please use a more specific slug."
+        exit 1
+    fi
+fi
 
 if [ -z "$PRD_FILE" ]; then
     echo "PRD not found: $PRD_SLUG"
