@@ -35,6 +35,7 @@ If workflow.json exists, use its `slug` and `quick` fields (ignore any command a
   - Route: Publish → Phase 2a, Implement → Phase 3, Stop → delete `.prdx/workflow.json` and end workflow
 - `"implementing"` → Jump to Phase 3 (implementation), using the slug from workflow.json
 - `"post-implement"` → Jump to Phase 3a (review decision), using the slug from workflow.json
+- `"reviewing"` → Jump to Step 3b (reviewing loop), using slug + pr_number from workflow.json
 - `"pushing"` → Inform user PR creation was interrupted. Offer to retry with `/prdx:push {slug}`. Delete `.prdx/workflow.json`
 
 If workflow.json does NOT exist, continue with normal logic below.
@@ -59,7 +60,7 @@ If workflow.json does NOT exist, continue with normal logic below.
   - `in-progress` → Continue implementation (Phase 3)
     - For multi-platform: Check which platforms are done (have Implementation Notes sections), resume with next platform per Implementation Order
   - `review` → Ask user: Fix issues OR Create PR? (Phase 3a)
-  - `implemented` → PR already created, inform user and show PR link from PRD
+  - `implemented` → Check PRD for `## Pull Request` section with PR metadata. If PR exists, enter reviewing loop (Step 3b) with PR number from PRD. If no PR, inform user and suggest `/prdx:push`
   - `completed` → Inform user the PRD is done
 
 **If the argument is a feature description** (not an existing PRD):
@@ -231,7 +232,7 @@ Do NOT proceed to create PR automatically. The user must test the implementation
 
 Route based on choice:
 - Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
-- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly, then proceed to Phase 5 (cleanup)
+- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly. After PR created, update workflow.json to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 - Done → Proceed to Phase 5 (cleanup) immediately — no PR
 - Test first → Delete `.prdx/workflow.json`. Tell user to test and resume with `/prdx:prdx quick-{slug}` when ready
 
@@ -243,7 +244,7 @@ Route based on choice:
 Route based on choice:
 - Test first → Delete `.prdx/workflow.json`. End workflow, tell user to test and resume with `/prdx:prdx [slug]` when ready
 - Create PR now → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
-- Create Draft PR → Run `/prdx:push [slug] --draft` directly (do NOT ask for confirmation again — user already confirmed)
+- Create Draft PR → Run `/prdx:push [slug] --draft` directly. After PR created, update workflow.json to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 
 ---
 
@@ -261,7 +262,7 @@ The implementation is complete but user hasn't confirmed it's ready for PR. Use 
 
 Route:
 - Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
-- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly, then proceed to Phase 5 (cleanup)
+- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly. After PR created, update workflow.json to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 - Done → Proceed to Phase 5 (cleanup) immediately
 - Fix issues → Same as normal mode below
 
@@ -273,7 +274,7 @@ Route:
 
 **Route based on choice:**
 - Create PR → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
-- Create Draft PR → Run `/prdx:push [slug] --draft` directly (do NOT ask for confirmation again — user already confirmed)
+- Create Draft PR → Run `/prdx:push [slug] --draft` directly. After PR created, update workflow.json to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 - Fix issues → Tell user to describe the issues. Claude will fix them in the current conversation (no need to re-run full implement). After fixes are committed, ask again.
 - View summary → Show the implementation notes from the PRD, then ask again
 
@@ -282,6 +283,83 @@ Route:
 2. Fix them directly in the conversation
 3. Commit the fixes
 4. Ask the review decision again
+
+---
+
+### Step 3b: Reviewing (Fix-Iterate Loop)
+
+**When workflow.json has phase `"reviewing"`, or PRD status is `implemented` with `## Pull Request` section:**
+
+This loop lets the user iterate on PR review comments without leaving the workflow.
+
+1. **Fetch PR context:**
+   ```bash
+   gh pr view {PR_NUMBER} --json state,isDraft,reviews,comments,title
+   ```
+
+2. **Fetch review comments (unresolved):**
+   ```bash
+   gh api repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/comments --jq '[.[] | select(.position != null)] | sort_by(.created_at) | .[] | "- \(.path):\(.position) — \(.body | split("\n") | first)"'
+   ```
+
+3. **Fetch PR-level review comments:**
+   ```bash
+   gh pr view {PR_NUMBER} --json reviews --jq '.reviews[] | select(.state != "APPROVED") | "[\(.state)] \(.body | split("\n") | first)"'
+   ```
+
+4. **Display summary:**
+   ```
+   PR #{PR_NUMBER}: {TITLE}
+   Status: {Draft/Open}
+   Reviews: {count pending/changes-requested/approved}
+   Comments: {count unresolved}
+
+   Recent comments:
+   - path/file.ts:42 — "This should validate the input..."
+   - path/other.ts:15 — "Consider using the existing helper..."
+   ```
+
+5. **Decision point via AskUserQuestion:**
+
+   **If draft PR:**
+   - Option 1: "Fix from PR comments" — Auto-fetch and fix review comments
+   - Option 2: "Fix manually" — Describe issues to fix
+   - Option 3: "Mark ready for review" — Run `gh pr ready`, end workflow
+   - Option 4: "Done" — End workflow without further action
+
+   **If non-draft (entered via PRD resume):**
+   - Option 1: "Fix from PR comments" — Auto-fetch and fix review comments
+   - Option 2: "Fix manually" — Describe issues to fix
+   - Option 3: "Done" — End workflow
+
+6. **Fix routing:**
+
+   **"Fix from PR comments":**
+   - Fetch full comment details via `gh api`
+   - Read the referenced files
+   - Fix issues directly in conversation
+   - Commit fixes (using prdx.json commit config — same as `/prdx:implement` Step 5 commit logic)
+   - Push: `git push`
+   - Loop back to step 1 of this phase (re-fetch, re-ask)
+
+   **"Fix manually":**
+   - Ask user to describe the issues
+   - Fix directly in conversation
+   - Commit fixes (using prdx.json commit config)
+   - Push: `git push`
+   - Loop back to step 1 of this phase
+
+   **"Mark ready for review":**
+   - Run `gh pr ready {PR_NUMBER}`
+   - Update PRD status to `implemented` (if not already)
+   - Delete `.prdx/workflow.json`
+   - Display: `PR #{PR_NUMBER} marked ready for review.`
+   - Quick mode: proceed to Phase 5 (cleanup)
+
+   **"Done":**
+   - Delete `.prdx/workflow.json`
+   - Display: `Resume later with /prdx:prdx {slug}`
+   - Quick mode: proceed to Phase 5 (cleanup)
 
 ---
 
@@ -308,23 +386,30 @@ EOF
 
 **After PR is created:**
 
-Delete `.prdx/workflow.json`:
-```bash
-rm -f .prdx/workflow.json
-```
+**If draft PR:**
+- Update workflow.json to `"reviewing"` phase with `pr_number`:
+  ```bash
+  cat > .prdx/workflow.json << EOF
+  {"slug": "{SLUG}", "phase": "reviewing", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}
+  EOF
+  ```
+- Proceed to Step 3b (reviewing loop)
 
-**If QUICK_MODE:** Proceed to Phase 5 (cleanup), then display completion.
+**If non-draft PR:**
+- Delete `.prdx/workflow.json`:
+  ```bash
+  rm -f .prdx/workflow.json
+  ```
+- **If QUICK_MODE:** Proceed to Phase 5 (cleanup), then display completion.
+- **If NOT QUICK_MODE:** Display completion message:
+  ```
+  Feature complete!
 
-**If NOT QUICK_MODE:** Display completion message:
+  PRD: ~/.claude/plans/[slug].md
+  PR: #[pr-number]
 
-```
-Feature complete!
-
-PRD: ~/.claude/plans/[slug].md
-PR: #[pr-number]
-
-The feature is ready for review.
-```
+  The feature is ready for review.
+  ```
 
 ---
 

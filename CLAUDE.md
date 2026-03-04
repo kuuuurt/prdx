@@ -181,6 +181,7 @@ prdx/
 /prdx:prdx "add biometric authentication"
 ↓
 Plan Mode → PRD saved → [Publish?] → Publish → [Implement?] → Implement → Review → [Ready?] → PR
+                                                                                         ↳ Draft PR → [Reviewing Loop] → Fix → Push → [Again?] → Mark Ready / Done
 ```
 
 **For multi-platform features (e.g., backend + mobile):**
@@ -210,6 +211,7 @@ The `/prdx:prdx` command is the main entry point, orchestrating the workflow wit
 /prdx:prdx --quick "fix login validation"
 ↓
 Lightweight Plan Mode → Temp PRD saved → [Implement?] → Implement → [Create PR? / Done?] → Cleanup
+                                                                                ↳ Draft PR → [Reviewing Loop] → Fix → Push → [Again?] → Cleanup
 ```
 
 Quick mode is for one-off tasks (bugfixes, PR review comments) that need the full pipeline rigor (dev-planner, code review) but don't need a permanent PRD artifact. The temporary PRD (`prdx-quick-{slug}.md`) flows through the existing pipeline unchanged, then gets cleaned up.
@@ -335,7 +337,8 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 2. Runs `/prdx:plan` for planning (uses native plan mode; `--quick` uses lightweight template)
 3. Asks: Implement now? → runs `/prdx:implement`
 4. Asks: Create PR? → runs `/prdx:push`
-5. Quick mode only: Cleans up temporary PRD after workflow completes
+5. After draft PR: enters reviewing loop (fix from PR comments → push → iterate)
+6. Quick mode only: Cleans up temporary PRD after workflow completes
 
 **Usage:**
 - `/prdx:prdx add user authentication` - Start new feature
