@@ -85,6 +85,7 @@ Rules for Platform fields:
 - **Single platform:** Use `**Platform:**` only (e.g., `**Platform:** android`). Omit `**Platforms:**` and `**Implementation Order:**`.
 - **Multiple platforms:** Use `**Platforms:**` with all platforms listed. Omit `**Platform:**`.
 - **Implementation Order:** Only present when `**Platforms:**` has 2+ entries. Numbered steps. Platforms on the same step are independent (can be done in any order). Steps execute sequentially.
+- **Parent (child PRDs only):** Add `**Parent:** {parent-slug}` below `**Platform:**` when this PRD is a child of a multi-platform parent. Omit for parent PRDs and single-platform PRDs.
 
 ### Quick Template (`--quick` Mode)
 
@@ -131,6 +132,153 @@ Used for ephemeral tasks. Saved as `prdx-quick-{slug}.md` and cleaned up after w
 5. `completed` - PR merged
 
 **To update status:** Edit the `**Status:**` line in the plan file directly.
+
+## State File Schema
+
+Per-PRD state files live at `.prdx/state/{slug}.json` (relative to the project root). They record runtime state that does not belong in the PRD document itself.
+
+**Directory creation:** Create `.prdx/state/` on first write if it does not already exist:
+```bash
+mkdir -p .prdx/state
+```
+
+**Schema:**
+
+```json
+{
+  "slug": "biometric-login",
+  "phase": "in-progress",
+  "quick": false,
+  "parent": "biometric-auth"
+}
+```
+
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `slug` | string | yes | Matches the PRD filename slug (`prdx-{slug}.md`) |
+| `phase` | string | yes | Current workflow status (mirrors `**Status:**` in PRD) |
+| `quick` | boolean | yes | `true` for quick-mode ephemeral PRDs |
+| `parent` | string | no | Slug of the parent PRD (child PRDs only) |
+
+**Status ordering for rollup** (used to derive parent status from children):
+
+```
+planning < in-progress < review < implemented < completed
+```
+
+The parent's derived status equals the minimum status across all children. For example, if one child is `review` and another is `in-progress`, the parent is `in-progress`.
+
+**Convention:**
+- State files are written/updated by `/prdx:implement` as implementation progresses.
+- Reading `.prdx/state/` lets any session check sibling or child progress without loading full PRDs.
+- State files for quick PRDs are deleted along with the ephemeral PRD after the workflow completes.
+
+## Parent-Child PRD Model
+
+Multi-platform features use a parent-child structure. The parent PRD describes the overall feature; each platform gets its own child PRD with focused scope.
+
+### Naming Convention
+
+| PRD | Filename |
+|-----|----------|
+| Parent | `prdx-{parent-slug}.md` |
+| Child | `prdx-{parent-slug}-{platform}.md` |
+
+Example: planning "biometric-auth" for backend + android produces:
+- `prdx-biometric-auth.md` (parent)
+- `prdx-biometric-auth-backend.md` (child)
+- `prdx-biometric-auth-android.md` (child)
+
+Child slugs always use a plain dash separator — the relationship is expressed in metadata, not enforced by filename alone.
+
+### Parent PRD Fields
+
+The parent PRD includes a `## Children` section listing all child slugs:
+
+```markdown
+**Platforms:** backend, android
+**Implementation Order:**
+1. backend
+2. android
+
+## Children
+
+- prdx-biometric-auth-backend.md — backend (`planning`)
+- prdx-biometric-auth-android.md — android (`planning`)
+```
+
+Parent status is **derived** from children (minimum status across all children). It is not edited directly — commands compute it by reading `.prdx/state/` files.
+
+### Child PRD Fields
+
+Each child PRD references its parent via the `**Parent:**` field:
+
+```markdown
+**Platform:** backend
+**Parent:** biometric-auth
+**Status:** in-progress
+```
+
+The `**Parent:**` field holds the parent slug (without `prdx-` prefix). It is omitted for single-platform PRDs.
+
+### Full Child PRD Template
+
+```markdown
+# [Feature Title] — [Platform]
+
+**Type:** feature | bug-fix | refactor
+**Platform:** backend | android | ios | frontend
+**Parent:** {parent-slug}
+**Status:** planning
+**Created:** [YYYY-MM-DD]
+**Branch:** feat/[parent-slug]-[platform]
+
+## Problem
+
+[Platform-specific problem statement, or reference to parent PRD]
+
+## Goal
+
+[Platform-specific goal]
+
+## Acceptance Criteria
+
+- [ ] [Platform-specific testable outcome]
+
+## Approach
+
+[Platform-specific approach]
+```
+
+### Multi-Session Workflow
+
+Large multi-platform features are implemented in separate sessions so each platform agent has focused context.
+
+**Orchestrator session** (`/prdx:implement {parent-slug}`):
+1. Reads the parent PRD and its children list
+2. Displays the implementation order from `**Implementation Order:**`
+3. Tells the user which child slugs to run in separate sessions, in what order
+4. Does NOT itself run platform agents — it delegates entirely
+
+**Child session** (`/prdx:implement {child-slug}`):
+1. Reads the child PRD (focused, single-platform context)
+2. Checks `.prdx/state/` for sibling progress (to confirm prerequisites are met)
+3. Runs the full implementation pipeline (dev-planner → platform agent → code reviewer)
+4. Writes `.prdx/state/{child-slug}.json` with current status
+5. Updates the child PRD status
+
+**Cross-session progress check:**
+Any session can read `.prdx/state/` to see where siblings stand without loading full PRD files.
+
+### Backward Compatibility
+
+Single-platform PRDs are **unaffected**:
+- No `**Parent:**` field (omitted entirely)
+- No `## Children` section
+- No `.prdx/state/` file required (created on first implement run)
+- `/prdx:implement {slug}` behaves exactly as before
+
+Backward compatibility guarantee: all existing commands continue to work with single-platform PRDs. The parent-child model is additive.
 
 ## Repository Structure
 
