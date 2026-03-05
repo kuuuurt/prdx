@@ -105,5 +105,22 @@ if ! grep -qF "**Implemented:**" "$PRD_FILE"; then
 fi
 
 echo "Updated PRD status to 'review'"
+
+# --- Write per-PRD state file ---
+mkdir -p .prdx/state
+
+# Check if this is a child PRD
+PARENT=$(grep -oP '^\*\*Parent:\*\*\s*\K.*' "$PRD_FILE" 2>/dev/null | xargs)
+
+if [ -n "$PARENT" ]; then
+  cat > .prdx/state/${PRD_SLUG}.json << EOF
+{"slug": "${PRD_SLUG}", "phase": "review", "quick": false, "parent": "${PARENT}"}
+EOF
+else
+  cat > .prdx/state/${PRD_SLUG}.json << EOF
+{"slug": "${PRD_SLUG}", "phase": "review", "quick": false}
+EOF
+fi
+
 echo "Test the implementation, then run /prdx:push to create PR"
 exit 0
