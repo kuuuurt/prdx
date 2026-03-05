@@ -100,9 +100,10 @@ Resolve slug using enhanced matching (exact → substring → word-boundary → 
 3. Found → **PRD mode** (use that PRD)
 4. Not found → Check last-used slug as fallback:
    ```bash
-   cat .prdx/last-slug 2>/dev/null
+   LAST_SLUG=$(cat .prdx/last-slug 2>/dev/null)
    ```
-   - If last slug exists and matching PRD file exists → **PRD mode** (use that PRD, confirm with user first)
+   - If last slug exists and matching PRD file (`~/.claude/plans/prdx-{LAST_SLUG}.md`) exists → **PRD mode** (use that PRD, confirm with user first)
+   - State for the last-used PRD is at `.prdx/state/{LAST_SLUG}.json` (if needed)
    - If no last slug or no matching PRD → **Standalone mode**
 
 ---
@@ -110,6 +111,35 @@ Resolve slug using enhanced matching (exact → substring → word-boundary → 
 ## PRD Mode
 
 When a matching PRD is found, use the full PRDX workflow.
+
+### Phase 1b: Check for Parent PRD
+
+Before proceeding, check if the resolved PRD is a parent PRD (multi-platform coordinator):
+
+```bash
+grep -q "^## Children" "$PRD_FILE"
+```
+
+If the PRD has a `## Children` section, it is a parent PRD. Show an error and stop:
+
+```
+Cannot push parent PRD directly.
+
+Parent PRDs coordinate multi-platform work and do not have their own implementation.
+Push each child PRD individually:
+
+  /prdx:push {child-slug-1}
+  /prdx:push {child-slug-2}
+
+Or push the shared branch directly:
+  git push -u origin {BRANCH}
+```
+
+Where `{child-slug-1}`, `{child-slug-2}`, etc. are extracted from the `## Children` section of the parent PRD, and `{BRANCH}` is the branch from the PRD's `**Branch:**` field.
+
+If the PRD does not have a `## Children` section, continue normally (including child PRDs, which work like regular single-platform PRDs for push purposes).
+
+---
 
 ### Phase 2a: Verify Status
 
