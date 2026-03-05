@@ -56,6 +56,13 @@ for section in "${REQUIRED_SECTIONS[@]}"; do
     fi
 done
 
+# Check for parent PRD (has children — cannot implement directly)
+if grep -q "^## Children" "$PRD_FILE"; then
+    echo "Cannot implement parent PRD directly. Use child PRD slugs instead."
+    echo "Run: /prdx:show $PRD_SLUG to see child PRDs"
+    exit 1
+fi
+
 # Check PRD status
 STATUS=$(grep "^\*\*Status:\*\*" "$PRD_FILE" | sed 's/\*\*Status:\*\* //')
 
