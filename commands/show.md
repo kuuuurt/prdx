@@ -351,7 +351,7 @@ Quick commands:
 7. **If the PRD has a `## Children` section (parent PRD), show a children status dashboard:**
 
    - For each child slug listed in `## Children`, read `.prdx/state/{child-slug}.json` if it
-     exists. Use the `status` field from the state file as the child's current status.
+     exists. Use the `phase` field from the state file as the child's current status.
    - If no state file exists, fall back to reading `**Status:**` from the child's PRD file.
    - Status ordering (ascending): planning < in-progress < review < implemented < completed
    - Parent status = minimum of all children statuses (i.e. the least-advanced child determines

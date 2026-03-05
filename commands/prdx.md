@@ -114,6 +114,11 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `~/.claude/plans/prdx-quick-{slug}.md`
 
+**After plan.md writes the real state file** (`.prdx/state/quick-{slug}.json`), delete the tentative file:
+```bash
+rm -f .prdx/state/quick-TENTATIVE.json
+```
+
 **Plan.md handles the post-planning decision point** (Implement/Stop) when called from a `/prdx:prdx` workflow (detected via state file).
 
 Route based on the user's choice from plan.md:
@@ -144,6 +149,11 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 **IMPORTANT: Stop here and wait.** Plan mode is an interactive process where the user reviews and iterates on the PRD. Do NOT proceed to implementation until:
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `~/.claude/plans/prdx-{slug}.md`
+
+**After plan.md writes the real state file** (`.prdx/state/{slug}.json`), delete the tentative file:
+```bash
+rm -f .prdx/state/TENTATIVE.json
+```
 
 **Plan.md handles the post-planning decision point** (Publish/Implement/Stop) when called from a `/prdx:prdx` workflow (detected via state file).
 

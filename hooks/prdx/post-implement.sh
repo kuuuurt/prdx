@@ -110,7 +110,7 @@ echo "Updated PRD status to 'review'"
 mkdir -p .prdx/state
 
 # Check if this is a child PRD
-PARENT=$(grep -oP '^\*\*Parent:\*\*\s*\K.*' "$PRD_FILE" 2>/dev/null | xargs)
+PARENT=$(grep '^\*\*Parent:\*\*' "$PRD_FILE" 2>/dev/null | sed 's/\*\*Parent:\*\* //' | xargs)
 
 if [ -n "$PARENT" ]; then
   cat > .prdx/state/${PRD_SLUG}.json << EOF

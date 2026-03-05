@@ -118,7 +118,7 @@ If it exists:
 
 If `.prdx/workflow.json` does not exist, skip this step silently.
 
-### Step 7: Display Summary
+### Step 6: Display Summary
 
 ```
 Migration Complete!
