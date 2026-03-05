@@ -80,12 +80,21 @@
    - Created date
    - Issue number (if exists)
    - PR number (if exists)
+   - Parent PRD (**Parent**: [value]) — present only in child PRDs
 
 3. **Apply filters if provided:**
    - Filter by status if `--status` provided
    - Filter by platform if `--platform` provided
 
-4. **Group by platform and display:**
+4. **Separate parent and child PRDs:**
+   - Child PRDs have a `**Parent:**` field — collect these separately
+   - Parent PRDs may have a `## Children` section — identify them
+   - Top-level PRDs are those with no `**Parent:**` field
+
+5. **Group by platform and display, with children nested under parents:**
+
+   Display parent PRDs first (within their platform group), with their child PRDs indented
+   underneath. Child PRDs do NOT appear at the top level — they are shown only under their parent.
 
 ```
 PRDs in ~/.claude/plans/ (12 found)
@@ -95,8 +104,10 @@ BACKEND (3)
   planning       Fix Context Storage Logger Tracing
               Created: 2025-11-08
 
-  in-progress Add Health Check Endpoint (#234)
+  in-progress Add Health Check Endpoint (#234)         (parent)
               Created: 2025-11-03 | Branch: feat/backend-234
+    review      add-health-check-backend    backend
+    planning    add-health-check-android    android
 
   completed   Fix IoT Client Memory Leak (#215)
               Created: 2025-10-28 | PR #223 merged
@@ -158,6 +169,10 @@ Quick actions:
    - Approach/Goal matches: medium
    - Other content: normal
 
+   For each result, extract and display `**Parent:**` if present, so users can see parent-child
+   relationships at a glance. Show it on the status line: `Status: ... | Parent: {slug}` or omit
+   if the PRD has no parent.
+
 4. **Display results with context:**
 
 ```
@@ -167,7 +182,7 @@ Found 3 PRDs matching "auth0"
 
 1. Optimize LoginViewModel (android)
    File: android-optimize-loginviewmodel.md
-   Status: planning | Created: 2025-11-05
+   Status: planning | Created: 2025-11-05 | Parent: biometric-auth
 
    [Goal]
    Simplify LoginViewModel by calling Auth0Client directly
@@ -183,7 +198,7 @@ Found 3 PRDs matching "auth0"
 
 2. Fix Auth0 Token Refresh (backend)
    File: backend-fix-auth0-token-refresh.md
-   Status: completed | Issue: #215 | PR #223 merged
+   Status: completed | Issue: #215 | PR #223 merged | (no parent)
 
    [Problem]
    The Auth0 token refresh mechanism is not properly
@@ -333,7 +348,33 @@ Quick commands:
 ╚═══════════════════════════════════════════════════════╝
 ```
 
-7. **Adapt display based on status:**
+7. **If the PRD has a `## Children` section (parent PRD), show a children status dashboard:**
+
+   - For each child slug listed in `## Children`, read `.prdx/state/{child-slug}.json` if it
+     exists. Use the `status` field from the state file as the child's current status.
+   - If no state file exists, fall back to reading `**Status:**` from the child's PRD file.
+   - Status ordering (ascending): planning < in-progress < review < implemented < completed
+   - Parent status = minimum of all children statuses (i.e. the least-advanced child determines
+     the overall progress).
+
+   Display after the main dashboard:
+
+```
+CHILDREN STATUS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+| Child                    | Platform | Status      |
+|--------------------------|----------|-------------|
+| biometric-auth-backend   | backend  | review      |
+| biometric-auth-android   | android  | in-progress |
+
+Overall: in-progress (derived from children)
+
+Session commands:
+  /prdx:implement biometric-auth-backend
+  /prdx:implement biometric-auth-android
+```
+
+8. **Adapt display based on status:**
    - **planning**: Show planning info, suggest publish or start
    - **in-progress**: Show detailed tasks, git status, next steps
    - **review**: Emphasize testing status, user confirms before PR
