@@ -272,6 +272,70 @@ This prefix is how all PRDX commands discover plans. Without it, the plan is inv
 - Quick mode full path: `~/.claude/plans/prdx-quick-{slug}.md`
 - Normal mode full path: `~/.claude/plans/prdx-{slug}.md`
 
+### Step 4.5: Auto-Generate Child PRDs (Multi-Platform Only)
+
+**Only run this step if ALL of the following are true:**
+- `QUICK_MODE` is `false`
+- The approved PRD has `**Platforms:**` with 2 or more platforms
+
+**If not applicable, skip to Step 5.**
+
+For each platform listed in `**Platforms:**`, create a child PRD at `~/.claude/plans/prdx-{parent-slug}-{platform}.md`.
+
+**Child PRD template:**
+
+```markdown
+# [Parent Title] — [Platform Name]
+
+**Type:** {same as parent}
+**Platform:** {platform}
+**Parent:** {parent-slug}
+**Status:** planning
+**Created:** {same date as parent}
+**Branch:** {same branch as parent}
+
+## Problem
+
+[Scoped from parent — platform-specific aspects only]
+
+## Goal
+
+[Scoped from parent — platform-specific goal]
+
+## Acceptance Criteria
+
+[Only ACs relevant to this platform, extracted from parent's ACs]
+
+## Approach
+
+[Platform-specific approach, derived from parent's Approach section]
+```
+
+Use your judgment to scope the parent's ACs and Approach to what is relevant for each platform. Do not include ACs that belong to other platforms.
+
+**After creating all child PRD files, append a `## Children` section to the parent PRD:**
+
+```markdown
+## Children
+
+- prdx-{parent-slug}-{platform1}.md — {platform1} (`planning`)
+- prdx-{parent-slug}-{platform2}.md — {platform2} (`planning`)
+```
+
+(Add one line per platform, in the order listed in `**Platforms:**`.)
+
+**Write state files for parent and each child:**
+
+```bash
+mkdir -p .prdx/state
+echo '{"slug": "{parent-slug}", "phase": "planning", "quick": false}' > .prdx/state/{parent-slug}.json
+```
+
+For each child platform:
+```bash
+echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, "parent": "{parent-slug}"}' > .prdx/state/{parent-slug}-{platform}.json
+```
+
 ### Step 5: Verify Plan File Naming
 
 **After ExitPlanMode**, verify the saved plan has the correct prefix:
@@ -341,15 +405,23 @@ Next steps:
 ```
 PRD created and saved
 
-PRD: ~/.claude/plans/prdx-{slug}.md
+Parent PRD: ~/.claude/plans/prdx-{slug}.md
 Platforms: {PLATFORMS_LIST}
 Implementation Order: {ORDER_SUMMARY}
 Status: planning
 Branch: {BRANCH}
 
+Child PRDs created:
+  - prdx-{slug}-{platform1}.md ({platform1})
+  - prdx-{slug}-{platform2}.md ({platform2})
+  [one line per platform]
+
 Next steps:
-- Run /prdx:implement {slug} to start implementation
-- Or run /prdx:prdx {slug} for guided workflow
+- Run /prdx:implement {slug} to see implementation instructions
+- Or implement children directly in separate sessions:
+  /prdx:implement {slug}-{platform1}
+  /prdx:implement {slug}-{platform2}
+  [one line per platform]
 ```
 
 ### Step 5.5: Save Workflow State and Decision Point
@@ -360,39 +432,53 @@ mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug
 ```
 (Use `quick-{slug}` for quick mode, e.g., `echo "quick-fix-login" > .prdx/last-slug`)
 
-**Check if this was called from a `/prdx:prdx` workflow:**
+**Write the state file for this PRD (single-platform or quick mode only):**
 
-Read `.prdx/workflow.json`:
+For single-platform PRDs and quick mode, write a state file now. For multi-platform PRDs, state files were already written in Step 4.5 — skip this write.
+
 ```bash
-cat .prdx/workflow.json 2>/dev/null
+# Single-platform or quick mode:
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "planning", "quick": {QUICK_VALUE}}
+EOF
 ```
 
-**If `.prdx/workflow.json` exists with `"phase": "planning"`** (this was called from `/prdx:prdx`):
+(Use the final `{SLUG}` — for quick mode, use `quick-{slug}`. `{QUICK_VALUE}` is `true` or `false`.)
 
-1. Update workflow.json with the final slug and phase:
+**Check if this was called from a `/prdx:prdx` workflow:**
+
+Read the parent state file:
+```bash
+cat .prdx/state/{SLUG}.json 2>/dev/null
+```
+
+**If the state file exists with `"phase": "planning"`** (this was called from `/prdx:prdx`):
+
+1. Update the state file with the post-planning phase:
    ```bash
-   cat > .prdx/workflow.json << EOF
+   mkdir -p .prdx/state
+   cat > .prdx/state/{SLUG}.json << EOF
    {"slug": "{SLUG}", "phase": "post-planning", "quick": {QUICK_VALUE}}
    EOF
    ```
-   (Use the final `{SLUG}` — for quick mode, use `quick-{slug}`. `{QUICK_VALUE}` is `true` or `false` from the existing workflow.json.)
 
 2. Show the decision point via **AskUserQuestion**:
 
-   **Normal mode** (quick field is false):
+   **Normal mode** (quick is false):
    - Option 1: "Publish to GitHub" — Create issue for team visibility
    - Option 2: "Implement now" — Start coding immediately
    - Option 3: "Stop here" — Review PRD later
 
-   **Quick mode** (quick field is true):
+   **Quick mode** (quick is true):
    - Option 1: "Implement now" (Recommended) — Start coding immediately
    - Option 2: "Stop here" — Review plan later
 
 3. **Do NOT proceed beyond this AskUserQuestion.** Display the user's choice and stop. The `/prdx:prdx` workflow (if still in context) or the user's next invocation will handle routing based on the choice.
 
-**If `.prdx/workflow.json` does NOT exist** (standalone `/prdx:plan` call):
+**If no state file exists** (standalone `/prdx:plan` call):
 
-Just display the summary above and end. No decision point needed. No workflow.json interaction.
+Just display the summary above and end. No decision point needed.
 
 ## Error Handling
 
