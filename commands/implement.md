@@ -288,6 +288,20 @@ Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
    - Status from `**Status:**` field
    - Full PRD content
 
+**Detect PRD type:**
+- If PRD contains `## Children` section → it is a **parent PRD**. Go to Step 2b (Parent PRD Handling).
+- If PRD contains `**Parent:**` field → it is a **child PRD**. Continue with normal flow (Steps 3-7) using the child PRD's single platform.
+- Otherwise → it is a **single-platform PRD**. Continue with normal flow (Steps 3-7) unchanged.
+
+**For child PRDs:** Also write/update the child's state file:
+```bash
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "in-progress", "quick": false, "parent": "{PARENT_SLUG}"}
+EOF
+```
+(Extract `{PARENT_SLUG}` from the `**Parent:**` field in the child PRD.)
+
 4. **Update status to `in-progress`:**
    Edit the PRD file to change `**Status:** planning` to `**Status:** in-progress`
 
@@ -295,6 +309,67 @@ Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
    ```bash
    mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug
    ```
+
+### Step 2b: Parent PRD Handling
+
+**This step runs only when the loaded PRD is a parent PRD (contains `## Children` section).**
+
+Parent PRDs are NOT directly implemented. They orchestrate child PRD implementations across sessions.
+
+1. **Parse children:** Read the `## Children` section to get child slugs and platforms.
+
+2. **Check child state files:** For each child, read `.prdx/state/{child-slug}.json` if it exists. If no state file exists, status is `planning`.
+
+3. **Parse Implementation Order** from the parent PRD to understand which children should be implemented first.
+
+4. **Display progress table:**
+   ```
+   Parent PRD: {PARENT_SLUG}
+   Branch: {BRANCH}
+   Implementation Order: {ORDER_SUMMARY}
+
+   | Child PRD | Platform | Status |
+   |-----------|----------|--------|
+   | {child-slug-1} | backend | in-progress |
+   | {child-slug-2} | android | planning |
+   ```
+
+5. **Check for missing child PRD files:** For each child slug listed in `## Children`, verify the PRD file exists at `~/.claude/plans/prdx-{child-slug}.md`. If any are missing:
+   ```
+   Warning: Child PRD file not found: prdx-{child-slug}.md
+   Re-run /prdx:plan to regenerate, or create manually.
+   ```
+
+6. **Display session instructions:**
+
+   Determine which children are ready to implement (status is `planning` or their prerequisites in Implementation Order are met):
+
+   ```
+   To implement this feature, run each child PRD in a separate Claude session:
+
+   Step 1 (run first):
+     /prdx:implement {child-slug-backend}
+
+   Step 2 (run after step 1 completes):
+     /prdx:implement {child-slug-android}
+     /prdx:implement {child-slug-ios}
+
+   Each session runs independently with focused context.
+   Check progress anytime: /prdx:show {parent-slug}
+   ```
+
+7. **Derive and display parent status:**
+
+   Read all child state files and compute parent status using the ordering:
+   `planning < in-progress < review < implemented < completed`
+
+   Parent status = minimum status across all children.
+
+   Display: `Overall status: {derived-status}`
+
+8. **STOP here.** Do NOT proceed to Steps 3-7. The parent PRD delegates all implementation to child sessions.
+
+---
 
 ### Step 2a: Determine Target Platform(s)
 
@@ -588,7 +663,16 @@ After each platform completes:
 {IMPLEMENTATION_SUMMARY from agent}
 ```
 
-3. **For multi-platform PRDs with remaining platforms:**
+3. **For child PRDs (has `**Parent:**` field):** Also update the child's state file after writing implementation notes:
+   ```bash
+   mkdir -p .prdx/state
+   cat > .prdx/state/{SLUG}.json << EOF
+   {"slug": "{SLUG}", "phase": "review", "quick": false, "parent": "{PARENT_SLUG}"}
+   EOF
+   ```
+   (Only include the `"parent"` key if the PRD has a `**Parent:**` field.)
+
+4. **For multi-platform PRDs with remaining platforms:**
    - Display completion for current platform:
      ```
      ✅ {CURRENT_PLATFORM} implementation complete! ({completed_count}/{total_platforms})
@@ -601,7 +685,7 @@ After each platform completes:
      - What could be improved for the next platform
    - **Loop back to Step 5a** for the next platform (following Implementation Order)
 
-4. **When all platforms are done:**
+5. **When all platforms are done:**
    - Continue to Step 5e (Code Review)
 
 ---
@@ -705,6 +789,22 @@ Route based on choice:
 
    The hook is the single owner of status updates. The command only updates status as a fallback when the hook is absent.
 
+3. **Write state file** (after hook runs or fallback status update):
+   ```bash
+   mkdir -p .prdx/state
+   # Write state file (include parent key only for child PRDs)
+   cat > .prdx/state/{SLUG}.json << EOF
+   {"slug": "{SLUG}", "phase": "review", "quick": false}
+   EOF
+   ```
+   For child PRDs (has `**Parent:**` field), include the parent key:
+   ```bash
+   mkdir -p .prdx/state
+   cat > .prdx/state/{SLUG}.json << EOF
+   {"slug": "{SLUG}", "phase": "review", "quick": false, "parent": "{PARENT_SLUG}"}
+   EOF
+   ```
+
 ### Step 7: Display Completion
 
 **For single-platform PRDs:**
@@ -720,6 +820,19 @@ Next steps:
 1. Test the implementation
 2. If bugs found: describe them and I'll fix them
 3. When ready: /prdx:push {slug}
+```
+
+**For child PRDs (has `**Parent:**` field):**
+```
+✅ Implementation Complete! ({PLATFORM})
+
+📄 PRD: {PRD_FILE}
+👆 Parent: {PARENT_SLUG}
+🌿 Branch: {BRANCH}
+📋 Status: review
+
+Check sibling progress: /prdx:show {parent-slug}
+When all children are done: /prdx:push {parent-slug}
 ```
 
 **For multi-platform PRDs:**
