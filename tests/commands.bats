@@ -64,15 +64,15 @@ load helpers/test_helper
     [ "$status" -eq 0 ]
 }
 
-@test "prdx.md contains multi-platform decision gate" {
+@test "prdx.md contains multi-platform session instructions" {
     local prdx_cmd="$REPO_ROOT/commands/prdx.md"
 
-    # Should have decision gate between steps
-    run grep "more steps remain" "$prdx_cmd"
+    # Should have multi-platform handling via separate sessions
+    run grep "multi-platform" "$prdx_cmd"
     [ "$status" -eq 0 ]
 
-    # Should have Continue/Stop/Skip options
-    run grep -E "(Continue to step|Stop here|Skip step)" "$prdx_cmd"
+    # Should instruct users to open separate sessions for child PRDs
+    run grep -E "(separate.*session|session.*instruction)" "$prdx_cmd"
     [ "$status" -eq 0 ]
 }
 
