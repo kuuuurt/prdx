@@ -17,12 +17,22 @@ Execute the following phases based on the argument provided:
 
 **First, check for active workflow state:**
 
-Read `.prdx/workflow.json` if it exists:
+Check for state files in `.prdx/state/`:
 ```bash
-cat .prdx/workflow.json 2>/dev/null
+ls .prdx/state/*.json 2>/dev/null
 ```
 
-If workflow.json exists, use its `slug` and `quick` fields (ignore any command arguments), and route based on `phase`:
+If state files exist, check the last-used slug first:
+```bash
+cat .prdx/last-slug 2>/dev/null
+```
+
+If a last-slug exists, read its state file:
+```bash
+cat .prdx/state/{last-slug}.json 2>/dev/null
+```
+
+If the state file exists, use its `slug` and `quick` fields (ignore any command arguments), and route based on `phase`:
 - `"planning"` → Fall through to normal Step 1 logic below (plan mode may still be active or needs restart)
 - `"post-planning"` → Show the post-planning decision point via AskUserQuestion:
   - **Normal mode** (quick=false):
@@ -32,13 +42,13 @@ If workflow.json exists, use its `slug` and `quick` fields (ignore any command a
   - **Quick mode** (quick=true):
     - Option 1: "Implement now" (Recommended)
     - Option 2: "Stop here" (review plan later)
-  - Route: Publish → Phase 2a, Implement → Phase 3, Stop → delete `.prdx/workflow.json` and end workflow
-- `"implementing"` → Jump to Phase 3 (implementation), using the slug from workflow.json
-- `"post-implement"` → Jump to Phase 3a (review decision), using the slug from workflow.json
-- `"reviewing"` → Jump to Step 3b (reviewing loop), using slug + pr_number from workflow.json
-- `"pushing"` → Inform user PR creation was interrupted. Offer to retry with `/prdx:push {slug}`. Delete `.prdx/workflow.json`
+  - Route: Publish → Phase 2a, Implement → Phase 3, Stop → delete `.prdx/state/{slug}.json` and end workflow
+- `"implementing"` → Jump to Phase 3 (implementation), using the slug from state file
+- `"post-implement"` → Jump to Phase 3a (review decision), using the slug from state file
+- `"reviewing"` → Jump to Step 3b (reviewing loop), using slug + pr_number from state file
+- `"pushing"` → Inform user PR creation was interrupted. Offer to retry with `/prdx:push {slug}`. Delete `.prdx/state/{slug}.json`
 
-If workflow.json does NOT exist, continue with normal logic below.
+If state file does NOT exist (or no last-slug found), continue with normal logic below.
 
 ---
 
@@ -83,12 +93,12 @@ If workflow.json does NOT exist, continue with normal logic below.
 
 **Save workflow state before planning:**
 ```bash
-mkdir -p .prdx
-cat > .prdx/workflow.json << 'EOF'
+mkdir -p .prdx/state
+cat > .prdx/state/quick-TENTATIVE.json << 'EOF'
 {"slug": "quick-TENTATIVE", "phase": "planning", "quick": true}
 EOF
 ```
-(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in workflow.json and last-slug.)
+(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in the state file and last-slug.)
 
 Run the planning command with the `--quick` flag:
 
@@ -104,22 +114,27 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `~/.claude/plans/prdx-quick-{slug}.md`
 
-**Plan.md handles the post-planning decision point** (Implement/Stop) when called from a `/prdx:prdx` workflow (detected via workflow.json).
+**After plan.md writes the real state file** (`.prdx/state/quick-{slug}.json`), delete the tentative file:
+```bash
+rm -f .prdx/state/quick-TENTATIVE.json
+```
+
+**Plan.md handles the post-planning decision point** (Implement/Stop) when called from a `/prdx:prdx` workflow (detected via state file).
 
 Route based on the user's choice from plan.md:
 - Implement → Phase 3
-- Stop → Delete `.prdx/workflow.json` and end workflow. Tell user they can resume with `/prdx:prdx quick-{slug}`
+- Stop → Delete `.prdx/state/quick-{slug}.json` and end workflow. Tell user they can resume with `/prdx:prdx quick-{slug}`
 
 **If NOT QUICK_MODE (normal mode):**
 
 **Save workflow state before planning:**
 ```bash
-mkdir -p .prdx
-cat > .prdx/workflow.json << 'EOF'
+mkdir -p .prdx/state
+cat > .prdx/state/TENTATIVE.json << 'EOF'
 {"slug": "TENTATIVE", "phase": "planning", "quick": false}
 EOF
 ```
-(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in workflow.json and last-slug.)
+(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in the state file and last-slug.)
 
 Run the planning command with the feature description:
 
@@ -135,12 +150,17 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `~/.claude/plans/prdx-{slug}.md`
 
-**Plan.md handles the post-planning decision point** (Publish/Implement/Stop) when called from a `/prdx:prdx` workflow (detected via workflow.json).
+**After plan.md writes the real state file** (`.prdx/state/{slug}.json`), delete the tentative file:
+```bash
+rm -f .prdx/state/TENTATIVE.json
+```
+
+**Plan.md handles the post-planning decision point** (Publish/Implement/Stop) when called from a `/prdx:prdx` workflow (detected via state file).
 
 Route based on the user's choice from plan.md:
 - Publish → Phase 2a (then ask about implementation)
 - Implement → Phase 3
-- Stop → Delete `.prdx/workflow.json` and end workflow. Tell user they can resume with `/prdx:prdx [slug]`
+- Stop → Delete `.prdx/state/{slug}.json` and end workflow. Tell user they can resume with `/prdx:prdx [slug]`
 
 ---
 
@@ -158,7 +178,7 @@ After issue is created, use AskUserQuestion:
 
 Route based on choice:
 - Yes → Phase 3
-- No → Delete `.prdx/workflow.json` and end workflow
+- No → Delete `.prdx/state/{slug}.json` and end workflow
 
 ---
 
@@ -166,8 +186,8 @@ Route based on choice:
 
 **Update workflow state:**
 ```bash
-# Update workflow.json phase to "implementing"
-cat > .prdx/workflow.json << EOF
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
 {"slug": "{SLUG}", "phase": "implementing", "quick": {QUICK_MODE}}
 EOF
 ```
@@ -182,57 +202,33 @@ Read the PRD and check for `**Platforms:**` field with multiple platforms.
 ```
 Wait for implementation to complete, then proceed to review decision.
 
-**For multi-platform PRDs:**
+**For multi-platform PRDs (parent PRDs):**
 
-Parse `**Implementation Order:**` from PRD into ordered steps.
-If no Implementation Order field, treat all platforms as one step (implement them all).
+This is a multi-platform PRD. Each platform should be implemented in a separate session. Display session instructions:
 
-**For each step in Implementation Order:**
+```
+This is a multi-platform PRD. To implement, open separate terminal sessions:
 
-**If the step has one platform:**
+  /prdx:implement {slug}-backend     (or whichever platforms apply)
+  /prdx:implement {slug}-android
+  /prdx:implement {slug}-ios
 
-1. **Display progress:**
-   ```
-   Starting {platform} implementation (step {step_num}/{total_steps})...
-   ```
+Follow the Implementation Order in the PRD. Platforms on the same step can run in parallel sessions.
 
-2. **Run implementation:**
-   ```
-   /prdx:implement [slug] {platform}
-   ```
+Check progress: /prdx:show {slug}
+Resume this workflow when all platforms are done: /prdx:prdx {slug}
+```
 
-3. **Wait for completion.**
-
-**If the step has multiple platforms (e.g., "android, ios"):**
-
-1. **Display progress:**
-   ```
-   Starting parallel implementation: {platform_list} (step {step_num}/{total_steps})...
-   ```
-
-2. **Launch ALL platform implementations concurrently** — use multiple Agent tool calls in a single message:
-   ```
-   /prdx:implement [slug] {platform_1}   (Agent call 1)
-   /prdx:implement [slug] {platform_2}   (Agent call 2)
-   ```
-
-3. **Wait for ALL to complete.** Collect results from each.
-
-**After each step completes (regardless of parallelism), if more steps remain, ask user:**
-Use AskUserQuestion:
-- Option 1: "Continue to step {next_step}" (Recommended) — which platforms are next
-- Option 2: "Stop here, I'll continue later"
-- Option 3: "Skip step {next_step}"
-
-Route based on choice:
-- Continue → Proceed to next step
-- Stop → Delete `.prdx/workflow.json` and end workflow, tell user to resume with `/prdx:prdx [slug]`
-- Skip → Skip that step, continue with remaining steps (or proceed to review if none left)
+**If this is a child PRD** (PRD contains `**Parent:**` field), run the normal single-platform implementation flow:
+```
+/prdx:implement [slug]
+```
+Wait for implementation to complete, then proceed to review decision.
 
 **After implementation completes, update workflow state:**
 ```bash
-# Update workflow.json phase to "post-implement"
-cat > .prdx/workflow.json << EOF
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
 {"slug": "{SLUG}", "phase": "post-implement", "quick": {QUICK_MODE}}
 EOF
 ```
@@ -249,9 +245,9 @@ Do NOT proceed to create PR automatically. The user must test the implementation
 
 Route based on choice:
 - Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
-- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly. After PR created, update workflow.json to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
+- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly. After PR created, update `.prdx/state/quick-{slug}.json` to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 - Done → Proceed to Phase 5 (cleanup) immediately — no PR
-- Test first → Delete `.prdx/workflow.json`. Tell user to test and resume with `/prdx:prdx quick-{slug}` when ready
+- Test first → Delete `.prdx/state/quick-{slug}.json`. Tell user to test and resume with `/prdx:prdx quick-{slug}` when ready
 
 **If NOT QUICK_MODE (normal mode):**
 - Option 1: "Test first" (Recommended) - Let me verify the implementation works
@@ -259,9 +255,9 @@ Route based on choice:
 - Option 3: "Create Draft PR" — Mark as draft, not human-reviewed yet
 
 Route based on choice:
-- Test first → Delete `.prdx/workflow.json`. End workflow, tell user to test and resume with `/prdx:prdx [slug]` when ready
+- Test first → Delete `.prdx/state/{slug}.json`. End workflow, tell user to test and resume with `/prdx:prdx [slug]` when ready
 - Create PR now → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
-- Create Draft PR → Run `/prdx:push [slug] --draft` directly. After PR created, update workflow.json to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
+- Create Draft PR → Run `/prdx:push [slug] --draft` directly. After PR created, update `.prdx/state/{slug}.json` to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 
 ---
 
@@ -279,7 +275,7 @@ The implementation is complete but user hasn't confirmed it's ready for PR. Use 
 
 Route:
 - Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
-- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly. After PR created, update workflow.json to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
+- Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly. After PR created, update `.prdx/state/quick-{slug}.json` to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 - Done → Proceed to Phase 5 (cleanup) immediately
 - Fix issues → Same as normal mode below
 
@@ -291,7 +287,7 @@ Route:
 
 **Route based on choice:**
 - Create PR → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
-- Create Draft PR → Run `/prdx:push [slug] --draft` directly. After PR created, update workflow.json to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
+- Create Draft PR → Run `/prdx:push [slug] --draft` directly. After PR created, update `.prdx/state/{slug}.json` to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 - Fix issues → Tell user to describe the issues. Claude will fix them in the current conversation (no need to re-run full implement). After fixes are committed, ask again.
 - View summary → Show the implementation notes from the PRD, then ask again
 
@@ -305,7 +301,7 @@ Route:
 
 ### Step 3b: Reviewing (Fix-Iterate Loop)
 
-**When workflow.json has phase `"reviewing"`, or PRD status is `implemented` with `## Pull Request` section:**
+**When state file has phase `"reviewing"`, or PRD status is `implemented` with `## Pull Request` section:**
 
 This loop lets the user iterate on PR review comments without leaving the workflow.
 
@@ -369,12 +365,12 @@ This loop lets the user iterate on PR review comments without leaving the workfl
    **"Mark ready for review":**
    - Run `gh pr ready {PR_NUMBER}`
    - Update PRD status to `implemented` (if not already)
-   - Delete `.prdx/workflow.json`
+   - Delete `.prdx/state/{SLUG}.json`
    - Display: `PR #{PR_NUMBER} marked ready for review.`
    - Quick mode: proceed to Phase 5 (cleanup)
 
    **"Done":**
-   - Delete `.prdx/workflow.json`
+   - Delete `.prdx/state/{SLUG}.json`
    - Display: `Resume later with /prdx:prdx {slug}`
    - Quick mode: proceed to Phase 5 (cleanup)
 
@@ -392,11 +388,12 @@ Use AskUserQuestion to confirm:
 Route based on choice:
 - Create PR → Run `/prdx:push [slug]`
 - Create Draft PR → Run `/prdx:push [slug] --draft`
-- Wait → Delete `.prdx/workflow.json` and end workflow
+- Wait → Delete `.prdx/state/{SLUG}.json` and end workflow
 
 **Update workflow state before PR creation:**
 ```bash
-cat > .prdx/workflow.json << EOF
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
 {"slug": "{SLUG}", "phase": "pushing", "quick": {QUICK_MODE}}
 EOF
 ```
@@ -404,18 +401,19 @@ EOF
 **After PR is created:**
 
 **If draft PR:**
-- Update workflow.json to `"reviewing"` phase with `pr_number`:
+- Update state file to `"reviewing"` phase with `pr_number`:
   ```bash
-  cat > .prdx/workflow.json << EOF
+  mkdir -p .prdx/state
+  cat > .prdx/state/{SLUG}.json << EOF
   {"slug": "{SLUG}", "phase": "reviewing", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}
   EOF
   ```
 - Proceed to Step 3b (reviewing loop)
 
 **If non-draft PR:**
-- Delete `.prdx/workflow.json`:
+- Delete state file:
   ```bash
-  rm -f .prdx/workflow.json
+  rm -f .prdx/state/{SLUG}.json
   ```
 - **If QUICK_MODE:** Proceed to Phase 5 (cleanup), then display completion.
 - **If NOT QUICK_MODE:** Display completion message:
@@ -441,7 +439,7 @@ EOF
 
 2. **Delete workflow state:**
    ```bash
-   rm -f .prdx/workflow.json
+   rm -f .prdx/state/quick-{slug}.json
    ```
 
 3. **Clear last-slug if it points to this quick task:**
@@ -500,9 +498,9 @@ EOF
 - If any phase fails, show clear error message
 - Don't auto-proceed after errors
 - Offer: retry, stop, or skip options
-- Delete `.prdx/workflow.json` on unrecoverable errors or when user chooses to abort
+- Delete `.prdx/state/{slug}.json` on unrecoverable errors or when user chooses to abort
 
-**Workflow state (`.prdx/workflow.json`):**
+**Workflow state (`.prdx/state/{slug}.json`):**
 - Written at phase transitions to enable resume after context clear
 - Read at Step 1 to detect interrupted workflows
 - Deleted at every terminal point (PR created, user stops, quick cleanup, errors)

@@ -11,6 +11,7 @@ Migrates PRDX files from the old `.prdx/prds/` location to Claude's native `~/.c
 | Old Location | New Location |
 |--------------|--------------|
 | `.prdx/prds/*.md` | `~/.claude/plans/prdx-*.md` |
+| `.prdx/workflow.json` | `.prdx/state/{slug}.json` |
 
 ## Usage
 
@@ -72,19 +73,67 @@ If user chooses to remove:
 rm -rf .prdx/prds
 ```
 
-### Step 5: Display Summary
+### Step 5: Migrate workflow.json to Per-PRD State Files
+
+Check if the legacy `.prdx/workflow.json` exists:
+
+```bash
+WORKFLOW_JSON=".prdx/workflow.json"
+```
+
+If it exists:
+
+1. Read the file and extract the `slug` field:
+   ```bash
+   SLUG=$(cat .prdx/workflow.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('slug',''))" 2>/dev/null)
+   ```
+
+2. If the slug is non-empty, create the per-PRD state file:
+   ```bash
+   mkdir -p .prdx/state
+   cp .prdx/workflow.json .prdx/state/${SLUG}.json
+   ```
+
+3. If the slug is empty or the file cannot be parsed, warn the user:
+   ```
+   Warning: .prdx/workflow.json found but could not extract a slug.
+   Please manually copy it to .prdx/state/{your-slug}.json.
+   ```
+
+4. After successful copy, ask the user whether to remove the old file using **AskUserQuestion**:
+   ```
+   Question: "workflow.json migrated to .prdx/state/{SLUG}.json. Remove .prdx/workflow.json?"
+   Header: "Cleanup legacy workflow.json"
+   Options:
+     - Label: "Yes, remove (Recommended)"
+       Description: "Delete .prdx/workflow.json to avoid confusion"
+     - Label: "No, keep as backup"
+       Description: "Keep the old file alongside the new state file"
+   ```
+
+   If the user confirms removal:
+   ```bash
+   rm .prdx/workflow.json
+   ```
+
+If `.prdx/workflow.json` does not exist, skip this step silently.
+
+### Step 6: Display Summary
 
 ```
 Migration Complete!
 
 Migrated:
   {COUNT} PRDs → ~/.claude/plans/prdx-*.md
+  {If workflow.json migrated:} .prdx/workflow.json → .prdx/state/{slug}.json
 
 {If cleanup was done:}
 Removed:
   .prdx/prds/
+  {If workflow.json removed:} .prdx/workflow.json
 
 Your PRDs are now in Claude's native plans directory.
+State files are now per-PRD in .prdx/state/.
 ```
 
 ## Error Handling
