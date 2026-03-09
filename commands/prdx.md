@@ -13,6 +13,141 @@ argument-hint: "[--quick] [feature description or PRD slug]"
 
 Execute the following phases based on the argument provided:
 
+### Step 0: Auto-Capture Lessons from Merged PRs
+
+**Before any other logic, scan for completed workflows that need lesson capture.**
+
+This runs silently at startup and does not block the user's intent.
+
+1. **Scan for pushed-phase state files:**
+   ```bash
+   # Check directory exists first, then iterate safely
+   if [ -d .prdx/state ]; then
+     for f in .prdx/state/*.json; do
+       [ -f "$f" ] || continue
+       # process each file in steps 2-8 below
+     done
+   fi
+   ```
+   If no state files exist or directory is absent, skip to Step 1.
+
+2. **For each state file found**, read it and check if `phase` is `"pushed"`:
+   ```bash
+   cat .prdx/state/{file}.json
+   ```
+   If `phase` is not `"pushed"`, skip this file.
+
+3. **Check if the PR is merged:**
+   ```bash
+   gh pr view {pr_number} --json state --jq '.state' 2>/dev/null
+   ```
+   - If the command fails or returns anything other than `"MERGED"`, skip this file (leave it for next startup).
+   - If `"MERGED"`, proceed with lesson capture below.
+
+4. **Display status line:**
+   ```
+   Capturing lessons from merged PR #{pr_number} ({slug})...
+   ```
+
+5. **Gather lesson sources:**
+
+   a. Read the PRD file to extract title, platform, and `## Implementation Notes` section(s):
+   ```bash
+   cat ~/.claude/plans/prdx-{slug}.md
+   ```
+   (For quick-mode slugs: `~/.claude/plans/prdx-{slug}.md` — the `quick-` prefix is part of the slug itself)
+
+   b. Fetch PR body:
+   ```bash
+   gh pr view {pr_number} --json body --jq '.body' 2>/dev/null
+   ```
+
+   c. Fetch PR review comments (inline code review comments):
+   ```bash
+   REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+   gh api "repos/$REPO/pulls/{pr_number}/comments" --jq '[.[] | "[\(.path):\(.line // .position)] \(.body)"] | join("\n---\n")' 2>/dev/null
+   ```
+
+   d. Fetch PR-level review bodies:
+   ```bash
+   gh pr view {pr_number} --json reviews --jq '[.reviews[] | .body | select(length > 0)] | join("\n---\n")' 2>/dev/null
+   ```
+
+6. **Extract learnings using a general-purpose agent:**
+
+   ```
+   subagent_type: "general-purpose"
+
+   prompt: "Extract implementation learnings from this completed PRD.
+
+   Platform: {PLATFORM}
+   Title: {TITLE}
+
+   Implementation Notes:
+   {IMPLEMENTATION_NOTES from PRD}
+
+   PR Description:
+   {PR_BODY}
+
+   PR Review Comments:
+   {PR_REVIEW_COMMENTS}
+
+   PR Review Bodies:
+   {PR_REVIEW_BODIES}
+
+   Extract concise learnings (3-5 bullet points total) in these categories:
+
+   **Patterns:** What patterns worked well and should be reused?
+   **Challenges & Solutions:** What problems came up and how were they solved?
+   **Deviations from Plan:** Where did the implementation diverge from the plan and why?
+   **Review Feedback:** What did reviewers flag that should be done differently next time?
+
+   Format your response as markdown bullet points, grouped by category. Only include categories that have learnings. Each bullet should be one line, starting with a dash.
+
+   Keep entries specific and actionable. Skip generic observations."
+   ```
+
+7. **Append learnings to the project's CLAUDE.md:**
+
+   Read the project's `CLAUDE.md` (in the repository root).
+
+   - If `CLAUDE.md` doesn't exist, create it with just the `## Lessons Learned` section
+   - If `CLAUDE.md` exists but has no `## Lessons Learned` section, append the section at the end of the file
+   - If the section already exists, append the new entry under it
+
+   Use Edit tool to append the entry:
+
+   ```markdown
+   ### {TITLE} ({DATE}) - {PLATFORM}
+   {EXTRACTED_LEARNINGS}
+   ```
+
+   If the `## Lessons Learned` section exceeds ~200 lines, trim the oldest entries (remove earliest `###` subsections) to stay under the limit.
+
+8. **Clean up state file and PRD (if quick mode):**
+
+   - If `quick` is `true` in the state file:
+     - Delete the temporary PRD file: `rm ~/.claude/plans/prdx-{slug}.md`
+     - Clear last-slug if it points to this slug:
+       ```bash
+       if [ "$(cat .prdx/last-slug 2>/dev/null)" = "{slug}" ]; then
+         rm .prdx/last-slug
+       fi
+       ```
+   - Delete the state file (both quick and normal mode):
+     ```bash
+     rm -f .prdx/state/{slug}.json
+     ```
+
+9. **Display confirmation:**
+   ```
+   Lessons captured for "{TITLE}" in CLAUDE.md
+   ```
+
+**Process all pushed-phase state files sequentially** (one at a time, not in parallel). After all are processed, continue to Step 1.
+
+---
+
 ### Step 1: Determine Entry Point
 
 **First, check for active workflow state:**
@@ -47,6 +182,8 @@ If the state file exists, use its `slug` and `quick` fields (ignore any command 
 - `"post-implement"` → Jump to Phase 3a (review decision), using the slug from state file
 - `"reviewing"` → Jump to Step 3b (reviewing loop), using slug + pr_number from state file
 - `"pushing"` → Inform user PR creation was interrupted. Offer to retry with `/prdx:push {slug}`. Delete `.prdx/state/{slug}.json`
+- `"pushed"` → Already handled by Step 0 startup scan (which processes all pushed files). If it reaches here (e.g., PR not yet merged and this slug is the last-slug), inform user: `PR #{pr_number} is not merged yet. Lessons will be captured automatically after merge.` Then ignore this state file (do NOT use its slug) and continue with normal Step 1 logic below, processing command arguments as if no state file was found.
+- `"completed"` → Stale state file (should have been deleted after lesson capture). Delete it (`rm -f .prdx/state/{slug}.json`) and continue with normal Step 1 logic below.
 
 If state file does NOT exist (or no last-slug found), continue with normal logic below.
 
@@ -365,9 +502,14 @@ This loop lets the user iterate on PR review comments without leaving the workfl
    **"Mark ready for review":**
    - Run `gh pr ready {PR_NUMBER}`
    - Update PRD status to `implemented` (if not already)
-   - Delete `.prdx/state/{SLUG}.json`
-   - Display: `PR #{PR_NUMBER} marked ready for review.`
-   - Quick mode: proceed to Phase 5 (cleanup)
+   - Transition state file to `"pushed"` phase (do NOT delete — enables automatic lesson capture on next startup):
+     ```bash
+     mkdir -p .prdx/state
+     cat > .prdx/state/{SLUG}.json << EOF
+     {"slug": "{SLUG}", "phase": "pushed", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}
+     EOF
+     ```
+   - Display: `PR #{PR_NUMBER} marked ready for review. Lessons will be captured automatically after merge.`
 
    **"Done":**
    - Delete `.prdx/state/{SLUG}.json`
@@ -411,11 +553,14 @@ EOF
 - Proceed to Step 3b (reviewing loop)
 
 **If non-draft PR:**
-- Delete state file:
+- Transition state file to `"pushed"` phase (do NOT delete — enables automatic lesson capture on next startup):
   ```bash
-  rm -f .prdx/state/{SLUG}.json
+  mkdir -p .prdx/state
+  cat > .prdx/state/{SLUG}.json << EOF
+  {"slug": "{SLUG}", "phase": "pushed", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}
+  EOF
   ```
-- **If QUICK_MODE:** Proceed to Phase 5 (cleanup), then display completion.
+- **If QUICK_MODE:** Display completion and inform user that lessons will be captured automatically on next `/prdx:prdx` startup after PR is merged. Do NOT run Phase 5 cleanup yet — cleanup happens after lesson capture on next startup.
 - **If NOT QUICK_MODE:** Display completion message:
   ```
   Feature complete!
@@ -424,13 +569,17 @@ EOF
   PR: #[pr-number]
 
   The feature is ready for review.
+  Lessons will be captured automatically after PR is merged.
   ```
 
 ---
 
 ### Step 5: Cleanup (Quick Mode Only)
 
-**This step only runs when QUICK_MODE is true.** It runs after the workflow completes (PR created, or user chose "Done").
+**This step only runs when QUICK_MODE is true.** It runs in two scenarios:
+
+**Scenario A: User chose "Done" (no PR created):**
+Run cleanup immediately — no lessons to capture.
 
 1. **Delete the temporary PRD file:**
    ```bash
@@ -450,21 +599,22 @@ EOF
    ```
 
 4. **Display completion message:**
-
-   If PR was created:
-   ```
-   Done! PR: #[pr-number]
-
-   Quick task cleaned up — no PRD artifact left behind.
-   ```
-
-   If user chose "Done" (no PR):
    ```
    Done! Changes committed on branch {BRANCH}.
 
    Quick task cleaned up — no PRD artifact left behind.
    Push when ready: git push -u origin {BRANCH}
    ```
+
+**Scenario B: PR was created (non-draft):**
+Do NOT run cleanup now. The state file transitions to `"pushed"` phase (Step 4). Cleanup happens automatically on next `/prdx:prdx` startup after the PR is merged and lessons are captured (see Step 0).
+
+Display:
+```
+Done! PR: #[pr-number]
+
+Lessons and cleanup will happen automatically after merge.
+```
 
 ---
 
@@ -503,4 +653,6 @@ EOF
 **Workflow state (`.prdx/state/{slug}.json`):**
 - Written at phase transitions to enable resume after context clear
 - Read at Step 1 to detect interrupted workflows
-- Deleted at every terminal point (PR created, user stops, quick cleanup, errors)
+- Deleted at most terminal points (user stops, errors)
+- Non-draft PR creation transitions to `"pushed"` phase (not deleted) to enable automatic lesson capture
+- `"pushed"` state files are processed at next `/prdx:prdx` startup: merged PRs trigger lesson capture, then state file is deleted
