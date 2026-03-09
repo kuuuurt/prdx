@@ -165,7 +165,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 **Quick:** true
 **Status:** planning
 **Created:** {TODAY's DATE}
-**Branch:** {BRANCH_NAME}
+**Branch:** {CURRENT_BRANCH}
 
 ## Problem
 
@@ -183,6 +183,8 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 [1-2 sentences — how to fix/implement this]
 ```
+
+`{CURRENT_BRANCH}` = output of `git branch --show-current`. Quick mode stays on the current branch — no new branch is created.
 
 **Filename convention for quick mode:** `prdx-quick-{slug}.md` (e.g., `prdx-quick-fix-login-validation.md`)
 
@@ -239,11 +241,13 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 - **Single platform:** Include `**Platform:**`, omit `**Platforms:**` and `**Implementation Order:**`
 - **Multiple platforms:** Include `**Platforms:**` and `**Implementation Order:**`, omit `**Platform:**`
 
-**Branch naming convention (both modes):**
+**Branch naming convention:**
 - feature → `feat/{slug}`
 - bug-fix → `fix/{slug}`
 - refactor → `refactor/{slug}`
 - spike → `chore/{slug}`
+
+**Quick mode exception:** Quick mode uses the current branch (`git branch --show-current`) instead of generating a new branch name.
 
 ### Step 3: Iterate Until Approval
 

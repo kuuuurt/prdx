@@ -99,7 +99,7 @@ Used for ephemeral tasks. Saved as `prdx-quick-{slug}.md` and cleaned up after w
 **Quick:** true
 **Status:** planning
 **Created:** [YYYY-MM-DD]
-**Branch:** fix/[slug] | feat/[slug] | refactor/[slug]
+**Branch:** [current branch via `git branch --show-current`]
 
 ## Problem
 
@@ -123,6 +123,8 @@ Used for ephemeral tasks. Saved as `prdx-quick-{slug}.md` and cleaned up after w
 - `bug-fix` type → `fix/{slug}`
 - `refactor` type → `refactor/{slug}`
 - `spike` type → `chore/{slug}`
+
+**Quick mode exception:** Quick PRDs use the current branch (`git branch --show-current`) instead of creating a new one.
 
 **Status workflow:**
 1. `planning` - Initial state, plan being created
@@ -171,6 +173,8 @@ The parent's derived status equals the minimum status across all children. For e
 
 **Runtime-only phase** (not part of PRD document status, used only in state files):
 - `"pushed"` — Non-draft PR created, awaiting merge. State file includes `pr_number`. At next `/prdx:prdx` startup, merged PRs trigger automatic lesson capture, then the state file is deleted.
+
+**TENTATIVE state files:** During planning (before the final slug is known), `/prdx:prdx` creates a tentative state file with a random suffix to avoid collisions between concurrent sessions: `TENTATIVE-${RANDOM}${RANDOM}.json` (normal) or `quick-TENTATIVE-${RANDOM}${RANDOM}.json` (quick). These are deleted once `plan.md` writes the real state file.
 
 **Convention:**
 - State files are written/updated by `/prdx:implement` as implementation progresses.

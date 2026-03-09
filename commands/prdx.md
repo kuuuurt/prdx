@@ -228,14 +228,15 @@ If state file does NOT exist (or no last-slug found), continue with normal logic
 
 **If QUICK_MODE:**
 
-**Save workflow state before planning:**
+**Save workflow state before planning (with unique tentative ID):**
 ```bash
 mkdir -p .prdx/state
-cat > .prdx/state/quick-TENTATIVE.json << 'EOF'
-{"slug": "quick-TENTATIVE", "phase": "planning", "quick": true}
+TENTATIVE_ID="quick-TENTATIVE-${RANDOM}${RANDOM}"
+cat > .prdx/state/${TENTATIVE_ID}.json << EOF
+{"slug": "${TENTATIVE_ID}", "phase": "planning", "quick": true}
 EOF
 ```
-(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in the state file and last-slug.)
+(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in the state file and last-slug. The random suffix prevents collisions between concurrent sessions.)
 
 Run the planning command with the `--quick` flag:
 
@@ -253,7 +254,7 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 
 **After plan.md writes the real state file** (`.prdx/state/quick-{slug}.json`), delete the tentative file:
 ```bash
-rm -f .prdx/state/quick-TENTATIVE.json
+rm -f .prdx/state/${TENTATIVE_ID}.json
 ```
 
 **Plan.md handles the post-planning decision point** (Implement/Stop) when called from a `/prdx:prdx` workflow (detected via state file).
@@ -264,14 +265,15 @@ Route based on the user's choice from plan.md:
 
 **If NOT QUICK_MODE (normal mode):**
 
-**Save workflow state before planning:**
+**Save workflow state before planning (with unique tentative ID):**
 ```bash
 mkdir -p .prdx/state
-cat > .prdx/state/TENTATIVE.json << 'EOF'
-{"slug": "TENTATIVE", "phase": "planning", "quick": false}
+TENTATIVE_ID="TENTATIVE-${RANDOM}${RANDOM}"
+cat > .prdx/state/${TENTATIVE_ID}.json << EOF
+{"slug": "${TENTATIVE_ID}", "phase": "planning", "quick": false}
 EOF
 ```
-(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in the state file and last-slug.)
+(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in the state file and last-slug. The random suffix prevents collisions between concurrent sessions.)
 
 Run the planning command with the feature description:
 
@@ -289,7 +291,7 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 
 **After plan.md writes the real state file** (`.prdx/state/{slug}.json`), delete the tentative file:
 ```bash
-rm -f .prdx/state/TENTATIVE.json
+rm -f .prdx/state/${TENTATIVE_ID}.json
 ```
 
 **Plan.md handles the post-planning decision point** (Publish/Implement/Stop) when called from a `/prdx:prdx` workflow (detected via state file).
