@@ -17,6 +17,13 @@ The plan phase is about **recon, planning, and feasibility**:
 
 Detailed implementation planning is done in `/prdx:implement` using the dev-planner agent.
 
+**⛔ SCOPE BOUNDARY: This command ONLY creates a PRD document. It does NOT implement anything.**
+- Do NOT write application code (no Edit/Write on source files)
+- Do NOT create branches, run tests, or make commits
+- Do NOT call `/prdx:implement` or platform agents
+- The ONLY files you create/edit are PRD files in `~/.claude/plans/` and state files in `.prdx/`
+- When the user approves the plan, you call ExitPlanMode → verify file → show decision point → STOP
+
 ## Usage
 
 ```bash
@@ -143,6 +150,8 @@ Numbered steps. Platforms on the same step separated by commas. Steps execute se
 ### Step 2: Enter Plan Mode
 
 Use **EnterPlanMode** tool to begin planning. (`QUICK_MODE` was already parsed in Step 0.)
+
+**⛔ REMINDER: You are entering plan mode to WRITE A DOCUMENT, not to implement a feature.** Your output in plan mode is a PRD (markdown document). You are NOT writing application code. When the user approves the document, you exit plan mode — you do NOT start coding.
 
 Once in plan mode, explore the codebase using **ONLY the PRDX exploration agents** (see mandatory section above):
 
@@ -285,13 +294,34 @@ Present the PRD draft and iterate based on user feedback:
 - Add/remove scope items
 - Adjust approach based on discussion
 
-When user approves (says "looks good", "approve", "let's do it", etc.), finalize the plan.
+When user approves (says "looks good", "approve", "let's do it", etc.), the plan **document** is finalized.
+
+**⛔ "Approval" means the PRD document is ready — NOT that you should start implementing.** When the user approves, proceed to Step 4 (ExitPlanMode). Do NOT interpret approval as permission to write application code, create branches, or start the implementation pipeline.
 
 ### Step 4: Exit Plan Mode
 
 When the user approves, call **ExitPlanMode** immediately.
 
 **IMPORTANT:** Do NOT ask "Should I exit plan mode?" or "Ready to exit?" - just call ExitPlanMode directly when the user approves the plan. The approval to exit is implicit in their approval of the plan.
+
+---
+
+**⛔ CRITICAL — POST-PLAN-MODE INSTRUCTIONS ⛔**
+
+**After calling ExitPlanMode, you MUST follow Steps 4→5→5.5 below BEFORE doing anything else.**
+
+**DO NOT skip ahead to implementation. DO NOT call `/prdx:implement`. DO NOT start coding.**
+
+The ONLY things you should do after ExitPlanMode are:
+1. Verify the plan file naming (Step 4 continued)
+2. Generate child PRDs if multi-platform (Step 4.5)
+3. Verify plan file exists (Step 5)
+4. Save state and show decision point (Step 5.5)
+5. **STOP and wait for user input**
+
+If you find yourself about to implement or write code after plan mode exits — STOP. You are in the wrong phase.
+
+---
 
 **CRITICAL — Plan File Naming:**
 
@@ -482,12 +512,20 @@ EOF
 
 **Check if this was called from a `/prdx:prdx` workflow:**
 
-Read the parent state file:
+Read the state file you just wrote:
 ```bash
 cat .prdx/state/{SLUG}.json 2>/dev/null
 ```
 
 **If the state file exists with `"phase": "planning"`** (this was called from `/prdx:prdx`):
+
+---
+
+**⛔ MANDATORY DECISION POINT — DO NOT SKIP ⛔**
+
+**You are NOT allowed to proceed to implementation. You MUST ask the user what to do next.**
+
+---
 
 1. Update the state file with the post-planning phase:
    ```bash
@@ -508,7 +546,7 @@ cat .prdx/state/{SLUG}.json 2>/dev/null
    - Option 1: "Implement now" (Recommended) — Start coding immediately
    - Option 2: "Stop here" — Review plan later
 
-3. **Do NOT proceed beyond this AskUserQuestion.** Display the user's choice and stop. The `/prdx:prdx` workflow (if still in context) or the user's next invocation will handle routing based on the choice.
+3. **⛔ FULL STOP.** Do NOT proceed beyond this AskUserQuestion. Do NOT call `/prdx:implement`. Do NOT start coding. Do NOT explore the codebase for implementation. Just display the user's choice and STOP. The `/prdx:prdx` workflow (if still in context) or the user's next invocation will handle routing.
 
 **If no state file exists** (standalone `/prdx:plan` call):
 

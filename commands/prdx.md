@@ -225,6 +225,8 @@ If state file does NOT exist (or no last-slug found), continue with normal logic
 
 ### Step 2: Planning
 
+**⛔ SCOPE: This step ONLY creates a PRD document. No application code, no branches, no implementation.** `/prdx:plan` enters plan mode to write a document. When the user approves the document, plan mode exits and a decision point is shown. Implementation happens in Step 3 — ONLY if the user chooses "Implement now".
+
 **If QUICK_MODE:**
 
 **Save workflow state before planning (with unique tentative ID):**
@@ -256,11 +258,13 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 rm -f .prdx/state/${TENTATIVE_ID}.json
 ```
 
-**Plan.md handles the post-planning decision point** (Implement/Stop) when called from a `/prdx:prdx` workflow (detected via state file).
+**⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 
 Route based on the user's choice from plan.md:
 - Implement → Phase 3
 - Stop → Delete `.prdx/state/quick-{slug}.json` and end workflow. Tell user they can resume with `/prdx:prdx quick-{slug}`
+
+**⛔ SAFETY CHECK:** If you find yourself about to call `/prdx:implement` or start writing code without the user explicitly choosing "Implement now" from the decision point above — STOP. You have skipped a mandatory decision point. Go back and ask the user.
 
 **If NOT QUICK_MODE (normal mode):**
 
@@ -293,12 +297,14 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 rm -f .prdx/state/${TENTATIVE_ID}.json
 ```
 
-**Plan.md handles the post-planning decision point** (Publish/Implement/Stop) when called from a `/prdx:prdx` workflow (detected via state file).
+**⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 
 Route based on the user's choice from plan.md:
 - Publish → Phase 2a (then ask about implementation)
 - Implement → Phase 3
 - Stop → Delete `.prdx/state/{slug}.json` and end workflow. Tell user they can resume with `/prdx:prdx [slug]`
+
+**⛔ SAFETY CHECK:** If you find yourself about to call `/prdx:implement` or start writing code without the user explicitly choosing "Implement now" from the decision point above — STOP. You have skipped a mandatory decision point. Go back and ask the user.
 
 ---
 
@@ -608,6 +614,7 @@ Lessons and cleanup will happen automatically after merge.
 ## Important Guidelines
 
 **CRITICAL: Never skip user decision points. ALWAYS use AskUserQuestion.**
+- **⛔ #1 FAILURE MODE: After plan mode exits, Claude starts implementing without asking.** This is WRONG. After ExitPlanMode, you MUST show the post-planning decision point (Publish/Implement/Stop) and WAIT for the user's choice. The plan.md Step 5.5 handles this — follow it.
 - After planning completes → STOP, ask before implementing
 - After implementing completes → STOP, ask before creating PR (recommend testing first)
 - Each phase transition requires explicit user consent via AskUserQuestion

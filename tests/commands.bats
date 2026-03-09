@@ -67,8 +67,8 @@ load helpers/test_helper
 @test "prdx.md contains multi-platform session instructions" {
     local prdx_cmd="$REPO_ROOT/commands/prdx.md"
 
-    # Should have multi-platform handling via separate sessions
-    run grep "multi-platform" "$prdx_cmd"
+    # Should have parent PRD handling via separate sessions
+    run grep -E "(parent PRD|Parent PRD)" "$prdx_cmd"
     [ "$status" -eq 0 ]
 
     # Should instruct users to open separate sessions for child PRDs
