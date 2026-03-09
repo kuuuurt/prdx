@@ -37,12 +37,10 @@ Both agents run in **isolated contexts** to minimize main conversation context u
 ## Usage
 
 ```bash
-/prdx:implement backend-auth
-/prdx:implement android-biometric-login
-/prdx:implement ios-profile-screen
-/prdx:implement fullstack-auth                  # Follows Implementation Order from PRD
-/prdx:implement fullstack-auth backend          # Implement backend only
-/prdx:implement fullstack-auth android          # Implement Android only
+/prdx:implement backend-auth                    # Single-platform PRD
+/prdx:implement biometric-auth                  # Parent PRD → shows child instructions
+/prdx:implement biometric-auth-backend          # Child PRD → runs implementation
+/prdx:implement biometric-auth-android          # Child PRD → checks prerequisites, runs implementation
 ```
 
 ## How It Works
@@ -70,11 +68,11 @@ This command orchestrates three agents in **isolated contexts**:
 - If issues found: platform agent fixes, then re-review (max 2 cycles)
 - Returns only review summary (~2KB)
 
-**For Multi-Platform PRDs:**
-- Follows `**Implementation Order:**` from PRD (e.g., backend first, then mobile platforms)
-- Runs Phase A + B for each platform sequentially
-- Learns from implementation, commits, and updates PRD
-- Each subsequent platform benefits from lessons learned
+**For Multi-Platform PRDs (parent-child model):**
+- Parent PRDs delegate to child PRDs (Step 2b) — they are never directly implemented
+- Each child PRD runs the full Phase A + B + C pipeline independently
+- Child sessions check sibling prerequisites via `.prdx/state/` files (Step 2c)
+- Children on the same Implementation Order step can run in parallel sessions (separate branches)
 
 ## Workflow
 
@@ -290,7 +288,7 @@ Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 
 **Detect PRD type:**
 - If PRD contains `## Children` section → it is a **parent PRD**. Go to Step 2b (Parent PRD Handling).
-- If PRD contains `**Parent:**` field → it is a **child PRD**. Continue with normal flow (Steps 3-7) using the child PRD's single platform.
+- If PRD contains `**Parent:**` field → it is a **child PRD**. Go to Step 2c (Prerequisite Check), then continue with normal flow (Steps 3-7) using the child PRD's single platform.
 - Otherwise → it is a **single-platform PRD**. Continue with normal flow (Steps 3-7) unchanged.
 
 **For child PRDs:** Also write/update the child's state file:
@@ -314,9 +312,9 @@ EOF
 
 **This step runs only when the loaded PRD is a parent PRD (contains `## Children` section).**
 
-Parent PRDs are NOT directly implemented. They orchestrate child PRD implementations across sessions.
+Parent PRDs are orchestration-only. They are NOT directly implemented — they delegate to child PRDs.
 
-1. **Parse children:** Read the `## Children` section to get child slugs and platforms.
+1. **Parse children:** Read the `## Children` section to get child slugs, platforms, and branches.
 
 2. **Check child state files:** For each child, read `.prdx/state/{child-slug}.json` if it exists. If no state file exists, status is `planning`.
 
@@ -325,13 +323,12 @@ Parent PRDs are NOT directly implemented. They orchestrate child PRD implementat
 4. **Display progress table:**
    ```
    Parent PRD: {PARENT_SLUG}
-   Branch: {BRANCH}
    Implementation Order: {ORDER_SUMMARY}
 
-   | Child PRD | Platform | Status |
-   |-----------|----------|--------|
-   | {child-slug-1} | backend | in-progress |
-   | {child-slug-2} | android | planning |
+   | Child PRD | Platform | Branch | Status |
+   |-----------|----------|--------|--------|
+   | {child-slug-1} | backend | feat/{parent}-backend | in-progress |
+   | {child-slug-2} | android | feat/{parent}-android | planning |
    ```
 
 5. **Check for missing child PRD files:** For each child slug listed in `## Children`, verify the PRD file exists at `~/.claude/plans/prdx-{child-slug}.md`. If any are missing:
@@ -342,21 +339,25 @@ Parent PRDs are NOT directly implemented. They orchestrate child PRD implementat
 
 6. **Display session instructions:**
 
-   Determine which children are ready to implement (status is `planning` or their prerequisites in Implementation Order are met):
+   Determine which children are ready to implement based on Implementation Order and sibling state:
+
+   For each step, check if all children in previous steps have status ≥ `review`. Mark children whose prerequisites are met as "ready".
 
    ```
    To implement this feature, run each child PRD in a separate Claude session:
 
-   Step 1 (run first):
+   Step 1 (ready):
      /prdx:implement {child-slug-backend}
 
-   Step 2 (run after step 1 completes):
+   Step 2 (waiting for step 1):
      /prdx:implement {child-slug-android}
      /prdx:implement {child-slug-ios}
 
-   Each session runs independently with focused context.
+   Children on the same step can run in parallel sessions (they have separate branches).
    Check progress anytime: /prdx:show {parent-slug}
    ```
+
+   Mark steps as "ready", "in progress", "waiting for step N", or "done" based on child state files.
 
 7. **Derive and display parent status:**
 
@@ -371,27 +372,37 @@ Parent PRDs are NOT directly implemented. They orchestrate child PRD implementat
 
 ---
 
-### Step 2a: Determine Target Platform(s)
+### Step 2c: Child PRD Prerequisite Check
 
-**Parse the command arguments:**
-- `{slug}` only → Use PRD's platform(s)
-- `{slug} {platform}` → Override to that platform only (e.g., `{slug} backend`, `{slug} android`, `{slug} ios`)
+**This step runs only when the loaded PRD is a child PRD (has `**Parent:**` field).**
 
-**For multi-platform PRDs:**
+Before starting implementation, verify that prerequisites from the Implementation Order are met.
 
-1. Check if PRD has `**Platforms:**` field with multiple platforms (e.g., "backend, android, ios")
-2. Parse the `Platforms` field into a list: `TARGET_PLATFORMS`
-3. If `**Implementation Order:**` exists, parse into `IMPLEMENTATION_STEPS` (ordered list of platform groups)
-4. If second argument provided (e.g., "backend"), filter to just that platform
-5. If no Implementation Order, treat all platforms as one step (implement in listed order)
+1. **Read the parent PRD:** Load `~/.claude/plans/prdx-{PARENT_SLUG}.md`
+   - If parent PRD file not found, warn but continue (parent may have been deleted)
 
-**Determine implementation order:**
-- Use `IMPLEMENTATION_STEPS` from PRD (e.g., step 1: ["backend"], step 2: ["android", "ios"])
-- Platforms within a step are independent but still implemented one at a time
-- Steps execute sequentially
+2. **Parse Implementation Order** from the parent PRD into ordered steps.
 
-**For single-platform PRDs:**
-- Set `TARGET_PLATFORMS` = ["{PLATFORM}"]
+3. **Determine this child's step number:** Find which step contains this child's platform.
+
+4. **If step > 1**, check prerequisites:
+   - For each child in all earlier steps, read `.prdx/state/{child-slug}.json`
+   - Check if their `phase` is at least `"review"` (meaning implementation is complete)
+
+5. **If any prerequisite is not met**, warn:
+   ```
+   ⚠️  Prerequisite not met
+
+   This child ({PLATFORM}) is in Implementation Order step {M}.
+   Step {N} child "{sibling-slug}" ({sibling-platform}) is still: {sibling-status}
+
+   Implementation Order requires step {N} to complete before step {M}.
+
+   Continue anyway? (y/n)
+   ```
+   Use AskUserQuestion. If user declines, stop. If user confirms, continue.
+
+6. **If all prerequisites are met** (or step = 1), continue to Step 3.
 
 ### Step 3: Run Pre-Implement Hook
 
@@ -427,30 +438,11 @@ If hook fails (non-zero exit), stop and show the error.
 
 **Important:** Each PRD = 1 branch = 1 PR. Do not create new branches for existing PRDs.
 
-### Step 5: Platform Implementation Loop
+### Step 5: Platform Implementation
 
-**For each step in IMPLEMENTATION_STEPS (following Implementation Order):**
+This step handles a **single platform** — the one from the PRD's `**Platform:**` field.
 
-If the current step has **one platform**: Run Steps 5a-5d sequentially for that platform.
-
-If the current step has **multiple platforms** (e.g., `2. android, ios`): These platforms are **independent** and should run in **parallel**:
-
-1. Launch dev-planner agents for ALL platforms in this step **concurrently** (multiple Agent tool calls in a single message)
-2. Once all dev-planners return, launch platform agents for ALL platforms **concurrently** (parse phases and execute per platform)
-3. Wait for ALL platform agents to complete
-4. Collect summaries from all platforms, then continue to next step
-
-**Parallel platform rules:**
-- Platforms within the same step CANNOT share `PREVIOUS_PLATFORM_NOTES` (they run concurrently)
-- Each platform gets its own dev-planner, phase execution loop, and phase summaries
-- If one platform fails, the other continues — failure is handled per-platform
-- After all parallel platforms complete, their combined summaries become `PREVIOUS_PLATFORM_NOTES` for the next step
-
-**For single-platform PRDs:** Set `IMPLEMENTATION_STEPS` = [["{PLATFORM}"]] (one step, one platform).
-
-**For multi-platform PRDs (sequential steps):**
-- First step: Full implementation from scratch
-- Subsequent steps: Benefit from lessons learned via `PREVIOUS_PLATFORM_NOTES`
+Multi-platform features are handled via parent-child PRDs: each child is a single-platform PRD that runs through this step independently in its own session.
 
 ---
 
@@ -469,23 +461,14 @@ subagent_type: "prdx:dev-planner"
 prompt: "Create a detailed implementation plan for this PRD.
 
 PRD File: {PRD_FILE}
-Platform: {CURRENT_PLATFORM}  (e.g., 'android' or 'ios')
+Platform: {PLATFORM}  (e.g., 'android' or 'ios')
 
 {PRD_CONTENT}
-
-{PREVIOUS_PLATFORM_NOTES}  (if this is the second platform)
 
 Read the skills files and explore the codebase to create a comprehensive dev plan.
 Use phased task groups (### Implementation Phases) with <!-- parallel: true --> or <!-- sequential --> annotations.
 Return only the dev plan document."
 ```
-
-**For subsequent platforms in a multi-platform PRD:**
-Include `PREVIOUS_PLATFORM_NOTES` with:
-- Summary of previously completed platform(s) implementation
-- Key patterns established
-- Any issues encountered and solutions
-- Recommendations for this platform
 
 Wait for the agent to return the dev plan. Store it for the next phase.
 
@@ -536,7 +519,7 @@ Parsed dev plan: {N} phases ({list of "Phase N: Name (mode)" entries})
 
 #### Step 5c: Phased Execution Loop
 
-Determine agent based on current platform:
+Determine agent based on platform:
 - backend → `prdx:backend-developer`
 - frontend → `prdx:frontend-developer`
 - android → `prdx:android-developer`
@@ -648,14 +631,14 @@ Route based on choice:
 
 #### Step 5d: Platform Completion
 
-After each platform completes:
+After all phases complete:
 
-1. **Store the implementation summary** for this platform
-2. **Update PRD** with platform-specific implementation notes:
+1. **Store the implementation summary**
+2. **Update PRD** with implementation notes:
 
 ```markdown
 ---
-## Implementation Notes ({CURRENT_PLATFORM})
+## Implementation Notes ({PLATFORM})
 
 **Branch:** {BRANCH}
 **Implemented:** {TODAY's DATE}
@@ -663,7 +646,7 @@ After each platform completes:
 {IMPLEMENTATION_SUMMARY from agent}
 ```
 
-3. **For child PRDs (has `**Parent:**` field):** Also update the child's state file after writing implementation notes:
+3. **For child PRDs (has `**Parent:**` field):** Also update the child's state file:
    ```bash
    mkdir -p .prdx/state
    cat > .prdx/state/{SLUG}.json << EOF
@@ -672,21 +655,7 @@ After each platform completes:
    ```
    (Only include the `"parent"` key if the PRD has a `**Parent:**` field.)
 
-4. **For multi-platform PRDs with remaining platforms:**
-   - Display completion for current platform:
-     ```
-     ✅ {CURRENT_PLATFORM} implementation complete! ({completed_count}/{total_platforms})
-
-     Moving to {NEXT_PLATFORM}...
-     ```
-   - Store learnings as `PREVIOUS_PLATFORM_NOTES`:
-     - What patterns were established in completed platform(s)
-     - What worked well
-     - What could be improved for the next platform
-   - **Loop back to Step 5a** for the next platform (following Implementation Order)
-
-5. **When all platforms are done:**
-   - Continue to Step 5e (Code Review)
+4. **Continue to Step 5e** (Code Review)
 
 ---
 
@@ -708,7 +677,7 @@ prompt: "Review the implementation for this PRD.
 
 PRD Slug: {SLUG}
 Base Branch: {DEFAULT_BRANCH}
-Platform: {CURRENT_PLATFORM}
+Platform: {PLATFORM}
 
 Acceptance Criteria:
 {ACCEPTANCE_CRITERIA from PRD}
@@ -835,25 +804,6 @@ Check sibling progress: /prdx:show {parent-slug}
 When all children are done: /prdx:push {parent-slug}
 ```
 
-**For multi-platform PRDs:**
-```
-✅ All platforms implemented!
-
-📄 PRD: {PRD_FILE}
-🌿 Branch: {BRANCH}
-📋 Status: review
-
-Platforms completed:
-  ✅ {platform_1} - {PLATFORM_1_SUMMARY}
-  ✅ {platform_2} - {PLATFORM_2_SUMMARY}
-  ✅ {platform_N} - {PLATFORM_N_SUMMARY}
-
-Next steps:
-1. Test the implementation on all platforms
-2. If bugs found: describe them and I'll fix them
-3. When ready: /prdx:push {slug}
-```
-
 ---
 
 ## Error Handling
@@ -910,6 +860,6 @@ Fix the issues and try again.
 5. **Pass commit instructions to agent** - Include in the prompt
 6. **Agents run isolated** - They don't have access to main conversation context
 7. **Return summaries only** - File contents stay in agent context
-8. **Multi-platform runs per Implementation Order** - Follows steps defined in PRD
-9. **Pass learnings between platforms** - Include previous platform notes
+8. **Multi-platform uses parent-child model** - Parent delegates to child PRDs in separate sessions
+9. **Child PRDs check prerequisites** - Read sibling state files before starting
 10. **Code review before handoff** - prdx:code-reviewer runs after implementation, fixes issues automatically (max 2 cycles)

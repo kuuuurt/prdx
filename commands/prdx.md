@@ -201,11 +201,10 @@ If state file does NOT exist (or no last-slug found), continue with normal logic
 - Read PRD and check its `**Status:**` field
 - **Detect quick mode from PRD:** If the PRD contains `**Quick:** true`, set `QUICK_MODE=true` internally
 - **Save last-used slug:** `mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug`
-- For multi-platform PRDs, also check which platforms have been implemented (look for `## Implementation Notes ({platform})` sections for each platform listed in `**Platforms:**`)
-- Resume from the appropriate phase:
+- **For parent PRDs** (has `## Children` section): Read child state files from `.prdx/state/` to determine progress. Display the child progress table (same as implement.md Step 2b). If all children are at `review` or beyond, ask if user wants to push each child. Otherwise, show which children still need work and display session instructions.
+- **For single-platform and child PRDs**, resume from the appropriate phase:
   - `planning` → Continue planning (Phase 2)
   - `in-progress` → Continue implementation (Phase 3)
-    - For multi-platform: Check which platforms are done (have Implementation Notes sections), resume with next platform per Implementation Order
   - `review` → Ask user: Fix issues OR Create PR? (Phase 3a)
   - `implemented` → Check PRD for `## Pull Request` section with PR metadata. If PR exists, enter reviewing loop (Step 3b) with PR number from PRD. If no PR, inform user and suggest `/prdx:push`
   - `completed` → Inform user the PRD is done
@@ -331,34 +330,20 @@ cat > .prdx/state/{SLUG}.json << EOF
 EOF
 ```
 
-**Check if this is a multi-platform PRD:**
+**Detect PRD type and route accordingly:**
 
-Read the PRD and check for `**Platforms:**` field with multiple platforms.
+**For parent PRDs** (has `## Children` section):
 
-**For single-platform PRDs:**
+Parent PRDs delegate implementation to child PRDs in separate sessions. Run `/prdx:implement {slug}` which will display the child progress table and session instructions (see implement.md Step 2b). Then stop — do not proceed to review decision. The user resumes with `/prdx:prdx {slug}` after children are done.
+
 ```
 /prdx:implement [slug]
 ```
-Wait for implementation to complete, then proceed to review decision.
 
-**For multi-platform PRDs (parent PRDs):**
+After displaying instructions, delete `.prdx/state/{SLUG}.json` and end workflow. The user manages child sessions independently.
 
-This is a multi-platform PRD. Each platform should be implemented in a separate session. Display session instructions:
+**For single-platform PRDs and child PRDs:**
 
-```
-This is a multi-platform PRD. To implement, open separate terminal sessions:
-
-  /prdx:implement {slug}-backend     (or whichever platforms apply)
-  /prdx:implement {slug}-android
-  /prdx:implement {slug}-ios
-
-Follow the Implementation Order in the PRD. Platforms on the same step can run in parallel sessions.
-
-Check progress: /prdx:show {slug}
-Resume this workflow when all platforms are done: /prdx:prdx {slug}
-```
-
-**If this is a child PRD** (PRD contains `**Parent:**` field), run the normal single-platform implementation flow:
 ```
 /prdx:implement [slug]
 ```

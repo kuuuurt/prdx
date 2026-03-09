@@ -190,15 +190,13 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 **If NOT QUICK_MODE — use the full PRD template:**
 
+**Single-platform template:**
+
 ```markdown
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
-**Platform:** {DETECTED_PLATFORM}   ← single platform only
-**Platforms:** {PLATFORMS_LIST}      ← multiple platforms only (omit Platform)
-**Implementation Order:**            ← only when Platforms has 2+ entries
-1. {first step platforms}
-2. {second step platforms}
+**Platform:** {DETECTED_PLATFORM}
 **Status:** planning
 **Created:** {TODAY's DATE}
 **Branch:** {BRANCH_NAME}
@@ -237,11 +235,42 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 - [Technical/business risks and constraints]
 ```
 
-**Field rules:**
-- **Single platform:** Include `**Platform:**`, omit `**Platforms:**` and `**Implementation Order:**`
-- **Multiple platforms:** Include `**Platforms:**` and `**Implementation Order:**`, omit `**Platform:**`
+**Multi-platform (parent) template** — used when 2+ platforms are selected:
 
-**Branch naming convention:**
+```markdown
+# [Title]
+
+**Type:** feature | bug-fix | refactor | spike
+**Platforms:** {PLATFORMS_LIST}
+**Implementation Order:**
+1. {first step platforms}
+2. {second step platforms}
+**Status:** planning
+**Created:** {TODAY's DATE}
+
+## Problem
+...
+## Goal
+...
+## User Stories
+...
+## Acceptance Criteria
+...
+## Scope
+...
+## Approach
+...
+## Risks & Considerations
+...
+```
+
+**Parent PRDs have NO `**Branch:**` field.** They are orchestration-only — they track children but are never directly implemented. Each child PRD gets its own branch (see Step 4.5).
+
+**Field rules:**
+- **Single platform:** Include `**Platform:**` and `**Branch:**`. Omit `**Platforms:**` and `**Implementation Order:**`.
+- **Multiple platforms (parent):** Include `**Platforms:**` and `**Implementation Order:**`. Omit `**Platform:**` and `**Branch:**`.
+
+**Branch naming convention (single-platform and child PRDs):**
 - feature → `feat/{slug}`
 - bug-fix → `fix/{slug}`
 - refactor → `refactor/{slug}`
@@ -296,7 +325,7 @@ For each platform listed in `**Platforms:**`, create a child PRD at `~/.claude/p
 **Parent:** {parent-slug}
 **Status:** planning
 **Created:** {same date as parent}
-**Branch:** {same branch as parent}
+**Branch:** {type-prefix}/{parent-slug}-{platform}
 
 ## Problem
 
@@ -315,6 +344,8 @@ For each platform listed in `**Platforms:**`, create a child PRD at `~/.claude/p
 [Platform-specific approach, derived from parent's Approach section]
 ```
 
+Each child gets its **own branch** derived from the parent slug + platform (e.g., `feat/biometric-auth-backend`, `feat/biometric-auth-android`). This allows children on the same Implementation Order step to run in parallel sessions without git conflicts.
+
 Use your judgment to scope the parent's ACs and Approach to what is relevant for each platform. Do not include ACs that belong to other platforms.
 
 **After creating all child PRD files, append a `## Children` section to the parent PRD:**
@@ -322,8 +353,8 @@ Use your judgment to scope the parent's ACs and Approach to what is relevant for
 ```markdown
 ## Children
 
-- prdx-{parent-slug}-{platform1}.md — {platform1} (`planning`)
-- prdx-{parent-slug}-{platform2}.md — {platform2} (`planning`)
+- prdx-{parent-slug}-{platform1}.md — {platform1} (`planning`) — branch: {type-prefix}/{parent-slug}-{platform1}
+- prdx-{parent-slug}-{platform2}.md — {platform2} (`planning`) — branch: {type-prefix}/{parent-slug}-{platform2}
 ```
 
 (Add one line per platform, in the order listed in `**Platforms:**`.)
@@ -413,11 +444,10 @@ Parent PRD: ~/.claude/plans/prdx-{slug}.md
 Platforms: {PLATFORMS_LIST}
 Implementation Order: {ORDER_SUMMARY}
 Status: planning
-Branch: {BRANCH}
 
 Child PRDs created:
-  - prdx-{slug}-{platform1}.md ({platform1})
-  - prdx-{slug}-{platform2}.md ({platform2})
+  - prdx-{slug}-{platform1}.md ({platform1}) — branch: {type-prefix}/{slug}-{platform1}
+  - prdx-{slug}-{platform2}.md ({platform2}) — branch: {type-prefix}/{slug}-{platform2}
   [one line per platform]
 
 Next steps:

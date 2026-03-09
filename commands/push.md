@@ -125,17 +125,14 @@ If the PRD has a `## Children` section, it is a parent PRD. Show an error and st
 ```
 Cannot push parent PRD directly.
 
-Parent PRDs coordinate multi-platform work and do not have their own implementation.
+Parent PRDs are orchestration-only and have no branch or implementation.
 Push each child PRD individually:
 
-  /prdx:push {child-slug-1}
-  /prdx:push {child-slug-2}
-
-Or push the shared branch directly:
-  git push -u origin {BRANCH}
+  /prdx:push {child-slug-1}    (branch: {child-1-branch})
+  /prdx:push {child-slug-2}    (branch: {child-2-branch})
 ```
 
-Where `{child-slug-1}`, `{child-slug-2}`, etc. are extracted from the `## Children` section of the parent PRD, and `{BRANCH}` is the branch from the PRD's `**Branch:**` field.
+Where `{child-slug-N}` and `{child-N-branch}` are extracted from the `## Children` section of the parent PRD.
 
 If the PRD does not have a `## Children` section, continue normally (including child PRDs, which work like regular single-platform PRDs for push purposes).
 

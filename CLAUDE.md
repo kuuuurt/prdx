@@ -82,9 +82,9 @@ PRDX uses Claude's default plans directory (`~/.claude/plans/`).
 ```
 
 Rules for Platform fields:
-- **Single platform:** Use `**Platform:**` only (e.g., `**Platform:** android`). Omit `**Platforms:**` and `**Implementation Order:**`.
-- **Multiple platforms:** Use `**Platforms:**` with all platforms listed. Omit `**Platform:**`.
-- **Implementation Order:** Only present when `**Platforms:**` has 2+ entries. Numbered steps. Platforms on the same step are independent (can be done in any order). Steps execute sequentially.
+- **Single platform:** Use `**Platform:**` and `**Branch:**`. Omit `**Platforms:**` and `**Implementation Order:**`.
+- **Multiple platforms (parent PRD):** Use `**Platforms:**` and `**Implementation Order:**`. Omit `**Platform:**` and `**Branch:**` (parent is orchestration-only, each child has its own branch).
+- **Implementation Order:** Only present when `**Platforms:**` has 2+ entries. Numbered steps. Platforms on the same step are independent (can run in parallel sessions). Steps execute sequentially.
 - **Parent (child PRDs only):** Add `**Parent:** {parent-slug}` below `**Platform:**` when this PRD is a child of a multi-platform parent. Omit for parent PRDs and single-platform PRDs.
 
 ### Quick Template (`--quick` Mode)
@@ -184,25 +184,25 @@ The parent's derived status equals the minimum status across all children. For e
 
 ## Parent-Child PRD Model
 
-Multi-platform features use a parent-child structure. The parent PRD describes the overall feature; each platform gets its own child PRD with focused scope.
+Multi-platform features use a parent-child structure. The parent PRD is an **orchestration-only** document — it describes the overall feature and tracks children, but is never directly implemented. Each platform gets its own child PRD with focused scope, its own branch, and its own PR.
 
 ### Naming Convention
 
-| PRD | Filename |
-|-----|----------|
-| Parent | `prdx-{parent-slug}.md` |
-| Child | `prdx-{parent-slug}-{platform}.md` |
+| PRD | Filename | Branch |
+|-----|----------|--------|
+| Parent | `prdx-{parent-slug}.md` | _(none — orchestration only)_ |
+| Child | `prdx-{parent-slug}-{platform}.md` | `{type-prefix}/{parent-slug}-{platform}` |
 
-Example: planning "biometric-auth" for backend + android produces:
-- `prdx-biometric-auth.md` (parent)
-- `prdx-biometric-auth-backend.md` (child)
-- `prdx-biometric-auth-android.md` (child)
+Example: planning "biometric-auth" (feature) for backend + android produces:
+- `prdx-biometric-auth.md` (parent, no branch)
+- `prdx-biometric-auth-backend.md` (child, branch: `feat/biometric-auth-backend`)
+- `prdx-biometric-auth-android.md` (child, branch: `feat/biometric-auth-android`)
 
 Child slugs always use a plain dash separator — the relationship is expressed in metadata, not enforced by filename alone.
 
 ### Parent PRD Fields
 
-The parent PRD includes a `## Children` section listing all child slugs:
+The parent PRD includes a `## Children` section listing all child slugs and branches:
 
 ```markdown
 **Platforms:** backend, android
@@ -212,9 +212,11 @@ The parent PRD includes a `## Children` section listing all child slugs:
 
 ## Children
 
-- prdx-biometric-auth-backend.md — backend (`planning`)
-- prdx-biometric-auth-android.md — android (`planning`)
+- prdx-biometric-auth-backend.md — backend (`planning`) — branch: feat/biometric-auth-backend
+- prdx-biometric-auth-android.md — android (`planning`) — branch: feat/biometric-auth-android
 ```
+
+Parent PRDs have **no `**Branch:**` field** — they are orchestration-only.
 
 Parent status is **derived** from children (minimum status across all children). It is not edited directly — commands compute it by reading `.prdx/state/` files.
 
@@ -226,9 +228,12 @@ Each child PRD references its parent via the `**Parent:**` field:
 **Platform:** backend
 **Parent:** biometric-auth
 **Status:** in-progress
+**Branch:** feat/biometric-auth-backend
 ```
 
 The `**Parent:**` field holds the parent slug (without `prdx-` prefix). It is omitted for single-platform PRDs.
+
+Each child has its **own branch**, allowing children on the same Implementation Order step to run in parallel sessions without git conflicts.
 
 ### Full Child PRD Template
 
@@ -240,7 +245,7 @@ The `**Parent:**` field holds the parent slug (without `prdx-` prefix). It is om
 **Parent:** {parent-slug}
 **Status:** planning
 **Created:** [YYYY-MM-DD]
-**Branch:** feat/[parent-slug]-[platform]
+**Branch:** {type-prefix}/[parent-slug]-[platform]
 
 ## Problem
 
@@ -261,23 +266,40 @@ The `**Parent:**` field holds the parent slug (without `prdx-` prefix). It is om
 
 ### Multi-Session Workflow
 
-Large multi-platform features are implemented in separate sessions so each platform agent has focused context.
+Multi-platform features are implemented in separate sessions so each platform agent has focused context.
 
 **Orchestrator session** (`/prdx:implement {parent-slug}`):
 1. Reads the parent PRD and its children list
-2. Displays the implementation order from `**Implementation Order:**`
-3. Tells the user which child slugs to run in separate sessions, in what order
-4. Does NOT itself run platform agents — it delegates entirely
+2. Displays progress table with child statuses (from `.prdx/state/` files)
+3. Shows which children are ready based on Implementation Order prerequisites
+4. Tells the user which child slugs to run in separate sessions
+5. Does NOT itself run platform agents — it delegates entirely
 
 **Child session** (`/prdx:implement {child-slug}`):
 1. Reads the child PRD (focused, single-platform context)
-2. Checks `.prdx/state/` for sibling progress (to confirm prerequisites are met)
-3. Runs the full implementation pipeline (dev-planner → platform agent → code reviewer)
-4. Writes `.prdx/state/{child-slug}.json` with current status
-5. Updates the child PRD status
+2. Checks prerequisites: reads sibling state files to verify earlier Implementation Order steps are complete (status ≥ `review`)
+3. Warns if prerequisites aren't met (user can override)
+4. Runs the full implementation pipeline (dev-planner → platform agent → code reviewer)
+5. Writes `.prdx/state/{child-slug}.json` with current status
+6. Updates the child PRD status
 
-**Cross-session progress check:**
-Any session can read `.prdx/state/` to see where siblings stand without loading full PRD files.
+**Cross-session communication:**
+- `.prdx/state/` is the primary communication mechanism between sessions
+- Any session can read state files to check sibling progress
+- The parent PRD's `## Children` section provides the canonical list of children and their branches
+- Implementation Order in the parent PRD defines prerequisite relationships
+
+### Prerequisite Checking
+
+When a child PRD starts implementation, it checks whether its prerequisites are met:
+
+1. Read parent PRD's `**Implementation Order:**`
+2. Determine which step this child belongs to
+3. If step > 1, check all children in earlier steps via `.prdx/state/{sibling}.json`
+4. If any prerequisite sibling has status < `review`, warn the user
+5. User can override (the check is advisory, not blocking)
+
+This ensures backend APIs are ready before mobile clients start, for example.
 
 ### Backward Compatibility
 
@@ -347,20 +369,20 @@ Plan Mode → PRD saved → [Publish?] → Publish → [Implement?] → Implemen
 ↓
 Plan Mode (asks: which platforms? what order?)
 ↓
-PRD saved to ~/.claude/plans/
+Parent PRD + Child PRDs saved to ~/.claude/plans/
 ↓
 [Publish?] → Publish (optional)
 ↓
-[Implement?] → Implement backend → [Continue?] → Implement android → [Continue?] → Implement ios
+[Implement?] → Shows child session instructions → User runs each child in separate sessions
 ↓
-Review (test, fix bugs if needed)
+Each child session: /prdx:implement {child-slug} → Dev Plan → Implement → Code Review → PR
 ↓
-[Ready?] → PR
+Children on same Implementation Order step can run in parallel (separate branches)
 ```
 
 The `/prdx:prdx` command is the main entry point, orchestrating the workflow with decision points.
 
-**1 PRD = 1 Branch = 1 PR:** Each PRD gets a unique branch name at planning time. All implementation happens on that branch, and the PR is created from it.
+**1 PRD = 1 Branch = 1 PR:** Each single-platform or child PRD gets a unique branch name at planning time. All implementation happens on that branch, and the PR is created from it. Parent PRDs are orchestration-only — they have no branch and no PR. Each child PRD gets its own branch (e.g., `feat/{parent-slug}-{platform}`) and creates its own PR.
 
 ### Quick Mode (`--quick`)
 
@@ -410,12 +432,13 @@ Quick mode is for one-off tasks (bugfixes, PR review comments) that need the ful
    - Status stays unchanged (publish is metadata, not a workflow state)
 
 3. Implement Feature
-   /prdx:implement {slug}
-   /prdx:implement {slug} backend  (for multi-platform: backend only)
-   /prdx:implement {slug} android  (for multi-platform: Android only)
-   /prdx:implement {slug} ios      (for multi-platform: iOS only)
+   /prdx:implement {slug}                  (single-platform or child PRD)
+   /prdx:implement {parent-slug}           (parent PRD → shows child instructions)
+   /prdx:implement {parent-slug}-{platform} (child PRD → checks prerequisites, implements)
    ↓
    - Reads PRD from ~/.claude/plans/
+   - Parent PRDs: display child progress table + session instructions, then stop
+   - Child PRDs: check prerequisites via sibling state files
    - Updates status to in-progress
    - Checks out PRD's designated branch
    - prdx:dev-planner agent creates dev plan
@@ -532,16 +555,17 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 
 **What it does:**
 1. Loads PRD file
-2. Runs `pre-implement.sh` hook
-3. Sets up git branch
-4. Invokes `prdx:dev-planner` agent (isolated) for detailed planning
-5. Parses dev plan into phases (phase-summary JSON → header regex → single-phase fallback)
-6. Executes phases one at a time — platform agent invoked per phase with focused context
-7. Phase progress displayed: "Phase 2/4: Core Logic (sequential)..."
-8. Invokes `prdx:code-reviewer` agent (isolated) to validate implementation
-9. If issues found: platform agent fixes, re-review (max 2 cycles)
-10. Runs `post-implement.sh` hook (runs tests, updates status)
-11. Appends implementation summary to PRD
+2. Detects PRD type: parent → shows child progress + session instructions (stops); child → checks prerequisites; single-platform → continues normally
+3. Runs `pre-implement.sh` hook
+4. Sets up git branch
+5. Invokes `prdx:dev-planner` agent (isolated) for detailed planning
+6. Parses dev plan into phases (phase-summary JSON → header regex → single-phase fallback)
+7. Executes phases one at a time — platform agent invoked per phase with focused context
+8. Phase progress displayed: "Phase 2/4: Core Logic (sequential)..."
+9. Invokes `prdx:code-reviewer` agent (isolated) to validate implementation
+10. If issues found: platform agent fixes, re-review (max 2 cycles)
+11. Runs `post-implement.sh` hook (runs tests, updates status)
+12. Appends implementation summary to PRD
 
 **Phased execution:**
 - Dev plan is parsed into phases using three-layer fallback (phase-summary JSON → header regex → single phase)
@@ -795,14 +819,14 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
-**Platform:** backend | frontend | android | ios
-**Platforms:** backend, android, ios (when multiple platforms)
-**Implementation Order:**
+**Platform:** backend | frontend | android | ios       ← single-platform only
+**Platforms:** backend, android, ios                    ← multi-platform parent only (omit Platform & Branch)
+**Implementation Order:**                               ← multi-platform parent only
 1. backend
 2. android, ios
 **Status:** planning | in-progress | review | implemented | completed
 **Created:** [DATE]
-**Branch:** [BRANCH_NAME]
+**Branch:** [BRANCH_NAME]                               ← single-platform and child PRDs only
 
 ## Problem
 
@@ -942,6 +966,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 ❌ Custom plan storage (use native plan mode)
 ❌ Direct codebase exploration in main context (use prdx:code-explorer/docs-explorer agents)
 ❌ Manual multi-agent orchestration (one agent per phase)
+❌ Inline multi-platform execution in one session (use parent-child model with separate sessions)
 ❌ Separate state management (status in plan file)
 ❌ Custom task tracking (use TodoWrite)
 ❌ TDD review checkpoints (code reviewer validates after implementation)
@@ -956,6 +981,9 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 ✅ TodoWrite for task visibility
 ✅ Interactive approval in plan mode
 ✅ Thin commands that orchestrate native tools
+✅ Parent-child PRDs for multi-platform (parent orchestrates, children implement independently)
+✅ Cross-session communication via `.prdx/state/` files
+✅ Prerequisite checking for Implementation Order dependencies
 
 ## Testing
 
