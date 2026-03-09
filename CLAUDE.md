@@ -38,6 +38,7 @@ PRDX uses Claude's default plans directory (`~/.claude/plans/`).
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
+**Project:** [git remote repo name]
 **Platform:** backend | frontend | android | ios
 **Platforms:** backend, android, ios (when multiple platforms)
 **Implementation Order:**
@@ -85,6 +86,7 @@ Rules for Platform fields:
 - **Single platform:** Use `**Platform:**` and `**Branch:**`. Omit `**Platforms:**` and `**Implementation Order:**`.
 - **Multiple platforms (parent PRD):** Use `**Platforms:**` and `**Implementation Order:**`. Omit `**Platform:**` and `**Branch:**` (parent is orchestration-only, each child has its own branch).
 - **Implementation Order:** Only present when `**Platforms:**` has 2+ entries. Numbered steps. Platforms on the same step are independent (can run in parallel sessions). Steps execute sequentially.
+- **Project:** Always include `**Project:**` with the git remote repo name. Auto-detected via `gh repo view --json name --jq '.name'`, falling back to repo directory name. Used to scope PRD discovery to the current project.
 - **Parent (child PRDs only):** Add `**Parent:** {parent-slug}` below `**Platform:**` when this PRD is a child of a multi-platform parent. Omit for parent PRDs and single-platform PRDs.
 
 ### Quick Template (`--quick` Mode)
@@ -95,6 +97,7 @@ Used for ephemeral tasks. Saved as `prdx-quick-{slug}.md` and cleaned up after w
 # [Title]
 
 **Type:** bug-fix | feature | refactor
+**Project:** [git remote repo name]
 **Platform:** {DETECTED_PLATFORM}
 **Quick:** true
 **Status:** planning
@@ -225,6 +228,7 @@ Parent status is **derived** from children (minimum status across all children).
 Each child PRD references its parent via the `**Parent:**` field:
 
 ```markdown
+**Project:** my-app
 **Platform:** backend
 **Parent:** biometric-auth
 **Status:** in-progress
@@ -241,6 +245,7 @@ Each child has its **own branch**, allowing children on the same Implementation 
 # [Feature Title] — [Platform]
 
 **Type:** feature | bug-fix | refactor
+**Project:** [git remote repo name]
 **Platform:** backend | android | ios | frontend
 **Parent:** {parent-slug}
 **Status:** planning
@@ -819,6 +824,7 @@ PRDs are business-focused documents that define **what** and **why**, not **how*
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
+**Project:** [git remote repo name]                     ← auto-detected, used to scope discovery
 **Platform:** backend | frontend | android | ios       ← single-platform only
 **Platforms:** backend, android, ios                    ← multi-platform parent only (omit Platform & Branch)
 **Implementation Order:**                               ← multi-platform parent only

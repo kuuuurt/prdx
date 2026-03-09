@@ -218,7 +218,11 @@ If state file does NOT exist (or no last-slug found), continue with normal logic
   - Option 1: "Continue {last-slug}" (Recommended) — Resume the last PRD you were working on
   - Option 2: "Choose a different PRD" — List all PRDs to pick from
   - Option 3: "Start a new feature" — Create a new PRD
-- If no last slug, list existing PRDX plans using: `ls -la ~/.claude/plans/*.md 2>/dev/null`
+- If no last slug, list existing PRDX plans for the current project:
+  ```bash
+  PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+  grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null
+  ```
   - Ask: "Start a new feature or continue an existing PRD?"
 
 ---

@@ -1,5 +1,5 @@
 | description | argument-hint |
-| Smart PRD viewer: list all, search by keyword, or show detailed status | [slug or keyword] [--status STATUS] [--platform PLATFORM] |
+| Smart PRD viewer: list all, search by keyword, or show detailed status | [slug or keyword] [--status STATUS] [--platform PLATFORM] [--project PROJECT] [--all] |
 
 # Show PRDs
 
@@ -19,10 +19,14 @@
 # Show specific PRD status
 /prdx:show android-219
 
-# Filter by status or platform
+# Filter by status, platform, or project
 /prdx:show --status planning
 /prdx:show --platform backend
 /prdx:show auth --platform android
+
+# Show PRDs from a specific project or all projects
+/prdx:show --project my-app
+/prdx:show --all                    # Show PRDs across all projects
 ```
 
 ---
@@ -55,8 +59,18 @@
 2. **Parse filters:**
    - Extract `--status` value (planning, in-progress, review, implemented, completed)
    - Extract `--platform` value (backend, android, ios, web)
+   - Extract `--project` value (explicit project name)
+   - Extract `--all` flag (show PRDs across all projects)
 
-3. **Determine mode:**
+3. **Detect current project** (unless `--all` is set):
+   ```bash
+   PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+   ```
+   - If `--project` provided → use that value instead
+   - If `--all` provided → skip project filtering entirely
+   - Otherwise → filter to current project by default
+
+4. **Determine mode:**
    - No args + no filters → **LIST mode**
    - Exact slug → **STATUS mode**
    - Keyword + no exact match → **SEARCH mode**
@@ -68,23 +82,29 @@
 
 **Display formatted list of all PRDs:**
 
-1. **Find all PRD files:**
+1. **Find PRD files (scoped to project by default):**
    ```bash
+   # If --all flag: show all plans
    ls ~/.claude/plans/*.md 2>/dev/null
+   # Otherwise: filter to current project
+   grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null
    ```
+   PRDs without a `**Project:**` field are included in all listings (backward compatibility).
 
 2. **Parse metadata from each:**
    - Title (first line with #)
-   - Platform (**Project**: [value])
-   - Status (**Status**: [value])
+   - Project (**Project:** [value])
+   - Platform (**Platform:** [value])
+   - Status (**Status:** [value])
    - Created date
    - Issue number (if exists)
    - PR number (if exists)
-   - Parent PRD (**Parent**: [value]) — present only in child PRDs
+   - Parent PRD (**Parent:** [value]) — present only in child PRDs
 
 3. **Apply filters if provided:**
    - Filter by status if `--status` provided
    - Filter by platform if `--platform` provided
+   - Filter by project if `--project` provided (overrides auto-detected project)
 
 4. **Separate parent and child PRDs:**
    - Child PRDs have a `**Parent:**` field — collect these separately
@@ -150,11 +170,14 @@ Quick actions:
 
 ## MODE 2: Search PRDs
 
-**Search all PRD content by keyword:**
+**Search PRD content by keyword (scoped to project by default):**
 
 1. **Search using grep:**
    ```bash
+   # If --all flag: search all plans
    grep -i -n "<keyword>" ~/.claude/plans/*.md
+   # Otherwise: search only current project's plans
+   grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null | xargs grep -i -n "<keyword>"
    ```
    - Case-insensitive search
    - Show line numbers

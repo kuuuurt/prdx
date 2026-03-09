@@ -43,7 +43,12 @@ if [ -z "$PRD_FILE" ]; then
     echo "PRD not found: $PRD_SLUG"
     echo ""
     echo "Available PRDs:"
-    ls ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+    PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+    if [ -n "$PROJECT_NAME" ]; then
+        grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+    else
+        ls ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+    fi
     exit 1
 fi
 

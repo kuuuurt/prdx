@@ -20,8 +20,9 @@ DIR="$PWD"; while [ "$DIR" != "/" ]; do
 done
 [ "$DIR" = "/" ] && echo "Config: (defaults)"
 echo ""
-echo "=== Available PRDs ==="
-ls -1 ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+echo "=== Available PRDs (this project) ==="
+PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
 ```
 
 # /prdx:implement - Implement Feature

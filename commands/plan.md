@@ -59,12 +59,22 @@ This command enters **native plan mode** to:
 
 ## Workflow
 
-### Step 0: Parse Flags
+### Step 0: Parse Flags and Detect Project
 
 **Parse `--quick` flag FIRST (before platform detection):**
 - Strip `--quick` from arguments if present
 - If `--quick` is present: set `QUICK_MODE=true`
 - If `--quick` is NOT present: set `QUICK_MODE=false`
+
+**Detect project name from git remote:**
+```bash
+gh repo view --json name --jq '.name' 2>/dev/null
+```
+Store the result as `{PROJECT_NAME}`. If the command fails (no remote, no `gh`), fall back to the repo root directory name:
+```bash
+basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null
+```
+If both fail, omit the `**Project:**` field from the PRD.
 
 ### Step 1: Platform Detection
 
@@ -170,6 +180,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 # [Title]
 
 **Type:** bug-fix | feature | refactor
+**Project:** {PROJECT_NAME}
 **Platform:** {DETECTED_PLATFORM}
 **Quick:** true
 **Status:** planning
@@ -205,6 +216,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
+**Project:** {PROJECT_NAME}
 **Platform:** {DETECTED_PLATFORM}
 **Status:** planning
 **Created:** {TODAY's DATE}
@@ -250,6 +262,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 # [Title]
 
 **Type:** feature | bug-fix | refactor | spike
+**Project:** {PROJECT_NAME}
 **Platforms:** {PLATFORMS_LIST}
 **Implementation Order:**
 1. {first step platforms}
@@ -351,6 +364,7 @@ For each platform listed in `**Platforms:**`, create a child PRD at `~/.claude/p
 # [Parent Title] — [Platform Name]
 
 **Type:** {same as parent}
+**Project:** {PROJECT_NAME}
 **Platform:** {platform}
 **Parent:** {parent-slug}
 **Status:** planning
