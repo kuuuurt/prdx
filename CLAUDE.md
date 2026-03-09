@@ -169,9 +169,8 @@ planning < in-progress < review < implemented < completed
 
 The parent's derived status equals the minimum status across all children. For example, if one child is `review` and another is `in-progress`, the parent is `in-progress`.
 
-**Runtime-only phases** (not part of PRD document status, used only in state files):
-- `"pushed"` — Non-draft PR created, awaiting merge. State file includes `pr_number`. At next `/prdx:prdx` startup, merged PRs trigger automatic lesson capture.
-- `"completed"` — Lessons captured, state file ready for cleanup (deleted immediately after capture).
+**Runtime-only phase** (not part of PRD document status, used only in state files):
+- `"pushed"` — Non-draft PR created, awaiting merge. State file includes `pr_number`. At next `/prdx:prdx` startup, merged PRs trigger automatic lesson capture, then the state file is deleted.
 
 **Convention:**
 - State files are written/updated by `/prdx:implement` as implementation progresses.

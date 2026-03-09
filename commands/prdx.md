@@ -21,9 +21,15 @@ This runs silently at startup and does not block the user's intent.
 
 1. **Scan for pushed-phase state files:**
    ```bash
-   ls .prdx/state/*.json 2>/dev/null
+   # Check directory exists first, then iterate safely
+   if [ -d .prdx/state ]; then
+     for f in .prdx/state/*.json; do
+       [ -f "$f" ] || continue
+       # process each file in steps 2-8 below
+     done
+   fi
    ```
-   If no state files exist, skip to Step 1.
+   If no state files exist or directory is absent, skip to Step 1.
 
 2. **For each state file found**, read it and check if `phase` is `"pushed"`:
    ```bash
@@ -176,8 +182,8 @@ If the state file exists, use its `slug` and `quick` fields (ignore any command 
 - `"post-implement"` → Jump to Phase 3a (review decision), using the slug from state file
 - `"reviewing"` → Jump to Step 3b (reviewing loop), using slug + pr_number from state file
 - `"pushing"` → Inform user PR creation was interrupted. Offer to retry with `/prdx:push {slug}`. Delete `.prdx/state/{slug}.json`
-- `"pushed"` → Already handled by Step 0 startup scan. If it reaches here (e.g., PR not yet merged), inform user: `PR #{pr_number} is not merged yet. Lessons will be captured automatically after merge.` Then continue with normal Step 1 logic below.
-- `"completed"` → State file is stale (should have been deleted after lesson capture). Delete it and continue with normal Step 1 logic below.
+- `"pushed"` → Already handled by Step 0 startup scan (which processes all pushed files). If it reaches here (e.g., PR not yet merged and this slug is the last-slug), inform user: `PR #{pr_number} is not merged yet. Lessons will be captured automatically after merge.` Then ignore this state file (do NOT use its slug) and continue with normal Step 1 logic below, processing command arguments as if no state file was found.
+- `"completed"` → Stale state file (should have been deleted after lesson capture). Delete it (`rm -f .prdx/state/{slug}.json`) and continue with normal Step 1 logic below.
 
 If state file does NOT exist (or no last-slug found), continue with normal logic below.
 
@@ -496,9 +502,14 @@ This loop lets the user iterate on PR review comments without leaving the workfl
    **"Mark ready for review":**
    - Run `gh pr ready {PR_NUMBER}`
    - Update PRD status to `implemented` (if not already)
-   - Delete `.prdx/state/{SLUG}.json`
-   - Display: `PR #{PR_NUMBER} marked ready for review.`
-   - Quick mode: proceed to Phase 5 (cleanup)
+   - Transition state file to `"pushed"` phase (do NOT delete — enables automatic lesson capture on next startup):
+     ```bash
+     mkdir -p .prdx/state
+     cat > .prdx/state/{SLUG}.json << EOF
+     {"slug": "{SLUG}", "phase": "pushed", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}
+     EOF
+     ```
+   - Display: `PR #{PR_NUMBER} marked ready for review. Lessons will be captured automatically after merge.`
 
    **"Done":**
    - Delete `.prdx/state/{SLUG}.json`
