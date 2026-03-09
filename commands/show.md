@@ -70,7 +70,7 @@
 
 1. **Find all PRD files:**
    ```bash
-   ls ~/.claude/plans/prdx-*.md 2>/dev/null
+   ls ~/.claude/plans/*.md 2>/dev/null
    ```
 
 2. **Parse metadata from each:**
@@ -154,7 +154,7 @@ Quick actions:
 
 1. **Search using grep:**
    ```bash
-   grep -i -n "<keyword>" ~/.claude/plans/prdx-*.md
+   grep -i -n "<keyword>" ~/.claude/plans/*.md
    ```
    - Case-insensitive search
    - Show line numbers

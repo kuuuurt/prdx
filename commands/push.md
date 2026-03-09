@@ -83,11 +83,13 @@ This command is a **thin wrapper** that:
 
 Resolve slug using enhanced matching (exact → substring → word-boundary → disambiguation):
 ```bash
-# 1. Exact: ~/.claude/plans/prdx-{slug}.md
-# 2. Substring: ls ~/.claude/plans/prdx-*{slug}*.md
-# 3. Word-boundary: split slug into words, find PRDs containing all words
-# 4. Multiple matches → ask user to select
+# 1. Exact (prefixed): ~/.claude/plans/prdx-{slug}.md
+# 2. Exact (unprefixed fallback): ~/.claude/plans/{slug}.md
+# 3. Substring: ls ~/.claude/plans/*{slug}*.md
+# 4. Word-boundary: split slug into words, find PRDs containing all words
+# 5. Multiple matches → ask user to select
 ```
+**Auto-rename unprefixed plans:** If matched without `prdx-` prefix, rename to `prdx-{slug}.md` and inform user.
 - Found → **PRD mode**
 - Not found → Error: "PRD not found: {slug}. Did you mean to run without a PRD? Use `/prdx:push` with no arguments from your feature branch."
 
@@ -95,7 +97,7 @@ Resolve slug using enhanced matching (exact → substring → word-boundary → 
 1. Get current branch: `git branch --show-current`
 2. Search for PRD matching the branch:
    ```bash
-   grep -rl "^\*\*Branch:\*\*.*$(git branch --show-current)" ~/.claude/plans/prdx-*.md 2>/dev/null
+   grep -rl "^\*\*Branch:\*\*.*$(git branch --show-current)" ~/.claude/plans/*.md 2>/dev/null
    ```
 3. Found → **PRD mode** (use that PRD)
 4. Not found → Check last-used slug as fallback:

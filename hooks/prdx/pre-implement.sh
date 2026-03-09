@@ -11,7 +11,7 @@ if [ -z "$PRD_SLUG" ]; then
     exit 1
 fi
 
-# Find PRD file — exact match first, then quick, then substring with ambiguity check
+# Find PRD file — exact match first, then quick, then unprefixed, then substring with ambiguity check
 PRD_FILE=""
 
 # 1. Exact match: prdx-{slug}.md
@@ -20,9 +20,12 @@ if [ -f ~/.claude/plans/prdx-${PRD_SLUG}.md ]; then
 # 2. Exact match: prdx-quick-{slug}.md
 elif [ -f ~/.claude/plans/prdx-quick-${PRD_SLUG}.md ]; then
     PRD_FILE=~/.claude/plans/prdx-quick-${PRD_SLUG}.md
+# 3. Exact match (unprefixed): {slug}.md
+elif [ -f ~/.claude/plans/${PRD_SLUG}.md ]; then
+    PRD_FILE=~/.claude/plans/${PRD_SLUG}.md
 else
-    # 3. Substring match with ambiguity check
-    MATCHES=$(ls ~/.claude/plans/prdx-*${PRD_SLUG}*.md 2>/dev/null || true)
+    # 4. Substring match with ambiguity check (search all .md files)
+    MATCHES=$(ls ~/.claude/plans/*${PRD_SLUG}*.md 2>/dev/null || true)
     MATCH_COUNT=$(echo "$MATCHES" | grep -c . 2>/dev/null || echo 0)
 
     if [ "$MATCH_COUNT" -eq 1 ]; then
@@ -40,7 +43,7 @@ if [ -z "$PRD_FILE" ]; then
     echo "PRD not found: $PRD_SLUG"
     echo ""
     echo "Available PRDs:"
-    ls ~/.claude/plans/prdx-*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+    ls ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
     exit 1
 fi
 

@@ -21,7 +21,7 @@ done
 [ "$DIR" = "/" ] && echo "Config: (defaults)"
 echo ""
 echo "=== Available PRDs ==="
-ls -1 ~/.claude/plans/prdx-*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+ls -1 ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
 ```
 
 # /prdx:implement - Implement Feature
