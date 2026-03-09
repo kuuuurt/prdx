@@ -159,6 +159,7 @@ mkdir -p .prdx/state
 | `phase` | string | yes | Current workflow status (mirrors `**Status:**` in PRD) |
 | `quick` | boolean | yes | `true` for quick-mode ephemeral PRDs |
 | `parent` | string | no | Slug of the parent PRD (child PRDs only) |
+| `pr_number` | number | no | PR number (present when phase is `"pushed"` or `"reviewing"`) |
 
 **Status ordering for rollup** (used to derive parent status from children):
 
@@ -168,10 +169,15 @@ planning < in-progress < review < implemented < completed
 
 The parent's derived status equals the minimum status across all children. For example, if one child is `review` and another is `in-progress`, the parent is `in-progress`.
 
+**Runtime-only phases** (not part of PRD document status, used only in state files):
+- `"pushed"` — Non-draft PR created, awaiting merge. State file includes `pr_number`. At next `/prdx:prdx` startup, merged PRs trigger automatic lesson capture.
+- `"completed"` — Lessons captured, state file ready for cleanup (deleted immediately after capture).
+
 **Convention:**
 - State files are written/updated by `/prdx:implement` as implementation progresses.
 - Reading `.prdx/state/` lets any session check sibling or child progress without loading full PRDs.
 - State files for quick PRDs are deleted along with the ephemeral PRD after the workflow completes.
+- After non-draft PR creation, state files transition to `"pushed"` (not deleted) to enable automatic lesson capture on next startup.
 
 ## Parent-Child PRD Model
 
