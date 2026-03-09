@@ -179,3 +179,23 @@ load helpers/test_helper
     grep -q "prdx-" "$post_hook"
     [ "$?" -eq 0 ]
 }
+
+@test "pre-implement hook supports project-scoped PRD listing" {
+    local pre_hook="$REPO_ROOT/hooks/prdx/pre-implement.sh"
+
+    # Should detect project name
+    grep -q "PROJECT_NAME" "$pre_hook"
+    [ "$?" -eq 0 ]
+
+    # Should filter by Project field when listing
+    grep -q "Project" "$pre_hook"
+    [ "$?" -eq 0 ]
+}
+
+@test "pre-implement hook has unprefixed fallback" {
+    local pre_hook="$REPO_ROOT/hooks/prdx/pre-implement.sh"
+
+    # Should have fallback for plans without prdx- prefix
+    grep -q 'plans/${PRD_SLUG}.md' "$pre_hook"
+    [ "$?" -eq 0 ]
+}

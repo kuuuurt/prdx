@@ -1,6 +1,7 @@
 # Test Feature Without Approach
 
 **Type:** feature
+**Project:** test-project
 **Platform:** backend
 **Status:** planning
 **Created:** 2026-02-02

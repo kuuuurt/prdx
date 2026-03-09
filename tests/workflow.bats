@@ -157,6 +157,23 @@ load helpers/test_helper
     [ "$?" -eq 0 ]
 }
 
+@test "PRD Project field is correctly formatted" {
+    copy_fixture_to_plans "valid-prd" "prdx-workflow-project"
+
+    HOME="$TEST_TEMP_DIR"
+
+    local prd_file="$TEST_PLANS_DIR/prdx-workflow-project.md"
+
+    # Should have Project field
+    grep -q "^\*\*Project:\*\*" "$prd_file"
+    [ "$?" -eq 0 ]
+
+    # Project extraction should work
+    local project=$(grep "^\*\*Project:\*\*" "$prd_file" | sed 's/\*\*Project:\*\* //')
+    [ -n "$project" ]
+    [ "$project" = "test-project" ]
+}
+
 @test "closed status is also rejected by pre-implement" {
     # Create a fixture with closed status
     copy_fixture_to_plans "valid-prd" "prdx-workflow-closed"

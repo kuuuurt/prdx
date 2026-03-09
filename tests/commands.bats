@@ -144,3 +144,77 @@ load helpers/test_helper
     echo "$gates" | grep -q "Option"
     [ "$?" -eq 0 ]
 }
+
+@test "plan.md includes Project field in all PRD templates" {
+    local plan_cmd="$REPO_ROOT/commands/plan.md"
+
+    # Should have Project field in templates
+    run grep -c "Project.*PROJECT_NAME" "$plan_cmd"
+    [ "$status" -eq 0 ]
+    # All 4 templates (quick, single, multi, child) should have it
+    [ "${lines[0]}" -ge 4 ]
+}
+
+@test "plan.md detects project from git remote" {
+    local plan_cmd="$REPO_ROOT/commands/plan.md"
+
+    # Should detect project via gh repo view
+    run grep "gh repo view.*--json name" "$plan_cmd"
+    [ "$status" -eq 0 ]
+
+    # Should have fallback to directory name
+    run grep "git rev-parse --show-toplevel" "$plan_cmd"
+    [ "$status" -eq 0 ]
+}
+
+@test "show.md supports --project and --all flags" {
+    local show_cmd="$REPO_ROOT/commands/show.md"
+
+    # Should support --project filter
+    run grep "\-\-project" "$show_cmd"
+    [ "$status" -eq 0 ]
+
+    # Should support --all flag
+    run grep "\-\-all" "$show_cmd"
+    [ "$status" -eq 0 ]
+
+    # Should filter by project by default
+    run grep "scoped to project" "$show_cmd"
+    [ "$status" -eq 0 ]
+}
+
+@test "PRD discovery filters by project" {
+    local impl_cmd="$REPO_ROOT/commands/implement.md"
+
+    # implement.md should grep for Project field
+    run grep 'Project.*PROJECT_NAME' "$impl_cmd"
+    [ "$status" -eq 0 ]
+}
+
+@test "plan.md has scope boundary preventing implementation" {
+    local plan_cmd="$REPO_ROOT/commands/plan.md"
+
+    # Should have explicit scope boundary
+    run grep "SCOPE BOUNDARY" "$plan_cmd"
+    [ "$status" -eq 0 ]
+
+    # Should forbid writing application code
+    run grep "Do NOT write application code" "$plan_cmd"
+    [ "$status" -eq 0 ]
+
+    # Should clarify approval means document is ready, not start implementing
+    run grep "Approval.*means.*PRD document is ready" "$plan_cmd"
+    [ "$status" -eq 0 ]
+}
+
+@test "CLAUDE.md includes Project field in PRD templates" {
+    local claude_md="$REPO_ROOT/CLAUDE.md"
+
+    # Should have Project field documented
+    run grep "Project.*git remote repo name" "$claude_md"
+    [ "$status" -eq 0 ]
+
+    # Should explain auto-detection
+    run grep "Auto-detected.*gh repo view" "$claude_md"
+    [ "$status" -eq 0 ]
+}

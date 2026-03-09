@@ -1,6 +1,7 @@
 # Test Feature - In Progress Status
 
 **Type:** feature
+**Project:** test-project
 **Platform:** backend
 **Status:** in-progress
 **Created:** 2026-02-02

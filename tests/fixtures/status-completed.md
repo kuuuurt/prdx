@@ -1,6 +1,7 @@
 # Test Feature - Completed Status
 
 **Type:** feature
+**Project:** test-project
 **Platform:** backend
 **Status:** completed
 **Created:** 2026-02-02
