@@ -235,7 +235,6 @@ Next steps:
 2. Request reviewers
 3. Address feedback
 4. Merge when approved
-5. Close PRD: /prdx:close {SLUG}
 
 To view PR: gh pr view {PR_NUMBER} --web
 ```

@@ -121,9 +121,9 @@ PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) w
                                       │
                                       ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  5. CLOSE (after PR merge)                                                  │
+│  5. COMPLETE (automatic on next /prdx:prdx startup)                          │
 │                                                                             │
-│     /prdx:close <slug>                                                      │
+│     Detects merged PR → captures lessons → cleans up                        │
 │                              ▼                                              │
 │               Status: implemented → completed                               │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -216,7 +216,6 @@ Stop anytime and resume with `/prdx:prdx <slug>`.
 /prdx:plan "add biometric auth"          # Create PRD
 /prdx:implement android-biometric-auth   # Implement feature
 /prdx:push android-biometric-auth        # Create PR
-/prdx:close android-biometric-auth       # Mark complete
 ```
 
 ## Installation
@@ -253,7 +252,6 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 | `/prdx:plan` | Create PRD |
 | `/prdx:implement` | Implement feature |
 | `/prdx:push` | Create pull request |
-| `/prdx:close` | Mark PRD complete |
 
 ### Standalone (no PRD required)
 
@@ -270,8 +268,6 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 | `/prdx:show` | View/list/search PRDs |
 | `/prdx:config` | Configure settings |
 | `/prdx:publish` | Create GitHub issue from PRD |
-| `/prdx:sync` | Sync PRD with GitHub issue |
-| `/prdx:migrate` | Migrate PRDs from old `.prdx/prds/` location |
 
 ## Agents
 

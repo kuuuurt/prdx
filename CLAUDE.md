@@ -327,11 +327,10 @@ prdx/
 │   ├── implement.md         # Triggers platform agent
 │   ├── show.md              # View/list/search PRDs
 │   ├── push.md              # Create PR
-│   ├── close.md             # Close PRD
 │   ├── publish.md           # Create GitHub issue
-│   ├── sync.md              # Sync with GitHub
+│   ├── commit.md            # Commit with prdx.json config
 │   ├── simplify.md          # Code cleanup/simplification
-│   └── help.md              # Documentation
+│   └── config.md            # Configure settings
 ├── hooks/prdx/              # Validation hooks
 │   ├── pre-plan.sh          # Pre-planning validation
 │   ├── pre-implement.sh     # Pre-implementation validation
@@ -398,14 +397,14 @@ Lightweight Plan Mode → Temp PRD saved → [Implement?] → Implement → [Cre
 
 Quick mode is for one-off tasks (bugfixes, PR review comments) that need the full pipeline rigor (dev-planner, code review) but don't need a permanent PRD artifact. The temporary PRD (`prdx-quick-{slug}.md`) flows through the existing pipeline unchanged, then gets cleaned up.
 
-| Aspect | `/prdx:bugfix` | `/prdx:prdx --quick` | `/prdx:prdx` |
-|--------|----------------|----------------------|--------------|
-| Planning | None | Lightweight plan mode | Full PRD |
-| Dev-planner | No | Yes | Yes |
-| Code review | Yes | Yes | Yes |
-| PRD artifact | None | Temporary (cleaned up) | Permanent |
-| Publish option | No | No | Yes |
-| Decision points | 1 | 2 | 4+ |
+| Aspect | `/prdx:prdx --quick` | `/prdx:prdx` |
+|--------|----------------------|--------------|
+| Planning | Lightweight plan mode | Full PRD |
+| Dev-planner | Yes | Yes |
+| Code review | Yes | Yes |
+| PRD artifact | Temporary (cleaned up) | Permanent |
+| Publish option | No | Yes |
+| Decision points | 2 | 4+ |
 
 **Key differences from normal mode:**
 - Lightweight PRD template (Problem, Goal, AC, Approach only)
@@ -605,9 +604,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 ### Other Commands
 
 - `/prdx:show` - List/search/view PRDs (bash + grep)
-- `/prdx:close` - Update PRD status to completed, capture lessons in project CLAUDE.md
 - `/prdx:publish` - Create GitHub issue from PRD
-- `/prdx:sync` - Sync PRD with GitHub issue
 
 ### Standalone-Capable Commands
 
@@ -745,7 +742,7 @@ Skills are read by agents during execution:
 - UI testing strategies
 - Test coverage standards
 
-**Lessons learned** are stored in the project's own `CLAUDE.md` (under `## Lessons Learned`), not in a skill file. This makes them project-specific, version-controlled, and automatically available in context. `/prdx:close` appends learnings there after each PRD is completed.
+**Lessons learned** are stored in the project's own `CLAUDE.md` (under `## Lessons Learned`), not in a skill file. This makes them project-specific, version-controlled, and automatically available in context. `/prdx:prdx` automatically captures learnings when it detects a merged PR on startup.
 
 **How agents use them:**
 - `prdx:dev-planner` reads skills during technical planning (lessons from CLAUDE.md are automatic)
