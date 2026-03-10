@@ -177,8 +177,6 @@ The parent's derived status equals the minimum status across all children. For e
 **Runtime-only phase** (not part of PRD document status, used only in state files):
 - `"pushed"` — Non-draft PR created, awaiting merge. State file includes `pr_number`. At next `/prdx:prdx` startup, merged PRs trigger automatic lesson capture, then the state file is deleted.
 
-**TENTATIVE state files:** During planning (before the final slug is known), `/prdx:prdx` creates a tentative state file with a random suffix to avoid collisions between concurrent sessions: `TENTATIVE-${RANDOM}${RANDOM}.json` (normal) or `quick-TENTATIVE-${RANDOM}${RANDOM}.json` (quick). These are deleted once `plan.md` writes the real state file.
-
 **Convention:**
 - State files are written/updated by `/prdx:implement` as implementation progresses.
 - Reading `.prdx/state/` lets any session check sibling or child progress without loading full PRDs.

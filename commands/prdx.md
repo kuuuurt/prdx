@@ -233,34 +233,19 @@ If state file does NOT exist (or no last-slug found), continue with normal logic
 
 **If QUICK_MODE:**
 
-**Save workflow state before planning (with unique tentative ID):**
-```bash
-mkdir -p .prdx/state
-TENTATIVE_ID="quick-TENTATIVE-${RANDOM}${RANDOM}"
-cat > .prdx/state/${TENTATIVE_ID}.json << EOF
-{"slug": "${TENTATIVE_ID}", "phase": "planning", "quick": true}
-EOF
-```
-(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in the state file and last-slug. The random suffix prevents collisions between concurrent sessions.)
-
 Run the planning command with the `--quick` flag:
 
 ```
 /prdx:plan --quick [description]
 ```
 
-This enters plan mode with a lightweight template (Problem, Goal, Acceptance Criteria, Approach only). The PRD is saved as `prdx-quick-{slug}.md`.
+This enters plan mode with a lightweight template (Problem, Goal, Acceptance Criteria, Approach only). The PRD is saved as `prdx-quick-{slug}.md`. Plan.md derives the slug from the description early (Step 0) and writes the state file + last-slug immediately — no tentative IDs needed.
 
 > **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
 
 **IMPORTANT: Stop here and wait.** Plan mode is interactive. Do NOT proceed until:
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `~/.claude/plans/prdx-quick-{slug}.md`
-
-**After plan.md writes the real state file** (`.prdx/state/quick-{slug}.json`), delete the tentative file:
-```bash
-rm -f .prdx/state/${TENTATIVE_ID}.json
-```
 
 **⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 
@@ -272,34 +257,19 @@ Route based on the user's choice from plan.md:
 
 **If NOT QUICK_MODE (normal mode):**
 
-**Save workflow state before planning (with unique tentative ID):**
-```bash
-mkdir -p .prdx/state
-TENTATIVE_ID="TENTATIVE-${RANDOM}${RANDOM}"
-cat > .prdx/state/${TENTATIVE_ID}.json << EOF
-{"slug": "${TENTATIVE_ID}", "phase": "planning", "quick": false}
-EOF
-```
-(Slug is tentative — derive from description in kebab-case. Plan.md will finalize the slug in the state file and last-slug. The random suffix prevents collisions between concurrent sessions.)
-
 Run the planning command with the feature description:
 
 ```
 /prdx:plan [description]
 ```
 
-This enters native plan mode and creates a PRD following the PRDX template format.
+This enters native plan mode and creates a PRD following the PRDX template format. Plan.md derives the slug from the description early (Step 0) and writes the state file + last-slug immediately — no tentative IDs needed.
 
 > **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
 
 **IMPORTANT: Stop here and wait.** Plan mode is an interactive process where the user reviews and iterates on the PRD. Do NOT proceed to implementation until:
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `~/.claude/plans/prdx-{slug}.md`
-
-**After plan.md writes the real state file** (`.prdx/state/{slug}.json`), delete the tentative file:
-```bash
-rm -f .prdx/state/${TENTATIVE_ID}.json
-```
 
 **⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 

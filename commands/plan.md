@@ -59,7 +59,7 @@ This command enters **native plan mode** to:
 
 ## Workflow
 
-### Step 0: Parse Flags and Detect Project
+### Step 0: Parse Flags, Detect Project, and Derive Slug
 
 **Parse `--quick` flag FIRST (before platform detection):**
 - Strip `--quick` from arguments if present
@@ -75,6 +75,21 @@ Store the result as `{PROJECT_NAME}`. If the command fails (no remote, no `gh`),
 basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null
 ```
 If both fail, omit the `**Project:**` field from the PRD.
+
+**Derive slug from description:**
+
+Convert the description to kebab-case to produce `{SLUG}` (e.g., "Add Biometric Login" → `biometric-login`). For quick mode, prefix with `quick-` (e.g., `quick-fix-login-validation`).
+
+**Write state file and last-slug immediately:**
+```bash
+mkdir -p .prdx/state .prdx
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "planning", "quick": {QUICK_VALUE}}
+EOF
+echo "{SLUG}" > .prdx/last-slug
+```
+
+This ensures the workflow is recoverable from the very start. The slug is derived from the description and stays consistent through the entire workflow — no tentative IDs needed.
 
 ### Step 1: Platform Detection
 
@@ -311,9 +326,22 @@ When user approves (says "looks good", "approve", "let's do it", etc.), the plan
 
 **⛔ "Approval" means the PRD document is ready — NOT that you should start implementing.** When the user approves, proceed to Step 4 (ExitPlanMode). Do NOT interpret approval as permission to write application code, create branches, or start the implementation pipeline.
 
-### Step 4: Exit Plan Mode
+### Step 4: Save State and Exit Plan Mode
 
-When the user approves, call **ExitPlanMode** immediately.
+When the user approves:
+
+**4a. Update state to `post-planning` BEFORE exiting plan mode.**
+
+This is critical because Claude Code may offer a "clear context" option after ExitPlanMode. If the user chooses it, all post-exit steps are lost. By saving state first, re-running `/prdx:prdx` picks up from `post-planning` and shows the decision point correctly.
+
+```bash
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "post-planning", "quick": {QUICK_VALUE}}
+EOF
+```
+
+**4b. Call ExitPlanMode.**
 
 **IMPORTANT:** Do NOT ask "Should I exit plan mode?" or "Ready to exit?" - just call ExitPlanMode directly when the user approves the plan. The approval to exit is implicit in their approval of the plan.
 
@@ -321,22 +349,24 @@ When the user approves, call **ExitPlanMode** immediately.
 
 **⛔ CRITICAL — POST-PLAN-MODE INSTRUCTIONS ⛔**
 
-**After calling ExitPlanMode, you MUST follow Steps 4→5→5.5 below BEFORE doing anything else.**
+**After calling ExitPlanMode, you MUST follow Steps 4c→4.5→5→5.5 below BEFORE doing anything else.**
 
 **DO NOT skip ahead to implementation. DO NOT call `/prdx:implement`. DO NOT start coding.**
 
 The ONLY things you should do after ExitPlanMode are:
-1. Verify the plan file naming (Step 4 continued)
+1. Verify the plan file naming (Step 4c)
 2. Generate child PRDs if multi-platform (Step 4.5)
 3. Verify plan file exists (Step 5)
-4. Save state and show decision point (Step 5.5)
+4. Show decision point (Step 5.5)
 5. **STOP and wait for user input**
 
 If you find yourself about to implement or write code after plan mode exits — STOP. You are in the wrong phase.
 
+**NOTE:** If context was cleared after ExitPlanMode, the state file already says `post-planning` (saved in Step 4a). Re-running `/prdx:prdx` will find it and show the decision point correctly — no work is lost.
+
 ---
 
-**CRITICAL — Plan File Naming:**
+**4c. Verify Plan File Naming:**
 
 **Quick mode:** The filename **MUST** be `prdx-quick-{slug}.md` (e.g., `prdx-quick-fix-login-validation.md`).
 
@@ -344,7 +374,6 @@ If you find yourself about to implement or write code after plan mode exits — 
 
 This prefix is how all PRDX commands discover plans. Without it, the plan is invisible to the workflow.
 
-- Derive `{slug}` from the title in kebab-case (e.g., "Add Biometric Login" → `biometric-login`)
 - Quick mode full path: `~/.claude/plans/prdx-quick-{slug}.md`
 - Normal mode full path: `~/.claude/plans/prdx-{slug}.md`
 
@@ -403,11 +432,10 @@ Use your judgment to scope the parent's ACs and Approach to what is relevant for
 
 (Add one line per platform, in the order listed in `**Platforms:**`.)
 
-**Write state files for parent and each child:**
+**Write state files for each child** (parent state file was already created in Step 0):
 
 ```bash
 mkdir -p .prdx/state
-echo '{"slug": "{parent-slug}", "phase": "planning", "quick": false}' > .prdx/state/{parent-slug}.json
 ```
 
 For each child platform:
@@ -502,36 +530,18 @@ Next steps:
   [one line per platform]
 ```
 
-### Step 5.5: Save Workflow State and Decision Point
+### Step 5.5: Decision Point
 
-**Save last-used slug:**
-```bash
-mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug
-```
-(Use `quick-{slug}` for quick mode, e.g., `echo "quick-fix-login" > .prdx/last-slug`)
-
-**Write the state file for this PRD (single-platform or quick mode only):**
-
-For single-platform PRDs and quick mode, write a state file now. For multi-platform PRDs, state files were already written in Step 4.5 — skip this write.
-
-```bash
-# Single-platform or quick mode:
-mkdir -p .prdx/state
-cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "planning", "quick": {QUICK_VALUE}}
-EOF
-```
-
-(Use the final `{SLUG}` — for quick mode, use `quick-{slug}`. `{QUICK_VALUE}` is `true` or `false`.)
+**State file and last-slug were already written in Steps 0 and 4a.** No need to write them here.
 
 **Check if this was called from a `/prdx:prdx` workflow:**
 
-Read the state file you just wrote:
+Read the state file:
 ```bash
 cat .prdx/state/{SLUG}.json 2>/dev/null
 ```
 
-**If the state file exists with `"phase": "planning"`** (this was called from `/prdx:prdx`):
+**If the state file exists with `"phase": "post-planning"`** (called from `/prdx:prdx`):
 
 ---
 
@@ -541,26 +551,18 @@ cat .prdx/state/{SLUG}.json 2>/dev/null
 
 ---
 
-1. Update the state file with the post-planning phase:
-   ```bash
-   mkdir -p .prdx/state
-   cat > .prdx/state/{SLUG}.json << EOF
-   {"slug": "{SLUG}", "phase": "post-planning", "quick": {QUICK_VALUE}}
-   EOF
-   ```
+Show the decision point via **AskUserQuestion**:
 
-2. Show the decision point via **AskUserQuestion**:
+**Normal mode** (quick is false):
+- Option 1: "Publish to GitHub" — Create issue for team visibility
+- Option 2: "Implement now" — Start coding immediately
+- Option 3: "Stop here" — Review PRD later
 
-   **Normal mode** (quick is false):
-   - Option 1: "Publish to GitHub" — Create issue for team visibility
-   - Option 2: "Implement now" — Start coding immediately
-   - Option 3: "Stop here" — Review PRD later
+**Quick mode** (quick is true):
+- Option 1: "Implement now" (Recommended) — Start coding immediately
+- Option 2: "Stop here" — Review plan later
 
-   **Quick mode** (quick is true):
-   - Option 1: "Implement now" (Recommended) — Start coding immediately
-   - Option 2: "Stop here" — Review plan later
-
-3. **⛔ FULL STOP.** Do NOT proceed beyond this AskUserQuestion. Do NOT call `/prdx:implement`. Do NOT start coding. Do NOT explore the codebase for implementation. Just display the user's choice and STOP. The `/prdx:prdx` workflow (if still in context) or the user's next invocation will handle routing.
+**⛔ FULL STOP.** Do NOT proceed beyond this AskUserQuestion. Do NOT call `/prdx:implement`. Do NOT start coding. Do NOT explore the codebase for implementation. Just display the user's choice and STOP. The `/prdx:prdx` workflow (if still in context) or the user's next invocation will handle routing.
 
 **If no state file exists** (standalone `/prdx:plan` call):
 
