@@ -181,7 +181,7 @@ If the state file exists, use its `slug` and `quick` fields (ignore any command 
 - `"implementing"` → Jump to Phase 3 (implementation), using the slug from state file
 - `"post-implement"` → Jump to Phase 3a (review decision), using the slug from state file
 - `"reviewing"` → Jump to Step 3b (reviewing loop), using slug + pr_number from state file
-- `"pushing"` → Inform user PR creation was interrupted. Offer to retry with `/prdx:push {slug}`. Delete `.prdx/state/{slug}.json`
+- `"pushing"` → PR creation was interrupted. Check if PR was actually created: `gh pr list --head {BRANCH} --json number --jq '.[0].number' 2>/dev/null`. If a PR exists, transition state to `"pushed"` with the pr_number and inform user. If no PR, offer to retry with `/prdx:push {slug}` and delete `.prdx/state/{slug}.json`.
 - `"pushed"` → Already handled by Step 0 startup scan (which processes all pushed files). If it reaches here (e.g., PR not yet merged and this slug is the last-slug), inform user: `PR #{pr_number} is not merged yet. Lessons will be captured automatically after merge.` Then ignore this state file (do NOT use its slug) and continue with normal Step 1 logic below, processing command arguments as if no state file was found.
 - `"completed"` → Stale state file (should have been deleted after lesson capture). Delete it (`rm -f .prdx/state/{slug}.json`) and continue with normal Step 1 logic below.
 
@@ -479,9 +479,14 @@ This loop lets the user iterate on PR review comments without leaving the workfl
    - Display: `PR #{PR_NUMBER} marked ready for review. Lessons will be captured automatically after merge.`
 
    **"Done":**
-   - Delete `.prdx/state/{SLUG}.json`
-   - Display: `Resume later with /prdx:prdx {slug}`
-   - Quick mode: proceed to Phase 5 (cleanup)
+   - Transition state file to `"pushed"` phase (do NOT delete — PR exists, enables automatic lesson capture on next startup):
+     ```bash
+     mkdir -p .prdx/state
+     cat > .prdx/state/{SLUG}.json << EOF
+     {"slug": "{SLUG}", "phase": "pushed", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}
+     EOF
+     ```
+   - Display: `Lessons will be captured automatically after PR #{PR_NUMBER} is merged.`
 
 ---
 
