@@ -330,7 +330,8 @@ prdx/
 │   ├── publish.md           # Create GitHub issue
 │   ├── commit.md            # Commit with prdx.json config
 │   ├── simplify.md          # Code cleanup/simplification
-│   └── config.md            # Configure settings
+│   ├── config.md            # Configure settings
+│   └── prdx-agent.md        # Agent teams workflow (/prdx:prdx:agent)
 ├── hooks/prdx/              # Validation hooks
 │   ├── pre-plan.sh          # Pre-planning validation
 │   ├── pre-implement.sh     # Pre-implementation validation
@@ -383,6 +384,26 @@ Children on same Implementation Order step can run in parallel (separate branche
 ```
 
 The `/prdx:prdx` command is the main entry point, orchestrating the workflow with decision points.
+
+### Agent Teams Mode (Experimental)
+
+```
+/prdx:prdx:agent "add biometric authentication"
+↓
+Create Team → Spawn Architect
+↓
+Architect explores codebase, drafts PRD → Lead reviews/iterates → PRD approved
+↓
+[Implement?] → Architect creates dev plan → Spawn Platform Dev + Auditor
+↓
+Lead sends dev plan to Platform Dev → Platform Dev implements (can ask Architect questions)
+↓
+Lead triggers Auditor review → Fix cycle if needed (max 2)
+↓
+Shutdown Team → [Ready?] → PR
+```
+
+Same workflow as `/prdx:prdx` but with persistent teammates. The architect retains codebase context from PRD creation through implementation. Falls back to `/prdx:prdx` if agent teams are unavailable.
 
 **1 PRD = 1 Branch = 1 PR:** Each single-platform or child PRD gets a unique branch name at planning time. All implementation happens on that branch, and the PR is created from it. Parent PRDs are orchestration-only — they have no branch and no PR. Each child PRD gets its own branch (e.g., `feat/{parent-slug}-{platform}`) and creates its own PR.
 
@@ -533,6 +554,33 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 - Resumes from current status when given existing PRD
 - Shows context and next steps at each decision
 - `--quick` flag: lightweight plan, same pipeline, PRD cleaned up after
+
+### /prdx:prdx:agent (Agent Teams Mode)
+
+**What it does:**
+Same workflow as `/prdx:prdx` but uses Claude Code's experimental agent teams for orchestration. Persistent teammates replace sequential subagent invocations.
+
+**Usage:**
+- `/prdx:prdx:agent add user authentication` - Start new feature with teams
+- `/prdx:prdx:agent biometric-login` - Resume existing PRD with teams
+- `/prdx:prdx:agent --quick "fix login validation"` - Quick ephemeral task with teams
+
+**Team composition:**
+- **Lead** (main session): Steers project, makes decisions, relays between teammates
+- **Architect** (`prdx:dev-planner`): Explores codebase, creates PRD, creates dev plan, answers questions during implementation
+- **Platform Dev** (`prdx:{platform}-developer`): Implements the dev plan. Strict 1:1 — one dev per platform
+- **Auditor** (`prdx:code-reviewer`): Reviews implementation, verifies ACs, validates tests
+
+**Key differences from `/prdx:prdx`:**
+- Architect handles both PRD creation AND dev planning (persistent context)
+- Platform devs can message architect directly for codebase questions
+- Auditor reviews immediately after implementation (no separate invocation)
+- Falls back to `/prdx:prdx` if agent teams feature is unavailable
+- 3-4x token cost (each teammate is a full Claude instance)
+
+**1:1 rule:** One developer per platform only. Cross-platform changes go through the lead.
+
+**Requires:** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` in settings.json
 
 ### /prdx:plan
 
