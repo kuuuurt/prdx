@@ -177,11 +177,11 @@ If the state file exists, use its `slug` and `quick` fields (ignore any command 
   - **Quick mode** (quick=true):
     - Option 1: "Implement now" (Recommended)
     - Option 2: "Stop here" (review plan later)
-  - Route: Publish → Phase 2a, Implement → Phase 3, Stop → delete `.prdx/state/{slug}.json` and end workflow
+  - Route: Publish → Phase 2a, Implement → Phase 3, Stop → end workflow (keep state file for future resume/lesson capture)
 - `"implementing"` → Jump to Phase 3 (implementation), using the slug from state file
 - `"post-implement"` → Jump to Phase 3a (review decision), using the slug from state file
 - `"reviewing"` → Jump to Step 3b (reviewing loop), using slug + pr_number from state file
-- `"pushing"` → PR creation was interrupted. Check if PR was actually created: `gh pr list --head {BRANCH} --json number --jq '.[0].number' 2>/dev/null`. If a PR exists, transition state to `"pushed"` with the pr_number and inform user. If no PR, offer to retry with `/prdx:push {slug}` and delete `.prdx/state/{slug}.json`.
+- `"pushing"` → PR creation was interrupted. Check if PR was actually created: `gh pr list --head {BRANCH} --json number --jq '.[0].number' 2>/dev/null`. If a PR exists, transition state to `"pushed"` with the pr_number and inform user. If no PR, transition state back to `"post-implement"` and offer to retry with `/prdx:push {slug}`.
 - `"pushed"` → Already handled by Step 0 startup scan (which processes all pushed files). If it reaches here (e.g., PR not yet merged and this slug is the last-slug), inform user: `PR #{pr_number} is not merged yet. Lessons will be captured automatically after merge.` Then ignore this state file (do NOT use its slug) and continue with normal Step 1 logic below, processing command arguments as if no state file was found.
 - `"completed"` → Stale state file (should have been deleted after lesson capture). Delete it (`rm -f .prdx/state/{slug}.json`) and continue with normal Step 1 logic below.
 
@@ -251,7 +251,7 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 
 Route based on the user's choice from plan.md:
 - Implement → Phase 3
-- Stop → Delete `.prdx/state/quick-{slug}.json` and end workflow. Tell user they can resume with `/prdx:prdx quick-{slug}`
+- Stop → End workflow. Tell user they can resume with `/prdx:prdx quick-{slug}`
 
 **⛔ SAFETY CHECK:** If you find yourself about to call `/prdx:implement` or start writing code without the user explicitly choosing "Implement now" from the decision point above — STOP. You have skipped a mandatory decision point. Go back and ask the user.
 
@@ -276,7 +276,7 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 Route based on the user's choice from plan.md:
 - Publish → Phase 2a (then ask about implementation)
 - Implement → Phase 3
-- Stop → Delete `.prdx/state/{slug}.json` and end workflow. Tell user they can resume with `/prdx:prdx [slug]`
+- Stop → End workflow. Tell user they can resume with `/prdx:prdx [slug]`
 
 **⛔ SAFETY CHECK:** If you find yourself about to call `/prdx:implement` or start writing code without the user explicitly choosing "Implement now" from the decision point above — STOP. You have skipped a mandatory decision point. Go back and ask the user.
 
@@ -296,7 +296,7 @@ After issue is created, use AskUserQuestion:
 
 Route based on choice:
 - Yes → Phase 3
-- No → Delete `.prdx/state/{slug}.json` and end workflow
+- No → End workflow (keep state file for future resume)
 
 ---
 
@@ -320,7 +320,7 @@ Parent PRDs delegate implementation to child PRDs in separate sessions. Run `/pr
 /prdx:implement [slug]
 ```
 
-After displaying instructions, delete `.prdx/state/{SLUG}.json` and end workflow. The user manages child sessions independently.
+After displaying instructions, end workflow. The user manages child sessions independently.
 
 **For single-platform PRDs and child PRDs:**
 
@@ -351,7 +351,7 @@ Route based on choice:
 - Create PR → Run `/prdx:push quick-{slug}` directly, then proceed to Phase 5 (cleanup)
 - Create Draft PR → Run `/prdx:push quick-{slug} --draft` directly. After PR created, update `.prdx/state/quick-{slug}.json` to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 - Done → Proceed to Phase 5 (cleanup) immediately — no PR
-- Test first → Delete `.prdx/state/quick-{slug}.json`. Tell user to test and resume with `/prdx:prdx quick-{slug}` when ready
+- Test first → End workflow. Tell user to test and resume with `/prdx:prdx quick-{slug}` when ready
 
 **If NOT QUICK_MODE (normal mode):**
 - Option 1: "Test first" (Recommended) - Let me verify the implementation works
@@ -359,7 +359,7 @@ Route based on choice:
 - Option 3: "Create Draft PR" — Mark as draft, not human-reviewed yet
 
 Route based on choice:
-- Test first → Delete `.prdx/state/{slug}.json`. End workflow, tell user to test and resume with `/prdx:prdx [slug]` when ready
+- Test first → End workflow, tell user to test and resume with `/prdx:prdx [slug]` when ready
 - Create PR now → Run `/prdx:push [slug]` directly (do NOT ask for confirmation again — user already confirmed)
 - Create Draft PR → Run `/prdx:push [slug] --draft` directly. After PR created, update `.prdx/state/{slug}.json` to `"reviewing"` phase with `pr_number`, then proceed to Step 3b (reviewing loop)
 
@@ -502,7 +502,7 @@ Use AskUserQuestion to confirm:
 Route based on choice:
 - Create PR → Run `/prdx:push [slug]`
 - Create Draft PR → Run `/prdx:push [slug] --draft`
-- Wait → Delete `.prdx/state/{SLUG}.json` and end workflow
+- Wait → End workflow (keep state file for future resume)
 
 **Update workflow state before PR creation:**
 ```bash
@@ -621,11 +621,11 @@ Lessons and cleanup will happen automatically after merge.
 - If any phase fails, show clear error message
 - Don't auto-proceed after errors
 - Offer: retry, stop, or skip options
-- Delete `.prdx/state/{slug}.json` on unrecoverable errors or when user chooses to abort
 
 **Workflow state (`.prdx/state/{slug}.json`):**
 - Written at phase transitions to enable resume after context clear
 - Read at Step 1 to detect interrupted workflows
-- Deleted at most terminal points (user stops, errors)
-- Non-draft PR creation transitions to `"pushed"` phase (not deleted) to enable automatic lesson capture
+- **Never deleted when user pauses** (stop, test first, wait) — state files persist for resume and future lesson capture
+- Only deleted in two cases: (1) Step 0 lesson capture after PR merge, (2) Quick mode "Done" cleanup (no PR, nothing to capture)
+- Non-draft PR creation transitions to `"pushed"` phase to enable automatic lesson capture
 - `"pushed"` state files are processed at next `/prdx:prdx` startup: merged PRs trigger lesson capture, then state file is deleted
