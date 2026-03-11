@@ -62,13 +62,17 @@ Scan `.prdx/state/` for state files with `"phase": "pushed"`, check if PRs are m
 
 **Identical to `/prdx:prdx` Step 1.** Same state file checking, argument parsing, `--quick` flag handling, PRD matching, and resume logic.
 
-The only difference: when resuming from `"implementing"` phase, jump to Step 3 (team-based implementation) instead of calling `/prdx:implement`.
+The only difference: when resuming from `"implementing"` phase, jump to Step 4 (team implementation) instead of calling `/prdx:implement`.
 
 ---
 
-### Step 2: Feature Gate Check
+### Step 2: Create Team
 
-Before creating a team, verify agent teams are available by attempting to use the TeamCreate tool.
+**This is the first real action after entry point determination.** Spawn the team immediately so the architect is available for all planning work.
+
+#### Step 2a: Feature Gate Check
+
+Verify agent teams are available by attempting to use the TeamCreate tool.
 
 **If TeamCreate is not available** (tool not found, feature not enabled, wrong environment):
 
@@ -82,34 +86,26 @@ To enable agent teams:
 
 Then run the standard `/prdx:prdx` workflow with the same arguments and STOP. Do not continue with the steps below.
 
-**If TeamCreate succeeds**, continue to Step 3.
-
----
-
-### Step 3: Planning (Architect Teammate)
-
-**Update workflow state:**
-```bash
-mkdir -p .prdx/state .prdx
-```
+#### Step 2b: Initialize State
 
 **Derive slug from description** (same logic as `/prdx:plan` Step 0):
 Convert description to kebab-case. For quick mode, prefix with `quick-`.
 
 ```bash
+mkdir -p .prdx/state .prdx
 cat > .prdx/state/{SLUG}.json << EOF
 {"slug": "{SLUG}", "phase": "planning", "quick": {QUICK_MODE}}
 EOF
 echo "{SLUG}" > .prdx/last-slug
 ```
 
-#### Step 3a: Detect Platform
+#### Step 2c: Detect Platform
 
 **Same logic as `/prdx:plan` Step 1.** Auto-detect platforms from description and codebase. For multi-platform, ask user which platforms and implementation order via AskUserQuestion.
 
 For quick mode: auto-detect single platform, skip multi-platform selection.
 
-#### Step 3b: Create Team and Spawn Architect
+#### Step 2d: Spawn Team and Architect
 
 Create the team:
 ```
@@ -187,7 +183,13 @@ Where `{QUICK_MODE_INSTRUCTION}` is:
 - If quick mode: `"Use the lightweight quick template: Problem (1-2 sentences), Goal (1 sentence), Acceptance Criteria, Approach (1-2 sentences). Save as prdx-quick-{SLUG}.md. Use current branch: {CURRENT_BRANCH}."`
 - If normal mode: `"Use the full PRDX PRD template with all sections (Problem, Goal, User Stories, Acceptance Criteria, Scope, Approach, Risks). Save as prdx-{SLUG}.md."`
 
-#### Step 3c: Lead Initiates Planning
+---
+
+### Step 3: Planning (Architect)
+
+The architect is already spawned and waiting. All planning is delegated to the architect — the lead never explores the codebase or drafts the PRD directly.
+
+#### Step 3a: Lead Initiates Planning
 
 Send the feature description to the architect:
 
@@ -205,7 +207,7 @@ SendMessage:
   Send me the PRD draft when ready."
 ```
 
-#### Step 3d: PRD Review Loop
+#### Step 3b: PRD Review Loop
 
 Wait for the architect's PRD draft message.
 
@@ -250,9 +252,9 @@ cat > .prdx/state/{SLUG}.json << EOF
 EOF
 ```
 
-**If "Stop":** Shut down architect, delete state, end workflow.
+**If "Stop":** Shut down team, delete state, end workflow.
 
-#### Step 3e: Post-Planning Decision Point
+#### Step 3c: Post-Planning Decision Point
 
 **Same decision point as `/prdx:prdx` Step 2:**
 
@@ -265,9 +267,9 @@ EOF
 - Option 1: "Implement now" (Recommended)
 - Option 2: "Stop here"
 
-Route: Publish → Step 3f, Implement → Step 4, Stop → shut down team, delete state, end workflow.
+Route: Publish → Step 3d, Implement → Step 4, Stop → shut down team, delete state, end workflow.
 
-#### Step 3f: Publish (Optional)
+#### Step 3d: Publish (Optional)
 
 If user chose to publish, run `/prdx:publish {slug}` (same as `/prdx:prdx` Step 2a).
 
