@@ -35,6 +35,22 @@ This command is a **thin wrapper** that:
 
 ## Workflow
 
+### Resolve Plans Directory
+
+Before any PRD operations, determine where plans are stored:
+
+```bash
+PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
+if [ -z "$PLANS_DIR" ]; then
+  PLANS_DIR="$HOME/.claude/plans"
+elif [[ "$PLANS_DIR" != /* ]]; then
+  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
+fi
+echo "Plans directory: $PLANS_DIR"
+```
+
+**Use `$PLANS_DIR` instead of `~/.claude/plans/` throughout this command.**
+
 ### Step 0: Validate GitHub CLI
 
 **Before any GitHub operations, verify `gh` is available and authenticated:**
@@ -83,9 +99,9 @@ This command is a **thin wrapper** that:
 
 Resolve slug using enhanced matching (exact → substring → word-boundary → disambiguation):
 ```bash
-# 1. Exact (prefixed): ~/.claude/plans/prdx-{slug}.md
-# 2. Exact (unprefixed fallback): ~/.claude/plans/{slug}.md
-# 3. Substring: ls ~/.claude/plans/*{slug}*.md
+# 1. Exact (prefixed): {PLANS_DIR}/prdx-{slug}.md
+# 2. Exact (unprefixed fallback): {PLANS_DIR}/{slug}.md
+# 3. Substring: ls {PLANS_DIR}/*{slug}*.md
 # 4. Word-boundary: split slug into words, find PRDs containing all words
 # 5. Multiple matches → ask user to select
 ```
@@ -97,14 +113,14 @@ Resolve slug using enhanced matching (exact → substring → word-boundary → 
 1. Get current branch: `git branch --show-current`
 2. Search for PRD matching the branch:
    ```bash
-   grep -rl "^\*\*Branch:\*\*.*$(git branch --show-current)" ~/.claude/plans/*.md 2>/dev/null
+   grep -rl "^\*\*Branch:\*\*.*$(git branch --show-current)" {PLANS_DIR}/*.md 2>/dev/null
    ```
 3. Found → **PRD mode** (use that PRD)
 4. Not found → Check last-used slug as fallback:
    ```bash
    LAST_SLUG=$(cat .prdx/last-slug 2>/dev/null)
    ```
-   - If last slug exists and matching PRD file (`~/.claude/plans/prdx-{LAST_SLUG}.md`) exists → **PRD mode** (use that PRD, confirm with user first)
+   - If last slug exists and matching PRD file (`{PLANS_DIR}/prdx-{LAST_SLUG}.md`) exists → **PRD mode** (use that PRD, confirm with user first)
    - State for the last-used PRD is at `.prdx/state/{LAST_SLUG}.json` (if needed)
    - If no last slug or no matching PRD → **Standalone mode**
 
@@ -226,7 +242,7 @@ Return only the PR summary (number, URL, title)."
 ```
 Pull Request Created!
 
-PRD: ~/.claude/plans/{SLUG}.md
+PRD: {PLANS_DIR}/{SLUG}.md
 PR: #{PR_NUMBER}
 URL: {PR_URL}
 
@@ -243,7 +259,7 @@ To view PR: gh pr view {PR_NUMBER} --web
 ```
 Draft Pull Request Created!
 
-PRD: ~/.claude/plans/{SLUG}.md
+PRD: {PLANS_DIR}/{SLUG}.md
 PR: #{PR_NUMBER} (Draft)
 URL: {PR_URL}
 
@@ -410,7 +426,7 @@ This keeps the main conversation context minimal.
 ```
 User: /prdx:push backend-auth
 
-→ Finds PRD: ~/.claude/plans/prdx-backend-auth.md
+→ Finds PRD: {PLANS_DIR}/prdx-backend-auth.md
 → Status is "review" → will update to "implemented" after PR creation
 → Validates git state
 → prdx:pr-author agent invoked (PRD mode)
@@ -421,7 +437,7 @@ User: /prdx:push backend-auth
 
 Pull Request Created!
 
-PRD: ~/.claude/plans/prdx-backend-auth.md
+PRD: {PLANS_DIR}/prdx-backend-auth.md
 PR: #42
 URL: https://github.com/user/repo/pull/42
 
@@ -485,7 +501,7 @@ To mark ready: gh pr ready 44
 ```
 User: /prdx:push backend-auth --draft
 
-→ Finds PRD: ~/.claude/plans/prdx-backend-auth.md
+→ Finds PRD: {PLANS_DIR}/prdx-backend-auth.md
 → Status is "review" → will update to "implemented" after PR creation
 → Draft: true → passes --draft to agent
 → Agent adds "not human-reviewed" notice to PR body
@@ -493,7 +509,7 @@ User: /prdx:push backend-auth --draft
 
 Draft Pull Request Created!
 
-PRD: ~/.claude/plans/prdx-backend-auth.md
+PRD: {PLANS_DIR}/prdx-backend-auth.md
 PR: #45 (Draft)
 URL: https://github.com/user/repo/pull/45
 

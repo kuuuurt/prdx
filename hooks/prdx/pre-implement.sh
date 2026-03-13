@@ -4,6 +4,10 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/resolve-plans-dir.sh"
+PLANS_DIR=$(resolve_plans_dir)
+
 PRD_SLUG="$1"
 
 if [ -z "$PRD_SLUG" ]; then
@@ -15,17 +19,17 @@ fi
 PRD_FILE=""
 
 # 1. Exact match: prdx-{slug}.md
-if [ -f ~/.claude/plans/prdx-${PRD_SLUG}.md ]; then
-    PRD_FILE=~/.claude/plans/prdx-${PRD_SLUG}.md
+if [ -f "$PLANS_DIR/prdx-${PRD_SLUG}.md" ]; then
+    PRD_FILE="$PLANS_DIR/prdx-${PRD_SLUG}.md"
 # 2. Exact match: prdx-quick-{slug}.md
-elif [ -f ~/.claude/plans/prdx-quick-${PRD_SLUG}.md ]; then
-    PRD_FILE=~/.claude/plans/prdx-quick-${PRD_SLUG}.md
+elif [ -f "$PLANS_DIR/prdx-quick-${PRD_SLUG}.md" ]; then
+    PRD_FILE="$PLANS_DIR/prdx-quick-${PRD_SLUG}.md"
 # 3. Exact match (unprefixed): {slug}.md
-elif [ -f ~/.claude/plans/${PRD_SLUG}.md ]; then
-    PRD_FILE=~/.claude/plans/${PRD_SLUG}.md
+elif [ -f "$PLANS_DIR/${PRD_SLUG}.md" ]; then
+    PRD_FILE="$PLANS_DIR/${PRD_SLUG}.md"
 else
     # 4. Substring match with ambiguity check (search all .md files)
-    MATCHES=$(ls ~/.claude/plans/*${PRD_SLUG}*.md 2>/dev/null || true)
+    MATCHES=$(ls "$PLANS_DIR/"*${PRD_SLUG}*.md 2>/dev/null || true)
     MATCH_COUNT=$(echo "$MATCHES" | grep -c . 2>/dev/null || echo 0)
 
     if [ "$MATCH_COUNT" -eq 1 ]; then
@@ -45,9 +49,9 @@ if [ -z "$PRD_FILE" ]; then
     echo "Available PRDs:"
     PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
     if [ -n "$PROJECT_NAME" ]; then
-        grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+        grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR/"*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
     else
-        ls ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+        ls "$PLANS_DIR/"*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
     fi
     exit 1
 fi

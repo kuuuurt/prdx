@@ -10,6 +10,22 @@ argument-hint: "[slug] [--issue #123]"
 
 ---
 
+## Resolve Plans Directory
+
+Before any PRD operations, determine where plans are stored:
+
+```bash
+PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
+if [ -z "$PLANS_DIR" ]; then
+  PLANS_DIR="$HOME/.claude/plans"
+elif [[ "$PLANS_DIR" != /* ]]; then
+  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
+fi
+echo "Plans directory: $PLANS_DIR"
+```
+
+**Use `$PLANS_DIR` instead of `~/.claude/plans/` throughout this command.**
+
 ## Step 0: Validate GitHub CLI
 
 **Before any GitHub operations, verify `gh` is available and authenticated:**
@@ -52,8 +68,8 @@ argument-hint: "[slug] [--issue #123]"
 
 1. If slug provided, resolve using enhanced matching (exact → substring → word-boundary → disambiguation):
    ```bash
-   # 1. Exact: ~/.claude/plans/prdx-{slug}.md
-   # 2. Substring: ls ~/.claude/plans/prdx-*{slug}*.md
+   # 1. Exact: {PLANS_DIR}/prdx-{slug}.md
+   # 2. Substring: ls {PLANS_DIR}/prdx-*{slug}*.md
    # 3. Word-boundary: split slug into words, find PRDs containing all words
    # 4. Multiple matches → ask user to select
    ```
@@ -232,7 +248,7 @@ If "Create new":
 
 3. Rename file:
    ```bash
-   mv ~/.claude/plans/[old-filename].md ~/.claude/plans/prdx-[platform]-[issue-number].md
+   mv {PLANS_DIR}/[old-filename].md {PLANS_DIR}/prdx-[platform]-[issue-number].md
    ```
 
 4. Display success:
@@ -244,8 +260,8 @@ If "Create new":
    Action: [Created new issue / Linked to existing issue]
 
    PRD renamed:
-   - From: ~/.claude/plans/[old-filename].md
-   - To:   ~/.claude/plans/prdx-[platform]-[issue-number].md
+   - From: {PLANS_DIR}/[old-filename].md
+   - To:   {PLANS_DIR}/prdx-[platform]-[issue-number].md
 
    Next steps:
    - View issue: gh issue view [number] --web
