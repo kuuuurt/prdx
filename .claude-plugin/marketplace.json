@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "PRDX - Complete PRD workflow experience for Claude Code",
-    "version": "0.28.0"
+    "version": "0.28.1"
   },
   "plugins": [
     {
       "name": "prdx",
       "description": "Complete PRD workflow experience with AI agents for feature development. Includes 9 commands for managing PRDs from planning through implementation, 3 specialized skills, and 9 AI agents for planning, implementation, and code review.",
-      "version": "0.28.0",
+      "version": "0.28.1",
       "author": {
         "name": "Kurt",
         "email": "18444033+kuuuurt@users.noreply.github.com"
