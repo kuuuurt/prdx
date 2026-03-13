@@ -42,6 +42,7 @@ resolve_plans_dir() {
                     echo "$project_root/$plans_dir"
                 else
                     # No project root available; fall through to default
+                    echo "Warning: plansDirectory is relative but no project root found; falling back to ~/.claude/plans" >&2
                     plans_dir=""
                     echo "${HOME}/.claude/plans"
                 fi

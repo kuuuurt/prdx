@@ -51,13 +51,14 @@ If the file does NOT exist (first PRDX run in this project):
    mkdir -p .claude .prdx .prdx/plans
    # Merge plansDirectory into settings.local.json (preserve existing keys)
    if [ -f .claude/settings.local.json ]; then
-     jq --arg dir "$PROJECT_ROOT/.prdx/plans" '. + {plansDirectory: $dir}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
+     jq '. + {plansDirectory: ".prdx/plans"}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
    else
-     jq -n --arg dir "$PROJECT_ROOT/.prdx/plans" '{plansDirectory: $dir}' > .claude/settings.local.json
+     echo '{"plansDirectory": ".prdx/plans"}' > .claude/settings.local.json
    fi
    echo "local" > .prdx/plans-setup-done
    # Add to .gitignore if not already there
    grep -qxF '.prdx/plans/' .gitignore 2>/dev/null || echo '.prdx/plans/' >> .gitignore
+   grep -qxF '.prdx/plans-setup-done' .gitignore 2>/dev/null || echo '.prdx/plans-setup-done' >> .gitignore
    ```
 
 3. If "Global":
