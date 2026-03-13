@@ -18,7 +18,7 @@ Check the `Mode:` field in the prompt to determine which mode to use.
 ### 1. Gather Context
 
 **PRD mode:**
-Load the PRD file from `~/.claude/plans/prdx-{slug}.md` and extract:
+Load the PRD file using the `PRD File:` path provided in the calling command's prompt. Do not hardcode a directory — the plans directory is project-configurable and resolved by the calling command. Extract:
 - Title and goal
 - Acceptance criteria
 - Approach summary
