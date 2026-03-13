@@ -24,7 +24,9 @@ PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document)
 
 ## Plan Mode Configuration
 
-PRDX uses Claude's default plans directory (`~/.claude/plans/`).
+PRDX uses Claude Code's `plansDirectory` setting to locate plans. By default this is `~/.claude/plans/`. When configured as project-local (via `/prdx:config plans local`), plans are saved to `.prdx/plans/` inside the project root instead.
+
+The `resolve-plans-dir.sh` helper resolves the correct directory at runtime. A `.prdx/plans-setup-done` marker file is created the first time a project switches to local mode, preventing repeated setup prompts.
 
 **Naming convention:** `prdx-{slug}.md` for normal PRDs, `prdx-quick-{slug}.md` for quick mode (ephemeral).
 
@@ -372,7 +374,7 @@ Plan Mode → PRD saved → [Publish?] → Publish → [Implement?] → Implemen
 ↓
 Plan Mode (asks: which platforms? what order?)
 ↓
-Parent PRD + Child PRDs saved to ~/.claude/plans/
+Parent PRD + Child PRDs saved to the configured plans directory
 ↓
 [Publish?] → Publish (optional)
 ↓
@@ -444,7 +446,7 @@ Quick mode is for one-off tasks (bugfixes, PR review comments) that need the ful
    - Explores codebase
    - Creates PRD using the template format
    - User iterates until approval
-   - Plan auto-saved to ~/.claude/plans/{slug}.md
+   - Plan auto-saved to the configured plans directory
    - Status: planning
 
 2. Publish to GitHub (optional)
@@ -459,7 +461,7 @@ Quick mode is for one-off tasks (bugfixes, PR review comments) that need the ful
    /prdx:implement {parent-slug}           (parent PRD → shows child instructions)
    /prdx:implement {parent-slug}-{platform} (child PRD → checks prerequisites, implements)
    ↓
-   - Reads PRD from ~/.claude/plans/
+   - Reads PRD from the configured plans directory
    - Parent PRDs: display child progress table + session instructions, then stop
    - Child PRDs: check prerequisites via sibling state files
    - Updates status to in-progress
@@ -502,7 +504,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 
 **Native Plan Mode:**
 - Uses Claude's built-in plan mode for PRD creation
-- Plans auto-saved to `~/.claude/plans/`
+- Plans auto-saved to the configured plans directory (default: `~/.claude/plans/`)
 - No custom file management needed
 - Interactive iteration until approval
 
@@ -591,7 +593,7 @@ Same workflow as `/prdx:prdx` but uses Claude Code's experimental agent teams fo
 4. Creates PRD using template format (full or lightweight with `--quick`)
 5. Iterates with user until approval
 6. Calls ExitPlanMode immediately when user approves (do NOT ask "should I exit plan mode?")
-7. Plan auto-saved to `~/.claude/plans/`
+7. Plan auto-saved to the configured plans directory
 
 **Uses:** Native plan mode (not an isolated agent)
 
@@ -805,7 +807,7 @@ Skills are read by agents during execution:
 
 **Validates:**
 - Git repository exists
-- `~/.claude/plans/` directory exists
+- Plans directory exists (resolved via `resolve-plans-dir.sh`)
 - PRDs are in `.gitignore`
 
 **On failure:** Stops planning
