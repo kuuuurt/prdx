@@ -4,6 +4,10 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/resolve-plans-dir.sh"
+PLANS_DIR=$(resolve_plans_dir)
+
 PRD_SLUG="$1"
 
 if [ -z "$PRD_SLUG" ]; then
@@ -15,14 +19,14 @@ fi
 PRD_FILE=""
 
 # 1. Exact match: prdx-{slug}.md
-if [ -f ~/.claude/plans/prdx-${PRD_SLUG}.md ]; then
-    PRD_FILE=~/.claude/plans/prdx-${PRD_SLUG}.md
+if [ -f "$PLANS_DIR/prdx-${PRD_SLUG}.md" ]; then
+    PRD_FILE="$PLANS_DIR/prdx-${PRD_SLUG}.md"
 # 2. Exact match: prdx-quick-{slug}.md
-elif [ -f ~/.claude/plans/prdx-quick-${PRD_SLUG}.md ]; then
-    PRD_FILE=~/.claude/plans/prdx-quick-${PRD_SLUG}.md
+elif [ -f "$PLANS_DIR/prdx-quick-${PRD_SLUG}.md" ]; then
+    PRD_FILE="$PLANS_DIR/prdx-quick-${PRD_SLUG}.md"
 else
     # 3. Substring match with ambiguity check
-    MATCHES=$(ls ~/.claude/plans/prdx-*${PRD_SLUG}*.md 2>/dev/null || true)
+    MATCHES=$(ls "$PLANS_DIR/"prdx-*${PRD_SLUG}*.md 2>/dev/null || true)
     MATCH_COUNT=$(echo "$MATCHES" | grep -c . 2>/dev/null || echo 0)
 
     if [ "$MATCH_COUNT" -eq 1 ]; then
