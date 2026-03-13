@@ -42,14 +42,30 @@
 
 ---
 
+## Resolve Plans Directory
+
+Before any PRD operations, determine where plans are stored:
+
+```bash
+PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
+if [ -z "$PLANS_DIR" ]; then
+  PLANS_DIR="$HOME/.claude/plans"
+elif [[ "$PLANS_DIR" != /* ]]; then
+  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
+fi
+echo "Plans directory: $PLANS_DIR"
+```
+
+**Use `$PLANS_DIR` instead of `~/.claude/plans/` throughout this command.**
+
 ## Phase 1: Determine Mode
 
 **Parse arguments and detect intent:**
 
 1. **Resolve slug using enhanced matching** (exact → substring → word-boundary):
    ```bash
-   # 1. Exact: ~/.claude/plans/prdx-{input}.md
-   # 2. Substring: ls ~/.claude/plans/prdx-*{input}*.md
+   # 1. Exact: {PLANS_DIR}/prdx-{input}.md
+   # 2. Substring: ls {PLANS_DIR}/prdx-*{input}*.md
    # 3. Word-boundary: split input into words, find PRDs containing all words
    ```
    - If exactly 1 match → STATUS mode
@@ -85,9 +101,9 @@
 1. **Find PRD files (scoped to project by default):**
    ```bash
    # If --all flag: show all plans
-   ls ~/.claude/plans/*.md 2>/dev/null
+   ls {PLANS_DIR}/*.md 2>/dev/null
    # Otherwise: filter to current project
-   grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null
+   grep -rl "^\*\*Project:\*\* $PROJECT_NAME" {PLANS_DIR}/*.md 2>/dev/null
    ```
    PRDs without a `**Project:**` field are included in all listings (backward compatibility).
 
@@ -117,7 +133,7 @@
    underneath. Child PRDs do NOT appear at the top level — they are shown only under their parent.
 
 ```
-PRDs in ~/.claude/plans/ (12 found)
+PRDs in {PLANS_DIR}/ (12 found)
 
 BACKEND (3)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -175,9 +191,9 @@ Quick actions:
 1. **Search using grep:**
    ```bash
    # If --all flag: search all plans
-   grep -i -n "<keyword>" ~/.claude/plans/*.md
+   grep -i -n "<keyword>" {PLANS_DIR}/*.md
    # Otherwise: search only current project's plans
-   grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null | xargs grep -i -n "<keyword>"
+   grep -rl "^\*\*Project:\*\* $PROJECT_NAME" {PLANS_DIR}/*.md 2>/dev/null | xargs grep -i -n "<keyword>"
    ```
    - Case-insensitive search
    - Show line numbers
@@ -305,7 +321,7 @@ Actions:
 ╚═══════════════════════════════════════════════════════╝
 
 Status: in-progress | Created: 2025-11-05 (3 days ago)
-File: ~/.claude/plans/android-optimize-loginviewmodel.md
+File: {PLANS_DIR}/android-optimize-loginviewmodel.md
 
 WORKFLOW PROGRESS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -362,7 +378,7 @@ NEXT ACTIONS ━━━━━━━━━━━━━━━━━━━━━━�
 
 Recommended:
   1. ✨ Continue work: /prdx:dev
-  2. 📝 Review plan: Read ~/.claude/plans/android-optimize-loginviewmodel.md
+  2. 📝 Review plan: Read {PLANS_DIR}/android-optimize-loginviewmodel.md
 
 Quick commands:
   /prdx:implement  Continue implementation

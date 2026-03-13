@@ -13,7 +13,64 @@ argument-hint: "[--quick] [feature description or PRD slug]"
 
 Execute the following phases based on the argument provided:
 
+### Resolve Plans Directory
+
+Before any PRD operations, determine where plans are stored:
+
+```bash
+PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
+if [ -z "$PLANS_DIR" ]; then
+  PLANS_DIR="$HOME/.claude/plans"
+elif [[ "$PLANS_DIR" != /* ]]; then
+  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
+fi
+echo "Plans directory: $PLANS_DIR"
+```
+
+**Use `$PLANS_DIR` instead of `~/.claude/plans/` throughout this command.**
+
 ### Step 0: Auto-Capture Lessons from Merged PRs
+
+**Before any other logic, check if this is the first PRDX run in this project (Plans Directory Setup).**
+
+Check if plans directory preference has been configured:
+
+```bash
+ls .prdx/plans-setup-done 2>/dev/null
+```
+
+If the file does NOT exist (first PRDX run in this project):
+
+1. Use AskUserQuestion:
+   - Option 1: "Project-local plans" (Recommended) — Plans saved inside this project directory (.prdx/plans/)
+   - Option 2: "Global plans" — Plans saved in ~/.claude/plans/ (shared across projects)
+
+2. If "Project-local":
+   ```bash
+   PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+   mkdir -p .claude .prdx .prdx/plans
+   # Merge plansDirectory into settings.local.json (preserve existing keys)
+   if [ -f .claude/settings.local.json ]; then
+     jq --arg dir "$PROJECT_ROOT/.prdx/plans" '. + {plansDirectory: $dir}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
+   else
+     jq -n --arg dir "$PROJECT_ROOT/.prdx/plans" '{plansDirectory: $dir}' > .claude/settings.local.json
+   fi
+   echo "local" > .prdx/plans-setup-done
+   # Add to .gitignore if not already there
+   grep -qxF '.prdx/plans/' .gitignore 2>/dev/null || echo '.prdx/plans/' >> .gitignore
+   ```
+
+3. If "Global":
+   ```bash
+   mkdir -p .prdx
+   echo "global" > .prdx/plans-setup-done
+   ```
+
+4. Re-resolve PLANS_DIR after setup (run the resolution preamble again).
+
+If the file DOES exist, skip this step entirely and proceed with lesson capture below.
+
+**After the setup check (or if already configured), scan for completed workflows that need lesson capture.**
 
 **Before any other logic, scan for completed workflows that need lesson capture.**
 
@@ -53,9 +110,9 @@ This runs silently at startup and does not block the user's intent.
 
    a. Read the PRD file to extract title, platform, and `## Implementation Notes` section(s):
    ```bash
-   cat ~/.claude/plans/prdx-{slug}.md
+   cat {PLANS_DIR}/prdx-{slug}.md
    ```
-   (For quick-mode slugs: `~/.claude/plans/prdx-{slug}.md` — the `quick-` prefix is part of the slug itself)
+   (For quick-mode slugs: `{PLANS_DIR}/prdx-{slug}.md` — the `quick-` prefix is part of the slug itself)
 
    b. Fetch PR body:
    ```bash
@@ -127,7 +184,7 @@ This runs silently at startup and does not block the user's intent.
 8. **Clean up state file and PRD (if quick mode):**
 
    - If `quick` is `true` in the state file:
-     - Delete the temporary PRD file: `rm ~/.claude/plans/prdx-{slug}.md`
+     - Delete the temporary PRD file: `rm {PLANS_DIR}/prdx-{slug}.md`
      - Clear last-slug if it points to this slug:
        ```bash
        if [ "$(cat .prdx/last-slug 2>/dev/null)" = "{slug}" ]; then
@@ -221,7 +278,7 @@ If state file does NOT exist (or no last-slug found), continue with normal logic
 - If no last slug, list existing PRDX plans for the current project:
   ```bash
   PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-  grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null
+  grep -rl "^\*\*Project:\*\* $PROJECT_NAME" {PLANS_DIR}/*.md 2>/dev/null
   ```
   - Ask: "Start a new feature or continue an existing PRD?"
 
@@ -245,7 +302,7 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 
 **IMPORTANT: Stop here and wait.** Plan mode is interactive. Do NOT proceed until:
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
-2. The PRD file exists in `~/.claude/plans/prdx-quick-{slug}.md`
+2. The PRD file exists in `{PLANS_DIR}/prdx-quick-{slug}.md`
 
 **⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 
@@ -269,7 +326,7 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 
 **IMPORTANT: Stop here and wait.** Plan mode is an interactive process where the user reviews and iterates on the PRD. Do NOT proceed to implementation until:
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
-2. The PRD file exists in `~/.claude/plans/prdx-{slug}.md`
+2. The PRD file exists in `{PLANS_DIR}/prdx-{slug}.md`
 
 **⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 
@@ -537,7 +594,7 @@ EOF
   ```
   Feature complete!
 
-  PRD: ~/.claude/plans/[slug].md
+  PRD: {PLANS_DIR}/[slug].md
   PR: #[pr-number]
 
   The feature is ready for review.
@@ -555,7 +612,7 @@ Run cleanup immediately — no lessons to capture.
 
 1. **Delete the temporary PRD file:**
    ```bash
-   rm ~/.claude/plans/prdx-quick-{slug}.md
+   rm {PLANS_DIR}/prdx-quick-{slug}.md
    ```
 
 2. **Delete workflow state:**

@@ -20,9 +20,18 @@ DIR="$PWD"; while [ "$DIR" != "/" ]; do
 done
 [ "$DIR" = "/" ] && echo "Config: (defaults)"
 echo ""
+echo "=== Plans Directory ==="
+PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
+if [ -z "$PLANS_DIR" ]; then
+  PLANS_DIR="$HOME/.claude/plans"
+elif [[ "$PLANS_DIR" != /* ]]; then
+  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
+fi
+echo "Plans directory: $PLANS_DIR"
+echo ""
 echo "=== Available PRDs (this project) ==="
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
 echo ""
 echo "=== Agent Teams ==="
 echo "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-not set}"
@@ -144,7 +153,7 @@ Agent tool:
     3. Draft a PRD using the PRDX template format (see CLAUDE.md for templates)
     4. Send the draft to the lead via SendMessage for review
     5. Iterate based on lead's feedback until approved
-    6. When approved, write the final PRD to ~/.claude/plans/prdx-{SLUG}.md
+    6. When approved, write the final PRD to {PLANS_DIR}/prdx-{SLUG}.md
 
     {QUICK_MODE_INSTRUCTION}
 
@@ -235,14 +244,14 @@ Loop back to waiting for architect's revised draft.
 SendMessage:
   type: "message"
   recipient: "architect"
-  content: "PRD approved. Write the final version to ~/.claude/plans/prdx-{SLUG}.md
+  content: "PRD approved. Write the final version to {PLANS_DIR}/prdx-{SLUG}.md
 
   Then confirm when the file is saved."
 ```
 
 Wait for architect's confirmation. Then verify the file exists:
 ```bash
-ls ~/.claude/plans/prdx-{SLUG}.md 2>/dev/null
+ls {PLANS_DIR}/prdx-{SLUG}.md 2>/dev/null
 ```
 
 Update state:
@@ -292,7 +301,7 @@ EOF
 
 #### Step 4.1: Detect PRD Type
 
-Read the PRD from `~/.claude/plans/prdx-{SLUG}.md`.
+Read the PRD from `{PLANS_DIR}/prdx-{SLUG}.md`.
 
 **For parent PRDs (has `## Children` section):**
 

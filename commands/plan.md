@@ -21,7 +21,7 @@ Detailed implementation planning is done in `/prdx:implement` using the dev-plan
 - Do NOT write application code (no Edit/Write on source files)
 - Do NOT create branches, run tests, or make commits
 - Do NOT call `/prdx:implement` or platform agents
-- The ONLY files you create/edit are PRD files in `~/.claude/plans/` and state files in `.prdx/`
+- The ONLY files you create/edit are PRD files in `{PLANS_DIR}/` and state files in `.prdx/`
 - When the user approves the plan, you call ExitPlanMode → verify file → show decision point → STOP
 
 ## Usage
@@ -55,9 +55,64 @@ This command enters **native plan mode** to:
 2. Explore codebase using `prdx:code-explorer` agent (NOT `Explore`, NOT direct Glob/Grep/Read)
 3. Create PRD using the PRDX template format
 4. Iterate with user until approval
-5. Plan auto-saved to `~/.claude/plans/`
+5. Plan auto-saved to `{PLANS_DIR}/`
 
 ## Workflow
+
+### Resolve Plans Directory
+
+Before any PRD operations, determine where plans are stored:
+
+```bash
+PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
+if [ -z "$PLANS_DIR" ]; then
+  PLANS_DIR="$HOME/.claude/plans"
+elif [[ "$PLANS_DIR" != /* ]]; then
+  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
+fi
+echo "Plans directory: $PLANS_DIR"
+```
+
+**Use `$PLANS_DIR` instead of `~/.claude/plans/` throughout this command.**
+
+### Plans Directory Setup (First Run Only)
+
+Check if plans directory preference has been configured:
+
+```bash
+ls .prdx/plans-setup-done 2>/dev/null
+```
+
+If the file does NOT exist (first PRDX run in this project):
+
+1. Use AskUserQuestion:
+   - Option 1: "Project-local plans" (Recommended) — Plans saved inside this project directory (.prdx/plans/)
+   - Option 2: "Global plans" — Plans saved in ~/.claude/plans/ (shared across projects)
+
+2. If "Project-local":
+   ```bash
+   PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+   mkdir -p .claude .prdx .prdx/plans
+   # Merge plansDirectory into settings.local.json (preserve existing keys)
+   if [ -f .claude/settings.local.json ]; then
+     jq --arg dir "$PROJECT_ROOT/.prdx/plans" '. + {plansDirectory: $dir}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
+   else
+     jq -n --arg dir "$PROJECT_ROOT/.prdx/plans" '{plansDirectory: $dir}' > .claude/settings.local.json
+   fi
+   echo "local" > .prdx/plans-setup-done
+   # Add to .gitignore if not already there
+   grep -qxF '.prdx/plans/' .gitignore 2>/dev/null || echo '.prdx/plans/' >> .gitignore
+   ```
+
+3. If "Global":
+   ```bash
+   mkdir -p .prdx
+   echo "global" > .prdx/plans-setup-done
+   ```
+
+4. Re-resolve PLANS_DIR after setup (run the resolution preamble again).
+
+If the file DOES exist, skip this step entirely.
 
 ### Step 0: Parse Flags, Detect Project, and Derive Slug
 
@@ -374,8 +429,8 @@ If you find yourself about to implement or write code after plan mode exits — 
 
 This prefix is how all PRDX commands discover plans. Without it, the plan is invisible to the workflow.
 
-- Quick mode full path: `~/.claude/plans/prdx-quick-{slug}.md`
-- Normal mode full path: `~/.claude/plans/prdx-{slug}.md`
+- Quick mode full path: `{PLANS_DIR}/prdx-quick-{slug}.md`
+- Normal mode full path: `{PLANS_DIR}/prdx-{slug}.md`
 
 ### Step 4.5: Auto-Generate Child PRDs (Multi-Platform Only)
 
@@ -385,7 +440,7 @@ This prefix is how all PRDX commands discover plans. Without it, the plan is inv
 
 **If not applicable, skip to Step 5.**
 
-For each platform listed in `**Platforms:**`, create a child PRD at `~/.claude/plans/prdx-{parent-slug}-{platform}.md`.
+For each platform listed in `**Platforms:**`, create a child PRD at `{PLANS_DIR}/prdx-{parent-slug}-{platform}.md`.
 
 **Child PRD template:**
 
@@ -450,32 +505,32 @@ echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, 
 1. Check if the plan was saved with the correct name:
    ```bash
    # Quick mode:
-   ls ~/.claude/plans/prdx-quick-{slug}.md 2>/dev/null
+   ls {PLANS_DIR}/prdx-quick-{slug}.md 2>/dev/null
    # Normal mode:
-   ls ~/.claude/plans/prdx-{slug}.md 2>/dev/null
+   ls {PLANS_DIR}/prdx-{slug}.md 2>/dev/null
    ```
 
 2. If not found, search for the plan by its title or recent creation:
    ```bash
    # Find recently created plans without prdx- prefix
-   find ~/.claude/plans/ -name "*.md" -newer .prdx/last-slug -not -name "prdx-*" 2>/dev/null
+   find {PLANS_DIR}/ -name "*.md" -newer .prdx/last-slug -not -name "prdx-*" 2>/dev/null
    # Or search by title content
-   grep -rl "^# {TITLE}" ~/.claude/plans/*.md 2>/dev/null | grep -v "prdx-"
+   grep -rl "^# {TITLE}" {PLANS_DIR}/*.md 2>/dev/null | grep -v "prdx-"
    ```
 
 3. If a non-prefixed plan is found, rename it:
    ```bash
    # Quick mode:
-   mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-quick-{slug}.md
+   mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-quick-{slug}.md
    # Normal mode:
-   mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-{slug}.md
+   mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-{slug}.md
    ```
 
 4. If no plan file is found at all, the plan may not have saved. Warn the user:
    ```
    Plan file not found at expected path.
 
-   Check ~/.claude/plans/ for recently created files and rename if needed.
+   Check {PLANS_DIR}/ for recently created files and rename if needed.
    ```
 
 **Display summary:**
@@ -484,7 +539,7 @@ echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, 
 ```
 Quick plan created and saved
 
-PRD: ~/.claude/plans/prdx-quick-{slug}.md
+PRD: {PLANS_DIR}/prdx-quick-{slug}.md
 Platform: {PLATFORM}
 Status: planning
 Branch: {BRANCH}
@@ -498,7 +553,7 @@ Next steps:
 ```
 PRD created and saved
 
-PRD: ~/.claude/plans/prdx-{slug}.md
+PRD: {PLANS_DIR}/prdx-{slug}.md
 Platform: {PLATFORM}
 Status: planning
 Branch: {BRANCH}
@@ -512,7 +567,7 @@ Next steps:
 ```
 PRD created and saved
 
-Parent PRD: ~/.claude/plans/prdx-{slug}.md
+Parent PRD: {PLANS_DIR}/prdx-{slug}.md
 Platforms: {PLATFORMS_LIST}
 Implementation Order: {ORDER_SUMMARY}
 Status: planning
@@ -617,7 +672,7 @@ Valid types: `feature`, `bug-fix`, `refactor`, `spike`
 
 1. **Uses native plan mode** - Not a custom agent
 2. **Follow the PRD template exactly** - Full template for normal mode, lightweight for `--quick`
-3. **Plans auto-save** - To `~/.claude/plans/` directory
+3. **Plans auto-save** - To `{PLANS_DIR}/` directory
 4. **Naming convention** - `prdx-{slug}.md` (normal) or `prdx-quick-{slug}.md` (quick mode)
 5. **Status starts as `planning`** - Updated by implement/push commands
 6. **Branch name in PRD** - Used by implement command

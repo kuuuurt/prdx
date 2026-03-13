@@ -20,9 +20,18 @@ DIR="$PWD"; while [ "$DIR" != "/" ]; do
 done
 [ "$DIR" = "/" ] && echo "Config: (defaults)"
 echo ""
+echo "=== Plans Directory ==="
+PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
+if [ -z "$PLANS_DIR" ]; then
+  PLANS_DIR="$HOME/.claude/plans"
+elif [[ "$PLANS_DIR" != /* ]]; then
+  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
+fi
+echo "Plans directory: $PLANS_DIR"
+echo ""
 echo "=== Available PRDs (this project) ==="
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-grep -rl "^\*\*Project:\*\* $PROJECT_NAME" ~/.claude/plans/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
 ```
 
 # /prdx:implement - Implement Feature
@@ -31,7 +40,7 @@ Three-phase implementation: **Dev Planning** (prdx:dev-planner) → **Developmen
 
 Both agents run in **isolated contexts** to minimize main conversation context usage.
 
-**PRDs are read from `~/.claude/plans/`** (created by native plan mode).
+**PRDs are read from `{PLANS_DIR}/`** (created by native plan mode).
 
 **For PRDs with multiple platforms:** Implementation runs per the PRD's `**Implementation Order:**`.
 
@@ -256,10 +265,10 @@ Then add based on config:
 
 **Resolve slug to PRD file using enhanced matching:**
 
-1. **Exact match (prefixed):** `~/.claude/plans/prdx-{slug}.md`
-2. **Exact match (unprefixed fallback):** `~/.claude/plans/{slug}.md` — for plans created without the `prdx-` prefix
-3. **Substring match:** `ls ~/.claude/plans/prdx-*{slug}*.md` — slug appears anywhere in prefixed filenames
-4. **Substring match (unprefixed fallback):** `ls ~/.claude/plans/*{slug}*.md` — search all plans if no prefixed match
+1. **Exact match (prefixed):** `{PLANS_DIR}/prdx-{slug}.md`
+2. **Exact match (unprefixed fallback):** `{PLANS_DIR}/{slug}.md` — for plans created without the `prdx-` prefix
+3. **Substring match:** `ls {PLANS_DIR}/prdx-*{slug}*.md` — slug appears anywhere in prefixed filenames
+4. **Substring match (unprefixed fallback):** `ls {PLANS_DIR}/*{slug}*.md` — search all plans if no prefixed match
 5. **Word-boundary match:** Split slug into words, find PRDs containing all words (in any order)
 6. **Disambiguation:** If multiple matches at any step, use AskUserQuestion to let user select:
    ```
@@ -274,7 +283,7 @@ Then add based on config:
 
 **Auto-rename unprefixed plans:** If a match is found without the `prdx-` prefix, rename it to add the prefix before proceeding:
 ```bash
-mv ~/.claude/plans/{old-name}.md ~/.claude/plans/prdx-{slug}.md
+mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-{slug}.md
 ```
 Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 
@@ -332,7 +341,7 @@ Parent PRDs are orchestration-only. They are NOT directly implemented — they d
    | {child-slug-2} | android | feat/{parent}-android | planning |
    ```
 
-5. **Check for missing child PRD files:** For each child slug listed in `## Children`, verify the PRD file exists at `~/.claude/plans/prdx-{child-slug}.md`. If any are missing:
+5. **Check for missing child PRD files:** For each child slug listed in `## Children`, verify the PRD file exists at `{PLANS_DIR}/prdx-{child-slug}.md`. If any are missing:
    ```
    Warning: Child PRD file not found: prdx-{child-slug}.md
    Re-run /prdx:plan to regenerate, or create manually.
@@ -379,7 +388,7 @@ Parent PRDs are orchestration-only. They are NOT directly implemented — they d
 
 Before starting implementation, verify that prerequisites from the Implementation Order are met.
 
-1. **Read the parent PRD:** Load `~/.claude/plans/prdx-{PARENT_SLUG}.md`
+1. **Read the parent PRD:** Load `{PLANS_DIR}/prdx-{PARENT_SLUG}.md`
    - If parent PRD file not found, warn but continue (parent may have been deleted)
 
 2. **Parse Implementation Order** from the parent PRD into ordered steps.
@@ -817,7 +826,7 @@ When all children are done: /prdx:push {parent-slug}
 Usage: /prdx:implement <slug>
 
 Available PRDs:
-{List PRDs from ~/.claude/plans/}
+{List PRDs from {PLANS_DIR}/}
 ```
 
 ### PRD Not Found
@@ -854,7 +863,7 @@ Fix the issues and try again.
 
 ## Key Points
 
-1. **PRDs from native plan mode** - Read from `~/.claude/plans/`
+1. **PRDs from native plan mode** - Read from `{PLANS_DIR}/`
 2. **Status tracking via file edit** - Update `**Status:**` field directly
 3. **Always read prdx.json first** - Config determines commit format
 4. **Build commit instructions dynamically** - Based on actual config values
