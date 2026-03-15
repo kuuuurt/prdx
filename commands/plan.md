@@ -136,13 +136,12 @@ If both fail, omit the `**Project:**` field from the PRD.
 
 Convert the description to kebab-case to produce `{SLUG}` (e.g., "Add Biometric Login" → `biometric-login`). For quick mode, prefix with `quick-` (e.g., `quick-fix-login-validation`).
 
-**Write state file and last-slug immediately:**
+**Write state file immediately:**
 ```bash
-mkdir -p .prdx/state .prdx
+mkdir -p .prdx/state
 cat > .prdx/state/{SLUG}.json << EOF
 {"slug": "{SLUG}", "phase": "planning", "quick": {QUICK_VALUE}}
 EOF
-echo "{SLUG}" > .prdx/last-slug
 ```
 
 This ensures the workflow is recoverable from the very start. The slug is derived from the description and stays consistent through the entire workflow — no tentative IDs needed.
@@ -514,7 +513,7 @@ echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, 
 2. If not found, search for the plan by its title or recent creation:
    ```bash
    # Find recently created plans without prdx- prefix
-   find {PLANS_DIR}/ -name "*.md" -newer .prdx/last-slug -not -name "prdx-*" 2>/dev/null
+   find {PLANS_DIR}/ -name "*.md" -mmin -5 -not -name "prdx-*" 2>/dev/null
    # Or search by title content
    grep -rl "^# {TITLE}" {PLANS_DIR}/*.md 2>/dev/null | grep -v "prdx-"
    ```
@@ -588,7 +587,7 @@ Next steps:
 
 ### Step 5.5: Decision Point
 
-**State file and last-slug were already written in Steps 0 and 4a.** No need to write them here.
+**State file was already written in Steps 0 and 4a.** No need to write it here.
 
 **Check if this was called from a `/prdx:prdx` workflow:**
 

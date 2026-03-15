@@ -105,7 +105,6 @@ mkdir -p .prdx/state .prdx
 cat > .prdx/state/{SLUG}.json << EOF
 {"slug": "{SLUG}", "phase": "planning", "quick": {QUICK_MODE}}
 EOF
-echo "{SLUG}" > .prdx/last-slug
 ```
 
 #### Step 2c: Detect Platform

@@ -116,13 +116,19 @@ Resolve slug using enhanced matching (exact → substring → word-boundary → 
    grep -rl "^\*\*Branch:\*\*.*$(git branch --show-current)" {PLANS_DIR}/*.md 2>/dev/null
    ```
 3. Found → **PRD mode** (use that PRD)
-4. Not found → Check last-used slug as fallback:
+4. Not found → Check active state files as fallback:
    ```bash
-   LAST_SLUG=$(cat .prdx/last-slug 2>/dev/null)
+   # Find state files with phase != "pushed" and != "completed"
+   if [ -d .prdx/state ]; then
+     for f in .prdx/state/*.json; do
+       [ -f "$f" ] || continue
+       # Read slug and check if matching PRD exists
+     done
+   fi
    ```
-   - If last slug exists and matching PRD file (`{PLANS_DIR}/prdx-{LAST_SLUG}.md`) exists → **PRD mode** (use that PRD, confirm with user first)
-   - State for the last-used PRD is at `.prdx/state/{LAST_SLUG}.json` (if needed)
-   - If no last slug or no matching PRD → **Standalone mode**
+   - If exactly one active state file exists and matching PRD file (`{PLANS_DIR}/prdx-{SLUG}.md`) exists → **PRD mode** (use that PRD, confirm with user first)
+   - If multiple active state files exist → ask user to select or use **Standalone mode**
+   - If no active state files or no matching PRD → **Standalone mode**
 
 ---
 

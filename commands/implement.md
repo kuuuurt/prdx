@@ -313,11 +313,6 @@ EOF
 4. **Update status to `in-progress`:**
    Edit the PRD file to change `**Status:** planning` to `**Status:** in-progress`
 
-5. **Save last-used slug** for context persistence:
-   ```bash
-   mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug
-   ```
-
 ### Step 2b: Parent PRD Handling
 
 **This step runs only when the loaded PRD is a parent PRD (contains `## Children` section).**

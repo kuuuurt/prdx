@@ -186,12 +186,6 @@ This runs silently at startup and does not block the user's intent.
 
    - If `quick` is `true` in the state file:
      - Delete the temporary PRD file: `rm {PLANS_DIR}/prdx-{slug}.md`
-     - Clear last-slug if it points to this slug:
-       ```bash
-       if [ "$(cat .prdx/last-slug 2>/dev/null)" = "{slug}" ]; then
-         rm .prdx/last-slug
-       fi
-       ```
    - Delete the state file (both quick and normal mode):
      ```bash
      rm -f .prdx/state/{slug}.json
@@ -215,17 +209,9 @@ Check for state files in `.prdx/state/`:
 ls .prdx/state/*.json 2>/dev/null
 ```
 
-If state files exist, check the last-used slug first:
-```bash
-cat .prdx/last-slug 2>/dev/null
-```
+If state files exist and **no argument was provided**, check if there is exactly one active (non-pushed, non-completed) state file. If so, auto-resume it. If multiple active state files exist, list them and let the user pick (see "no argument provided" section below).
 
-If a last-slug exists, read its state file:
-```bash
-cat .prdx/state/{last-slug}.json 2>/dev/null
-```
-
-If the state file exists, use its `slug` and `quick` fields (ignore any command arguments), and route based on `phase`:
+If exactly one active state file exists, read it and route based on `phase`:
 - `"planning"` → Fall through to normal Step 1 logic below (plan mode may still be active or needs restart)
 - `"post-planning"` → Show the post-planning decision point via AskUserQuestion:
   - **Normal mode** (quick=false):
@@ -240,10 +226,10 @@ If the state file exists, use its `slug` and `quick` fields (ignore any command 
 - `"post-implement"` → Jump to Phase 3a (review decision), using the slug from state file
 - `"reviewing"` → Jump to Step 3b (reviewing loop), using slug + pr_number from state file
 - `"pushing"` → PR creation was interrupted. Check if PR was actually created: `gh pr list --head {BRANCH} --json number --jq '.[0].number' 2>/dev/null`. If a PR exists, transition state to `"pushed"` with the pr_number and inform user. If no PR, transition state back to `"post-implement"` and offer to retry with `/prdx:push {slug}`.
-- `"pushed"` → Already handled by Step 0 startup scan (which processes all pushed files). If it reaches here (e.g., PR not yet merged and this slug is the last-slug), inform user: `PR #{pr_number} is not merged yet. Lessons will be captured automatically after merge.` Then ignore this state file (do NOT use its slug) and continue with normal Step 1 logic below, processing command arguments as if no state file was found.
+- `"pushed"` → Already handled by Step 0 startup scan (which processes all pushed files). If it reaches here (e.g., PR not yet merged), inform user: `PR #{pr_number} is not merged yet. Lessons will be captured automatically after merge.` Then ignore this state file (do NOT use its slug) and continue with normal Step 1 logic below, processing command arguments as if no state file was found.
 - `"completed"` → Stale state file (should have been deleted after lesson capture). Delete it (`rm -f .prdx/state/{slug}.json`) and continue with normal Step 1 logic below.
 
-If state file does NOT exist (or no last-slug found), continue with normal logic below.
+If no active state file qualifies (or no state files exist), continue with normal logic below.
 
 ---
 
@@ -258,7 +244,6 @@ If state file does NOT exist (or no last-slug found), continue with normal logic
 **If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
 - Read PRD and check its `**Status:**` field
 - **Detect quick mode from PRD:** If the PRD contains `**Quick:** true`, set `QUICK_MODE=true` internally
-- **Save last-used slug:** `mkdir -p .prdx && echo "{SLUG}" > .prdx/last-slug`
 - **For parent PRDs** (has `## Children` section): Read child state files from `.prdx/state/` to determine progress. Display the child progress table (same as implement.md Step 2b). If all children are at `review` or beyond, ask if user wants to push each child. Otherwise, show which children still need work and display session instructions.
 - **For single-platform and child PRDs**, resume from the appropriate phase:
   - `planning` → Continue planning (Phase 2)
@@ -271,12 +256,23 @@ If state file does NOT exist (or no last-slug found), continue with normal logic
 - Proceed to Phase 2 (planning)
 
 **If no argument provided**:
-- Check for last-used slug: `cat .prdx/last-slug 2>/dev/null`
-- If last slug exists and matching PRD file exists, offer it as the first option via AskUserQuestion:
-  - Option 1: "Continue {last-slug}" (Recommended) — Resume the last PRD you were working on
+- Scan `.prdx/state/*.json` for active state files (phase is NOT `"pushed"` and NOT `"completed"`):
+  ```bash
+  if [ -d .prdx/state ]; then
+    for f in .prdx/state/*.json; do
+      [ -f "$f" ] || continue
+      # Read phase, skip pushed/completed
+    done
+  fi
+  ```
+- If exactly one active state file exists, offer to resume it via AskUserQuestion:
+  - Option 1: "Continue {slug}" (Recommended) — Resume the in-progress PRD
   - Option 2: "Choose a different PRD" — List all PRDs to pick from
   - Option 3: "Start a new feature" — Create a new PRD
-- If no last slug, list existing PRDX plans for the current project:
+- If multiple active state files exist, list them all and let the user pick via AskUserQuestion:
+  - One option per active PRD (showing slug, phase, and quick status)
+  - Plus: "Start a new feature" — Create a new PRD
+- If no active state files, list existing PRDX plans for the current project:
   ```bash
   PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
   grep -rl "^\*\*Project:\*\* $PROJECT_NAME" {PLANS_DIR}/*.md 2>/dev/null
@@ -297,7 +293,7 @@ Run the planning command with the `--quick` flag:
 /prdx:plan --quick [description]
 ```
 
-This enters plan mode with a lightweight template (Problem, Goal, Acceptance Criteria, Approach only). The PRD is saved as `prdx-quick-{slug}.md`. Plan.md derives the slug from the description early (Step 0) and writes the state file + last-slug immediately — no tentative IDs needed.
+This enters plan mode with a lightweight template (Problem, Goal, Acceptance Criteria, Approach only). The PRD is saved as `prdx-quick-{slug}.md`. Plan.md derives the slug from the description early (Step 0) and writes the state file immediately — no tentative IDs needed.
 
 > **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
 
@@ -321,7 +317,7 @@ Run the planning command with the feature description:
 /prdx:plan [description]
 ```
 
-This enters native plan mode and creates a PRD following the PRDX template format. Plan.md derives the slug from the description early (Step 0) and writes the state file + last-slug immediately — no tentative IDs needed.
+This enters native plan mode and creates a PRD following the PRDX template format. Plan.md derives the slug from the description early (Step 0) and writes the state file immediately — no tentative IDs needed.
 
 > **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
 
@@ -621,14 +617,7 @@ Run cleanup immediately — no lessons to capture.
    rm -f .prdx/state/quick-{slug}.json
    ```
 
-3. **Clear last-slug if it points to this quick task:**
-   ```bash
-   if [ "$(cat .prdx/last-slug 2>/dev/null)" = "quick-{slug}" ]; then
-     rm .prdx/last-slug
-   fi
-   ```
-
-4. **Display completion message:**
+3. **Display completion message:**
    ```
    Done! Changes committed on branch {BRANCH}.
 
