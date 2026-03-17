@@ -455,7 +455,7 @@ Multi-platform features are handled via parent-child PRDs: each child is a singl
 
 **Display progress:**
 ```
-Phase 1/3: Dev Planning — Creating implementation plan...
+Phase 1/4: Dev Planning — Creating implementation plan...
 ```
 
 Invoke the dev-planner agent using the Task tool:
@@ -664,14 +664,100 @@ After all phases complete:
 
 ---
 
-#### Step 5e: Code Review (prdx:code-reviewer)
+#### Step 5e: AC Verification (prdx:ac-verifier)
 
 **Display progress:**
 ```
-Phase 3/3: Code Review — Reviewing against acceptance criteria...
+Phase 3/4: AC Verification — Checking acceptance criteria...
 ```
 
-After all platform implementations are complete, run an automated code review before handing off to the user.
+After all platform implementations are complete, verify that acceptance criteria are met before code review.
+
+Invoke the ac-verifier agent using the Task tool:
+
+```
+subagent_type: "prdx:ac-verifier"
+
+prompt: "Verify the acceptance criteria for this PRD.
+
+PRD Slug: {SLUG}
+Base Branch: {DEFAULT_BRANCH}
+Platform: {PLATFORM}
+
+Acceptance Criteria:
+{ACCEPTANCE_CRITERIA from PRD}
+
+Check the diff (git diff {DEFAULT_BRANCH}..HEAD) against each acceptance criterion.
+Perform the three-point check: code exists, test exists, coverage (happy + error).
+
+Return only the AC verification summary."
+```
+
+**If any AC is NOT MET or Partial:**
+1. Display the AC verification summary to the conversation
+2. Feed the unmet/partial ACs back to the platform agent for fixing:
+
+```
+subagent_type: "{PLATFORM_AGENT}"
+
+prompt: "Fix the following unmet acceptance criteria.
+
+## AC Issues
+
+{UNMET_AND_PARTIAL_ACS from ac-verifier output}
+
+## Context
+
+**Changed files:**
+{OUTPUT of: git diff {DEFAULT_BRANCH}..HEAD --name-only}
+
+**Recent commits:**
+{OUTPUT of: git log {DEFAULT_BRANCH}..HEAD --oneline}
+
+**Full Acceptance Criteria (from PRD):**
+{ACCEPTANCE_CRITERIA from PRD}
+
+## Instructions
+
+1. Fix each unmet/partial AC listed above
+2. Write missing tests where indicated
+3. Run tests to verify fixes
+4. Commit the fixes using the commit format below
+
+{COMMIT_INSTRUCTIONS from Step 1b}
+
+Return only a summary of fixes applied."
+```
+
+3. After fixes, re-run the ac-verifier to confirm
+4. If ACs still unmet, loop back: platform agent fixes → ac-verifier re-checks
+5. Continue looping until all ACs are verified or 3 attempts are exhausted
+
+**If all ACs verified (at any attempt):**
+- Continue to Step 5f
+
+**If ACs still unmet after 3 fix attempts:**
+
+Use AskUserQuestion to offer options:
+- Option 1: "Proceed to code review" (Recommended) — Continue with remaining AC gaps noted
+- Option 2: "Fix manually" — Stop here, let user fix AC issues (status stays `in-progress`)
+- Option 3: "Stop implementation" — Halt workflow entirely
+
+Route based on choice:
+- Proceed → Continue to Step 5f, include unmet ACs in completion summary
+- Fix manually → Display unmet ACs, end workflow
+- Stop → End workflow, show how to resume with `/prdx:prdx {slug}`
+
+---
+
+#### Step 5f: Code Review — Pass 1 (prdx:code-reviewer)
+
+**Display progress:**
+```
+Phase 4/4: Code Review — Pass 1 of 2...
+```
+
+Run the first code review pass focused on bugs, security, quality, and conventions.
 
 Invoke the code-reviewer agent using the Task tool:
 
@@ -684,19 +770,15 @@ PRD Slug: {SLUG}
 Base Branch: {DEFAULT_BRANCH}
 Platform: {PLATFORM}
 
-Acceptance Criteria:
-{ACCEPTANCE_CRITERIA from PRD}
-
-Review the diff (git diff {DEFAULT_BRANCH}..HEAD) against the acceptance criteria.
-Flag bugs, security issues, quality problems, and unmet criteria.
-Only report high-confidence issues.
+Review the diff (git diff {DEFAULT_BRANCH}..HEAD) for bugs, security issues, quality problems, and convention adherence.
+Only report high-confidence issues (>80%).
 
 Return only the review summary."
 ```
 
 **If issues found:**
 1. Display the review summary to the conversation
-2. Feed each issue back to the platform agent for fixing with full context:
+2. Feed each issue back to the platform agent for fixing:
 
 ```
 subagent_type: "{PLATFORM_AGENT}"
@@ -715,9 +797,6 @@ prompt: "Fix the following code review issues.
 **Recent commits:**
 {OUTPUT of: git log {DEFAULT_BRANCH}..HEAD --oneline}
 
-**Acceptance Criteria (from PRD):**
-{ACCEPTANCE_CRITERIA from PRD}
-
 ## Instructions
 
 1. Fix each issue listed above
@@ -729,9 +808,37 @@ prompt: "Fix the following code review issues.
 Return only a summary of fixes applied."
 ```
 
-3. After fixes, re-run the code reviewer to verify (max 2 review cycles to avoid loops)
+**After fixes (or if no issues found), always proceed to Step 5g.**
 
-**If 2 review cycles exhausted and issues remain:**
+---
+
+#### Step 5g: Code Review — Pass 2 (prdx:code-reviewer)
+
+**Display progress:**
+```
+Code Review — Pass 2 of 2 (verification)...
+```
+
+Always run a second review pass. This catches issues introduced by fixes from Pass 1 and provides a clean verification.
+
+Invoke the code-reviewer agent using the Task tool (same prompt as Pass 1):
+
+```
+subagent_type: "prdx:code-reviewer"
+
+prompt: "Review the implementation for this PRD.
+
+PRD Slug: {SLUG}
+Base Branch: {DEFAULT_BRANCH}
+Platform: {PLATFORM}
+
+Review the diff (git diff {DEFAULT_BRANCH}..HEAD) for bugs, security issues, quality problems, and convention adherence.
+Only report high-confidence issues (>80%).
+
+Return only the review summary."
+```
+
+**If issues found on Pass 2:**
 
 Use AskUserQuestion to offer options:
 - Option 1: "Proceed anyway" (Recommended) — Continue to Step 6 with remaining issues noted
@@ -743,7 +850,7 @@ Route based on choice:
 - Fix manually → Display remaining issues, end workflow
 - Stop → End workflow, show how to resume with `/prdx:prdx {slug}`
 
-**If no issues found (or after fixes verified):**
+**If no issues found:**
 - Continue to Step 6
 
 ---
