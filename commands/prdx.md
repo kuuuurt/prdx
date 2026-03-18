@@ -1,6 +1,6 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[--quick] [feature description or PRD slug]"
+argument-hint: "[--quick] [--ci --issue <number>] [feature description or PRD slug]"
 ---
 
 # /prdx:prdx - Complete Feature Workflow
@@ -40,6 +40,8 @@ ls .prdx/plans-setup-done 2>/dev/null
 ```
 
 If the file does NOT exist (first PRDX run in this project):
+
+**If `CI_MODE=true`:** Skip to Step 1 — CI mode validates plans-setup-done separately and never prompts.
 
 1. Use AskUserQuestion:
    - Option 1: "Project-local plans" (Recommended) — Plans saved inside this project directory (.prdx/plans/)
@@ -240,6 +242,46 @@ If no active state file qualifies (or no state files exist), continue with norma
   - Error: `--quick requires a description. Usage: /prdx:prdx --quick "fix login validation"`
   - Set `QUICK_MODE=true`, skip PRD matching, go directly to Phase 2 (planning)
 - If `--quick` is NOT present, continue with normal entry point logic below
+
+**Next, parse `--ci` and `--issue` flags:**
+- Strip `--ci` from arguments if present
+- Strip `--issue {number}` from arguments if present (captures the number)
+- If `--ci` is present:
+  - Set `CI_MODE=true`
+  - `--issue` is required when `--ci` is set — error if missing:
+    ```
+    --ci requires --issue. Usage: /prdx:prdx --ci --issue 42
+    ```
+  - Store `ISSUE_NUMBER` from the `--issue` flag
+  - **Skip the state-file resume scan entirely** (do not check `.prdx/state/` for active workflows)
+  - **Skip the plans-directory setup prompt** — require `.prdx/plans-setup-done` to exist:
+    ```bash
+    if [ ! -f .prdx/plans-setup-done ]; then
+      echo "CI mode requires plans directory to be pre-configured."
+      echo "Run /prdx:config plans local (or global) interactively first."
+      exit 1
+    fi
+    ```
+  - **Validate GitHub CLI:**
+    ```bash
+    gh auth status 2>/dev/null
+    ```
+    If not authenticated, error:
+    ```
+    CI mode requires authenticated GitHub CLI.
+    Run: gh auth login
+    ```
+  - **Fetch issue:**
+    ```bash
+    gh issue view {ISSUE_NUMBER} --json title,body,labels
+    ```
+    If issue not found, error:
+    ```
+    Issue #{ISSUE_NUMBER} not found or not accessible.
+    ```
+    Store the issue title as `ISSUE_TITLE` and body as `ISSUE_BODY`
+  - **Jump directly to the CI workflow** (skip all interactive steps — go to new "Step 2-CI" section, which will be added in Phase 3)
+- If `--ci` is NOT present, continue with normal entry point logic below
 
 **If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
 - Read PRD and check its `**Status:**` field
