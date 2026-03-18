@@ -64,10 +64,15 @@ PRDX is a [Claude Code plugin](https://docs.anthropic.com/en/docs/claude-code) t
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                              ▼                                              │
 │  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │  Phase C: prdx:code-reviewer agent (isolated context)                 │  │
-│  │  • Reviews diff against acceptance criteria                           │  │
-│  │  • Flags bugs, security issues, quality problems                      │  │
-│  │  • If issues found: platform agent fixes, re-review (max 2 cycles)   │  │
+│  │  Phase C: Review (isolated contexts)                                  │  │
+│  │                                                                       │  │
+│  │  1. prdx:ac-verifier                                                  │  │
+│  │     • Verifies acceptance criteria (code exists, test exists, covers) │  │
+│  │     • If ACs unmet: platform agent fixes, re-verify (max 3 attempts) │  │
+│  │                                                                       │  │
+│  │  2. prdx:code-reviewer                                                │  │
+│  │     • Flags bugs, security issues, quality problems                   │  │
+│  │     • If issues found: platform agent fixes, re-review (max 2 cycles) │  │
 │  └───────────────────────────────────────────────────────────────────────┘  │
 │                              ▼                                              │
 │               Status: in-progress → review                                  │
