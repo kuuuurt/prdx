@@ -1,6 +1,6 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[--quick] [--ci --issue <number>] [feature description or PRD slug]"
+argument-hint: "[--quick] [--ci] [--issue <number>] [feature description or PRD slug]"
 ---
 
 # /prdx:prdx - Complete Feature Workflow
@@ -246,13 +246,25 @@ If no active state file qualifies (or no state files exist), continue with norma
 **Next, parse `--ci` and `--issue` flags:**
 - Strip `--ci` from arguments if present
 - Strip `--issue {number}` from arguments if present (captures the number)
+- If `--issue` is present (with or without `--ci`):
+  - Store `ISSUE_NUMBER` from the `--issue` flag
+  - Set `HAS_ISSUE=true`
+  - **Fetch issue:**
+    ```bash
+    gh issue view {ISSUE_NUMBER} --json title,body,labels
+    ```
+    If issue not found, error:
+    ```
+    Issue #{ISSUE_NUMBER} not found or not accessible.
+    ```
+    Store the issue title as `ISSUE_TITLE` and body as `ISSUE_BODY`
+  - Use `ISSUE_TITLE` + `ISSUE_BODY` as the feature description for planning (replaces any text argument)
 - If `--ci` is present:
   - Set `CI_MODE=true`
   - `--issue` is required when `--ci` is set — error if missing:
     ```
     --ci requires --issue. Usage: /prdx:prdx --ci --issue 42
     ```
-  - Store `ISSUE_NUMBER` from the `--issue` flag
   - **Skip the state-file resume scan entirely** (do not check `.prdx/state/` for active workflows)
   - **Skip the plans-directory setup prompt** — require `.prdx/plans-setup-done` to exist:
     ```bash
@@ -270,17 +282,8 @@ If no active state file qualifies (or no state files exist), continue with norma
       exit 1
     fi
     ```
-  - **Fetch issue:**
-    ```bash
-    gh issue view {ISSUE_NUMBER} --json title,body,labels
-    ```
-    If issue not found, error:
-    ```
-    Issue #{ISSUE_NUMBER} not found or not accessible.
-    ```
-    Store the issue title as `ISSUE_TITLE` and body as `ISSUE_BODY`
-  - **Jump directly to the CI workflow** (skip all interactive steps — go to new "Step 2-CI" section, which will be added in Phase 3)
-- If `--ci` is NOT present, continue with normal entry point logic below
+  - **Jump directly to the CI workflow** (skip all interactive steps — go to Step 2-CI)
+- If `--ci` is NOT present, continue with normal entry point logic below (issue data is available via `HAS_ISSUE` if `--issue` was provided)
 
 **If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
 - Read PRD and check its `**Status:**` field
@@ -358,6 +361,8 @@ Run the planning command with the feature description:
 /prdx:plan [description]
 ```
 
+**If `HAS_ISSUE=true`:** Pass the issue context to plan mode as the description: `"{ISSUE_TITLE}. {ISSUE_BODY}"`. This gives plan mode the full issue content to work with.
+
 This enters native plan mode and creates a PRD following the PRDX template format. Plan.md derives the slug from the description early (Step 0) and writes the state file immediately — no tentative IDs needed.
 
 > **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
@@ -367,6 +372,21 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 2. The PRD file exists in `{PLANS_DIR}/prdx-{slug}.md`
 
 **⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
+
+**If `HAS_ISSUE=true`:** After plan mode exits and before showing the decision point, automatically comment the PRD on the issue:
+
+```bash
+gh issue comment {ISSUE_NUMBER} --body "$(cat <<'PRDBODY'
+## PRDX: Generated PRD
+
+---
+
+{FULL PRD CONTENT}
+PRDBODY
+)"
+```
+
+Display: `PRD commented on issue #{ISSUE_NUMBER}`
 
 Route based on the user's choice from plan.md:
 - Publish → Phase 2a (then ask about implementation)
@@ -783,6 +803,8 @@ Route based on choice:
 - Create PR → Run `/prdx:push [slug]`
 - Create Draft PR → Run `/prdx:push [slug] --draft`
 - Wait → End workflow (keep state file for future resume)
+
+**If `HAS_ISSUE=true`:** When invoking `/prdx:push`, ensure the pr-author agent includes `Closes #{ISSUE_NUMBER}` in the PR body to link and auto-close the issue on merge. Pass this as additional context in the agent prompt.
 
 **Update workflow state before PR creation:**
 ```bash
