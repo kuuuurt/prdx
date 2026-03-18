@@ -2,7 +2,7 @@
 
 > PRD workflow for Claude Code leveraging native plan mode
 
-PRDX is a Claude Code plugin that provides PRD (Product Requirements Document) workflow using Claude's **native plan mode**, platform-specific agents, hooks, and skills.
+PRDX is a [Claude Code plugin](https://docs.anthropic.com/en/docs/claude-code) that provides a PRD (Product Requirements Document) workflow using Claude's **native plan mode**, platform-specific agents, hooks, and skills.
 
 ## The Workflow
 
@@ -142,9 +142,133 @@ PRD created    Coding...   User tests    PR created    PR merged
 Optional: /prdx:publish adds GitHub issue link at any status (metadata, not a workflow state)
 ```
 
+## Quick Start
+
+### Installation
+
+```bash
+# Claude Code plugin marketplace (recommended)
+/plugin marketplace add kuuuurt/prdx
+/plugin install prdx@prdx
+```
+
+### One Command Workflow
+
+```bash
+/prdx:prdx "add biometric authentication to Android app"
+```
+
+This orchestrates the entire workflow with decision points at each phase.
+Plans auto-save to `~/.claude/plans/prdx-{slug}.md`.
+Stop anytime and resume with `/prdx:prdx <slug>`.
+
+### Quick Mode
+
+For one-off tasks that don't need a permanent PRD:
+
+```bash
+/prdx:prdx --quick "fix login validation"
+```
+
+Same pipeline (dev-planner, code review) but with a lightweight PRD that's cleaned up after.
+
+### Individual Commands
+
+```bash
+/prdx:plan "add biometric auth"          # Create PRD
+/prdx:implement android-biometric-auth   # Implement feature
+/prdx:push android-biometric-auth        # Create PR
+```
+
+## CI Mode
+
+Run PRDX from GitHub Actions or any CI environment to automatically plan and implement features from GitHub issues.
+
+```bash
+/prdx:prdx --ci --issue 42
+```
+
+This fetches the GitHub issue, generates a PRD, implements it, and creates a PR — all non-interactively.
+
+### Setup
+
+1. Configure plans directory (one-time, interactive):
+   ```bash
+   /prdx:config plans local
+   ```
+
+2. Ensure GitHub CLI is authenticated in your CI environment.
+
+3. Add to your workflow:
+   ```yaml
+   - name: Implement feature
+     run: |
+       claude "/prdx:prdx --ci --issue ${{ github.event.issue.number }}"
+   ```
+
+### What CI mode does differently
+
+- Skips all interactive prompts (no "Implement now?" / "Create PR?" decision points)
+- Fetches issue title + body as the feature description
+- Auto-detects platform from codebase
+- Generates PRD, implements, and creates PR in one shot
+- Posts the generated PRD as a comment on the issue
+- Requires pre-configured plans directory (`.prdx/plans-setup-done` must exist)
+
+## Installation
+
+### Option 1: GitHub Marketplace (Recommended)
+
+```bash
+/plugin marketplace add kuuuurt/prdx
+/plugin install prdx@prdx
+```
+
+### Option 2: Local Development
+
+```bash
+git clone https://github.com/kuuuurt/prdx.git ~/prdx
+/plugin marketplace add ~/prdx
+/plugin install prdx-local@prdx
+```
+
+### Option 3: Symlink
+
+```bash
+git clone https://github.com/kuuuurt/prdx.git
+ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
+```
+
+## Commands
+
+### Main Workflow
+
+| Command | Description |
+|---------|-------------|
+| **`/prdx:prdx`** | **Complete workflow orchestrator (recommended)** |
+| `/prdx:plan` | Create PRD |
+| `/prdx:implement` | Implement feature |
+| `/prdx:push` | Create pull request (supports `--draft`) |
+
+### Standalone (no PRD required)
+
+| Command | Description |
+|---------|-------------|
+| `/prdx:commit` | Create commit using prdx.json config |
+| `/prdx:simplify` | Simplify code with pragmatic cleanup |
+| `/prdx:push` | Also works standalone (auto-detects PRD or creates PR from commits) |
+
+### Management
+
+| Command | Description |
+|---------|-------------|
+| `/prdx:show` | View/list/search PRDs |
+| `/prdx:config` | Configure settings |
+| `/prdx:publish` | Create GitHub issue from PRD |
+
 ## Why This Approach?
 
-**Native plan mode** handles PRD creation - plans auto-save to `~/.claude/plans/prdx-*.md`.
+**Native plan mode** handles PRD creation — plans auto-save to `~/.claude/plans/prdx-*.md`.
 
 **Context-isolated agents** handle implementation, keeping the main conversation lightweight:
 
@@ -198,76 +322,17 @@ Optional: /prdx:publish adds GitHub issue link at any status (metadata, not a wo
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Quick Start
+## Multi-Platform Support
 
-### One Command Workflow
-
-```bash
-/prdx:prdx "add biometric authentication to Android app"
-```
-
-This orchestrates the entire workflow with decision points at each phase.
-Plans auto-save to `~/.claude/plans/prdx-{slug}.md`.
-Stop anytime and resume with `/prdx:prdx <slug>`.
-
-### Individual Commands
+For features spanning multiple platforms, PRDX uses a parent-child model:
 
 ```bash
-/prdx:plan "add biometric auth"          # Create PRD
-/prdx:implement android-biometric-auth   # Implement feature
-/prdx:push android-biometric-auth        # Create PR
+/prdx:prdx "add biometric authentication"
+# → Creates parent PRD + child PRDs (one per platform)
+# → Each child gets its own branch and PR
+# → Implementation Order controls sequencing
+# → Children on the same step can run in parallel sessions
 ```
-
-## Installation
-
-### Option 1: GitHub Marketplace
-
-```bash
-/plugin marketplace add kuuuurt/prdx
-/plugin install prdx@prdx
-```
-
-### Option 2: Local Development
-
-```bash
-git clone https://github.com/kuuuurt/prdx.git ~/prdx
-/plugin marketplace add ~/prdx
-/plugin install prdx-local@prdx
-```
-
-### Option 3: Symlink
-
-```bash
-git clone https://github.com/kuuuurt/prdx.git
-ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
-```
-
-## Commands
-
-### Main Workflow
-
-| Command | Description |
-|---------|-------------|
-| **`/prdx:prdx`** | **Complete workflow orchestrator (recommended)** |
-| `/prdx:plan` | Create PRD |
-| `/prdx:implement` | Implement feature |
-| `/prdx:push` | Create pull request |
-
-### Standalone (no PRD required)
-
-| Command | Description |
-|---------|-------------|
-| `/prdx:commit` | Create commit using prdx.json config |
-| `/prdx:simplify` | Simplify code with pragmatic cleanup |
-| `/prdx:push` | Also works standalone (auto-detects PRD or creates PR from commits) |
-
-### Management
-
-| Command | Description |
-|---------|-------------|
-| `/prdx:show` | View/list/search PRDs |
-| `/prdx:config` | Configure settings |
-| `/prdx:publish` | Create GitHub issue from PRD |
 
 ## Agents
 
@@ -276,7 +341,8 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 │  Workflow Agents                                                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  prdx:dev-planner    │ Creates detailed technical implementation plans     │
-│  prdx:code-reviewer  │ Reviews diff against acceptance criteria            │
+│  prdx:ac-verifier    │ Verifies acceptance criteria (3-point check)       │
+│  prdx:code-reviewer  │ Reviews diff for bugs, security, quality           │
 │  prdx:pr-author      │ Creates comprehensive PR descriptions              │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  Platform Agents (framework-agnostic, discovers stack from codebase)       │
@@ -295,47 +361,13 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 Note: PRD creation uses Claude's native plan mode (not a custom agent).
 ```
 
-## PRD Structure
-
-PRDs are stored in `~/.claude/plans/` with `prdx-` prefix:
-
-```markdown
-# Feature Title
-
-**Type:** feature | bug-fix | refactor | spike
-**Platform:** backend | frontend | android | ios | mobile
-**Platforms:** android, ios (only for mobile - lists target platforms)
-**Status:** planning | in-progress | review | implemented | completed
-**Created:** YYYY-MM-DD
-**Branch:** feat/feature-slug
-
-## Problem
-[What pain point exists?]
-
-## Goal
-[What outcome do we want?]
-
-## User Stories
-- As a [user type], I want to [action] so that [benefit]
-
-## Acceptance Criteria
-- [ ] [Testable outcome]
-
-## Scope
-### Included / ### Excluded
-
-## Approach
-[High-level strategy]
-
-## Risks & Considerations
-```
-
 ## Configuration
 
 ```bash
 /prdx:config minimal     # Conventional commits, no extras
 /prdx:config standard    # Full attribution (default)
 /prdx:config simple      # Simple commits with attribution
+/prdx:config plans local # Store plans in project directory (.prdx/plans/)
 ```
 
 Or create `prdx.json`:
@@ -354,7 +386,7 @@ Or create `prdx.json`:
 
 - **Claude Code** (claude.ai/code)
 - **Git repository**
-- **GitHub CLI** (`gh`) - Optional, for GitHub integration
+- **GitHub CLI** (`gh`) — Optional, for GitHub integration (required for CI mode)
 
 ## License
 
