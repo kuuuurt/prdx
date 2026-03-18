@@ -94,12 +94,17 @@ if grep -q "^\*\*Branch:\*\*" "$PRD_FILE"; then
         echo "Current: $CURRENT_BRANCH"
         echo "Expected: $EXPECTED_BRANCH"
         echo ""
-        read -p "Switch to $EXPECTED_BRANCH? (y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [ "$CI" = "true" ]; then
+            echo "CI mode: auto-switching to $EXPECTED_BRANCH"
             git checkout "$EXPECTED_BRANCH" 2>/dev/null || git checkout -b "$EXPECTED_BRANCH"
         else
-            exit 1
+            read -p "Switch to $EXPECTED_BRANCH? (y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                git checkout "$EXPECTED_BRANCH" 2>/dev/null || git checkout -b "$EXPECTED_BRANCH"
+            else
+                exit 1
+            fi
         fi
     fi
 fi
@@ -109,10 +114,14 @@ if [ -n "$(git status --porcelain)" ]; then
     echo "You have uncommitted changes"
     git status --short
     echo ""
-    read -p "Continue anyway? (y/n) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
+    if [ "$CI" = "true" ]; then
+        echo "CI mode: continuing with uncommitted changes"
+    else
+        read -p "Continue anyway? (y/n) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
     fi
 fi
 

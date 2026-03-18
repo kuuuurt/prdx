@@ -1,6 +1,6 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[--quick] [feature description or PRD slug]"
+argument-hint: "[--quick] [--ci] [--issue <number>] [feature description or PRD slug]"
 ---
 
 # /prdx:prdx - Complete Feature Workflow
@@ -40,6 +40,8 @@ ls .prdx/plans-setup-done 2>/dev/null
 ```
 
 If the file does NOT exist (first PRDX run in this project):
+
+**If `CI_MODE=true`:** Skip to Step 1 — CI mode validates plans-setup-done separately and never prompts.
 
 1. Use AskUserQuestion:
    - Option 1: "Project-local plans" (Recommended) — Plans saved inside this project directory (.prdx/plans/)
@@ -241,6 +243,48 @@ If no active state file qualifies (or no state files exist), continue with norma
   - Set `QUICK_MODE=true`, skip PRD matching, go directly to Phase 2 (planning)
 - If `--quick` is NOT present, continue with normal entry point logic below
 
+**Next, parse `--ci` and `--issue` flags:**
+- Strip `--ci` from arguments if present
+- Strip `--issue {number}` from arguments if present (captures the number)
+- If `--issue` is present (with or without `--ci`):
+  - Store `ISSUE_NUMBER` from the `--issue` flag
+  - Set `HAS_ISSUE=true`
+  - **Fetch issue:**
+    ```bash
+    gh issue view {ISSUE_NUMBER} --json title,body,labels
+    ```
+    If issue not found, error:
+    ```
+    Issue #{ISSUE_NUMBER} not found or not accessible.
+    ```
+    Store the issue title as `ISSUE_TITLE` and body as `ISSUE_BODY`
+  - Use `ISSUE_TITLE` + `ISSUE_BODY` as the feature description for planning (replaces any text argument)
+- If `--ci` is present:
+  - Set `CI_MODE=true`
+  - `--issue` is required when `--ci` is set — error if missing:
+    ```
+    --ci requires --issue. Usage: /prdx:prdx --ci --issue 42
+    ```
+  - **Skip the state-file resume scan entirely** (do not check `.prdx/state/` for active workflows)
+  - **Skip the plans-directory setup prompt** — require `.prdx/plans-setup-done` to exist:
+    ```bash
+    if [ ! -f .prdx/plans-setup-done ]; then
+      echo "CI mode requires plans directory to be pre-configured."
+      echo "Run /prdx:config plans local (or global) interactively first."
+      exit 1
+    fi
+    ```
+  - **Validate GitHub CLI:**
+    ```bash
+    if ! gh auth status >/dev/null 2>&1; then
+      echo "CI mode requires authenticated GitHub CLI."
+      echo "Run: gh auth login"
+      exit 1
+    fi
+    ```
+  - **Jump directly to the CI workflow** (skip all interactive steps — go to Step 2-CI)
+- If `--ci` is NOT present, continue with normal entry point logic below (issue data is available via `HAS_ISSUE` if `--issue` was provided)
+
 **If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
 - Read PRD and check its `**Status:**` field
 - **Detect quick mode from PRD:** If the PRD contains `**Quick:** true`, set `QUICK_MODE=true` internally
@@ -317,6 +361,8 @@ Run the planning command with the feature description:
 /prdx:plan [description]
 ```
 
+**If `HAS_ISSUE=true`:** Pass the issue context to plan mode as the description: `"{ISSUE_TITLE}. {ISSUE_BODY}"`. This gives plan mode the full issue content to work with.
+
 This enters native plan mode and creates a PRD following the PRDX template format. Plan.md derives the slug from the description early (Step 0) and writes the state file immediately — no tentative IDs needed.
 
 > **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
@@ -326,6 +372,21 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 2. The PRD file exists in `{PLANS_DIR}/prdx-{slug}.md`
 
 **⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
+
+**If `HAS_ISSUE=true`:** After plan mode exits and before showing the decision point, automatically comment the PRD on the issue:
+
+```bash
+gh issue comment {ISSUE_NUMBER} --body "$(cat <<'PRDBODY'
+## PRDX: Generated PRD
+
+---
+
+{FULL PRD CONTENT}
+PRDBODY
+)"
+```
+
+Display: `PRD commented on issue #{ISSUE_NUMBER}`
 
 Route based on the user's choice from plan.md:
 - Publish → Phase 2a (then ask about implementation)
@@ -351,6 +412,191 @@ After issue is created, use AskUserQuestion:
 Route based on choice:
 - Yes → Phase 3
 - No → End workflow (keep state file for future resume)
+
+---
+
+### Step 2-CI: Direct PRD Generation (CI Mode)
+
+**This step runs ONLY when `CI_MODE=true`.** It replaces the interactive plan mode (Step 2) with direct PRD generation.
+
+**2-CI.1: Derive slug and detect platform:**
+
+Derive `{SLUG}` from `ISSUE_TITLE` by converting to kebab-case (lowercase, spaces/special chars to hyphens, strip leading/trailing hyphens, collapse multiple hyphens).
+
+Detect platform from codebase (same logic as `/prdx:plan` Step 1 — check directories, config files, issue title keywords). Use single-platform detection only (CI mode does not support multi-platform).
+
+Detect project name:
+```bash
+PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+```
+
+**2-CI.2: Explore codebase:**
+
+Use `prdx:code-explorer` agent to understand the codebase context relevant to the issue:
+
+```
+subagent_type: "prdx:code-explorer"
+
+prompt: "Explore this codebase to understand patterns and architecture relevant to this task:
+
+Title: {ISSUE_TITLE}
+Description: {ISSUE_BODY}
+
+Focus on: existing patterns, relevant files, architecture layers, and conventions that would inform implementation. Return a concise summary."
+```
+
+**2-CI.3: Write PRD file:**
+
+Use the Write tool to create `{PLANS_DIR}/prdx-{SLUG}.md` with the full PRD template:
+
+```markdown
+# {ISSUE_TITLE}
+
+**Type:** {auto-detect from issue: "bug-fix" if title/body contains "bug"/"fix"/"broken", "refactor" if contains "refactor"/"cleanup", else "feature"}
+**Project:** {PROJECT_NAME}
+**Platform:** {DETECTED_PLATFORM}
+**Status:** planning
+**Created:** {TODAY's DATE}
+**Branch:** {TYPE_PREFIX}/{SLUG}
+
+## Problem
+
+{Extract from ISSUE_BODY — the problem statement or first paragraph}
+
+## Goal
+
+{Derive from issue title and body — the desired outcome}
+
+## Acceptance Criteria
+
+{Extract from ISSUE_BODY if present (look for checkboxes, "acceptance criteria", numbered lists), otherwise derive 2-3 testable criteria from the issue description}
+
+## Approach
+
+{Generate based on codebase exploration results — high-level strategy for implementation}
+
+## Risks & Considerations
+
+{Generate 1-2 risks based on codebase exploration and issue complexity}
+```
+
+Use the codebase exploration results from step 2-CI.2 to inform the Approach and Risks sections.
+
+**2-CI.4: Comment PRD on issue:**
+
+Post the generated PRD as a comment on the originating issue:
+
+```bash
+gh issue comment {ISSUE_NUMBER} --body "$(cat <<'PRDBODY'
+## PRDX: Auto-Generated PRD
+
+_This PRD was automatically generated by PRDX CI mode. Implementation will begin shortly._
+
+---
+
+{FULL PRD CONTENT}
+PRDBODY
+)"
+```
+
+**2-CI.5: Write state file:**
+
+```bash
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "implementing", "quick": false}
+EOF
+```
+
+**2-CI.6: Proceed directly to Step 3-CI.**
+
+---
+
+### Step 3-CI: Implement and Push (CI Mode)
+
+**This step runs ONLY when `CI_MODE=true`.** It replaces the interactive Steps 3-4 with a straight-line execution path.
+
+**3-CI.1: Set up git branch:**
+
+Create and checkout the feature branch from the PRD:
+
+```bash
+BRANCH=$(grep "^\*\*Branch:\*\*" {PLANS_DIR}/prdx-{SLUG}.md | sed 's/\*\*Branch:\*\* //')
+git checkout "$BRANCH" 2>/dev/null || git checkout -b "$BRANCH"
+```
+
+**3-CI.2: Implement:**
+
+Run `/prdx:implement {SLUG}` — this invokes the full implementation pipeline (dev-planner → platform agent → code reviewer) non-interactively. The `CI=true` env var must be set in the runner environment (GitHub Actions sets this automatically) so that `pre-implement.sh` auto-answers prompts.
+
+**Ensure `CI=true` is set** before invoking implement:
+```bash
+export CI=true
+```
+
+```
+/prdx:implement {SLUG}
+```
+
+Wait for implementation to complete.
+
+**3-CI.3: Push PR with issue reference:**
+
+After implementation completes, create a non-draft PR that references the originating issue.
+
+Update state file:
+```bash
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "pushing", "quick": false}
+EOF
+```
+
+Invoke the pr-author agent with the issue reference:
+
+```
+subagent_type: "prdx:pr-author"
+
+prompt: "Create a pull request for this PRD.
+
+Mode: prd
+PRD Slug: {SLUG}
+PRD File: {PLANS_DIR}/prdx-{SLUG}.md
+Branch: {BRANCH}
+Base Branch: {DEFAULT_BRANCH}
+Draft: false
+
+IMPORTANT: Include 'Closes #{ISSUE_NUMBER}' in the PR body to link and auto-close the GitHub issue.
+
+Read the PRD, analyze commits, create comprehensive PR description,
+execute gh pr create, and update PRD with PR metadata.
+
+Return only the PR summary (number, URL, title)."
+```
+
+**3-CI.4: Update state and display completion:**
+
+After PR is created, transition state to `"pushed"`:
+
+```bash
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "pushed", "quick": false, "pr_number": {PR_NUMBER}}
+EOF
+```
+
+Display:
+```
+CI Mode Complete!
+
+PRD: {PLANS_DIR}/prdx-{SLUG}.md
+PR: #{PR_NUMBER}
+Issue: #{ISSUE_NUMBER} (will auto-close on merge)
+
+Lessons will be captured automatically after PR is merged.
+```
+
+**End of CI workflow.** No further decision points.
 
 ---
 
@@ -557,6 +803,8 @@ Route based on choice:
 - Create PR → Run `/prdx:push [slug]`
 - Create Draft PR → Run `/prdx:push [slug] --draft`
 - Wait → End workflow (keep state file for future resume)
+
+**If `HAS_ISSUE=true`:** When invoking `/prdx:push`, ensure the pr-author agent includes `Closes #{ISSUE_NUMBER}` in the PR body to link and auto-close the issue on merge. Pass this as additional context in the agent prompt.
 
 **Update workflow state before PR creation:**
 ```bash
