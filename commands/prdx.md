@@ -542,7 +542,7 @@ Wait for implementation to complete.
 
 **3-CI.3: Push PR with issue reference:**
 
-After implementation completes, create a non-draft PR that references the originating issue.
+After implementation completes, create a draft PR that references the originating issue.
 
 Update state file:
 ```bash
@@ -564,7 +564,7 @@ PRD Slug: {SLUG}
 PRD File: {PLANS_DIR}/prdx-{SLUG}.md
 Branch: {BRANCH}
 Base Branch: {DEFAULT_BRANCH}
-Draft: false
+Draft: true
 
 IMPORTANT: Include 'Closes #{ISSUE_NUMBER}' in the PR body to link and auto-close the GitHub issue.
 
