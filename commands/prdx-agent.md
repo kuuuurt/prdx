@@ -50,7 +50,7 @@ echo "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAM
 | **Lead** | _(main session)_ | You | Steers project, makes decisions, relays between teammates |
 | **Architect** | `architect` | `prdx:code-explorer` + `prdx:dev-planner` | Explores codebase, creates PRD, creates dev plan, answers questions |
 | **Platform Dev** | `{platform}-dev` | `prdx:{platform}-developer` | Implements the dev plan for their platform |
-| **Auditor** | `auditor` | `prdx:code-reviewer` | Reviews implementation, verifies ACs, validates tests |
+| **Auditor** | `auditor` | `prdx:ac-verifier` + `prdx:code-reviewer` | Verifies ACs, then reviews code quality |
 
 **Rules:**
 - **1:1 rule**: Exactly one developer per platform. No exceptions.
@@ -406,28 +406,20 @@ Agent tool:
     WAIT for the lead to send you the dev plan before starting."
 ```
 
-**Auditor:**
+**Auditor (AC Verifier):**
 ```
 Agent tool:
   team_name: "prdx-{SLUG}"
   name: "auditor"
-  subagent_type: "prdx:code-reviewer"
-  prompt: "You are the **auditor** on team prdx-{SLUG}.
+  subagent_type: "prdx:ac-verifier"
+  prompt: "You are the **auditor** (AC verification) on team prdx-{SLUG}.
 
     ## Your Role
 
-    Review the implementation after it's complete. You verify:
-    1. Acceptance criteria are actually met (not just claimed)
-    2. Tests are meaningful (not just added for coverage)
-    3. No bugs, security issues, or quality problems
-    4. Code follows project conventions
-
-    ## Rules
-
-    - Only report issues with >80% confidence
-    - Categorize issues: bug, security, quality, missing-ac
-    - Include file path and line number for each issue
-    - Verify tests actually test the right behavior
+    Verify acceptance criteria are met using the 3-point check:
+    1. Code exists — implementation addresses the AC
+    2. Test exists — at least one test covers the AC
+    3. Coverage — test covers happy path AND error/edge cases
 
     ## Acceptance Criteria
 
@@ -435,11 +427,39 @@ Agent tool:
 
     ## Communication
 
-    - WAIT for the lead to message you before starting your review
+    - WAIT for the lead to message you before starting
+    - Send your AC verification summary to the lead via SendMessage (~1KB max)
+    - If the lead asks you to re-verify after fixes, do so
+
+    WAIT for the lead to tell you when to start."
+```
+
+**Auditor (Code Reviewer):**
+```
+Agent tool:
+  team_name: "prdx-{SLUG}"
+  name: "reviewer"
+  subagent_type: "prdx:code-reviewer"
+  prompt: "You are the **reviewer** (code quality) on team prdx-{SLUG}.
+
+    ## Your Role
+
+    Review implementation for bugs, security issues, quality problems, and convention adherence.
+
+    ## Rules
+
+    - Only report issues with >80% confidence
+    - Categorize issues: bug, security, quality
+    - Include file path and line number for each issue
+    - Do NOT check acceptance criteria (handled by ac-verifier)
+
+    ## Communication
+
+    - WAIT for the lead to message you before starting
     - Send your review summary to the lead via SendMessage (~2KB max)
     - If the lead asks you to re-review after fixes, do so
 
-    WAIT for the lead to tell you when to start reviewing."
+    WAIT for the lead to tell you when to start."
 ```
 
 #### Step 4.6: Implementation (Platform Developer)
@@ -477,30 +497,82 @@ Wait for the platform dev's implementation summary. Store it as `IMPL_SUMMARY`.
 
 Display:
 ```
-Implementation complete. Starting code review.
+Implementation complete. Starting AC verification.
 ```
 
-#### Step 4.7: Code Review (Auditor)
+#### Step 4.7a: AC Verification (Auditor)
 
-Message the auditor to begin review:
+Message the auditor to verify acceptance criteria:
 
 ```
 SendMessage:
   type: "message"
   recipient: "auditor"
-  content: "Implementation is complete. Review the diff now.
+  content: "Implementation is complete. Verify acceptance criteria now.
 
   Base branch: {DEFAULT_BRANCH}
   Run: git diff {DEFAULT_BRANCH}..HEAD
 
-  Verify all acceptance criteria are met.
-  Check for bugs, security issues, and code quality.
+  Perform the 3-point check for each AC.
+  Send me your AC verification summary."
+```
+
+Wait for auditor's AC verification message.
+
+**If all ACs verified:** Proceed to Step 4.7b.
+
+**If ACs unmet (AC fix loop — max 3 attempts):**
+
+1. Display AC verification summary to user
+2. Relay unmet ACs to platform dev:
+   ```
+   SendMessage:
+     type: "message"
+     recipient: "{PLATFORM}-dev"
+     content: "The auditor found unmet acceptance criteria. Fix them:
+
+     {UNMET_ACS}
+
+     Write missing tests where indicated.
+     Commit fixes and message me when done."
+   ```
+3. Wait for platform dev's fix confirmation
+4. Message auditor to re-verify:
+   ```
+   SendMessage:
+     type: "message"
+     recipient: "auditor"
+     content: "Fixes applied. Re-verify ACs (git diff {DEFAULT_BRANCH}..HEAD).
+
+     Send me your updated AC verification."
+   ```
+5. Wait for auditor's re-verification
+6. If ACs still unmet and attempts < 3, loop back to step 2
+7. **If ACs still unmet after 3 attempts:** Offer user choice via AskUserQuestion:
+   - Option 1: "Proceed to code review" (Recommended) — Continue with noted AC gaps
+   - Option 2: "Fix manually" — Stop, user fixes AC issues
+   - Option 3: "Stop" — End workflow
+
+#### Step 4.7b: Code Review (Reviewer)
+
+Message the reviewer to begin code quality review:
+
+```
+SendMessage:
+  type: "message"
+  recipient: "reviewer"
+  content: "Review the implementation now.
+
+  Base branch: {DEFAULT_BRANCH}
+  Run: git diff {DEFAULT_BRANCH}..HEAD
+
+  Check for bugs, security issues, quality problems, and convention adherence.
   Only report issues with >80% confidence.
 
   Send me your review summary."
 ```
 
-Wait for auditor's review message.
+Wait for reviewer's review message.
 
 **If no issues found:** Proceed to Step 4.8.
 
@@ -512,27 +584,29 @@ Wait for auditor's review message.
    SendMessage:
      type: "message"
      recipient: "{PLATFORM}-dev"
-     content: "The auditor found these issues. Fix them:
+     content: "The reviewer found these issues. Fix them:
 
      {REVIEW_ISSUES}
 
      Commit fixes and message me when done."
    ```
 3. Wait for platform dev's fix confirmation
-4. Message auditor to re-review:
+4. Message reviewer to re-review:
    ```
    SendMessage:
      type: "message"
-     recipient: "auditor"
+     recipient: "reviewer"
      content: "Fixes applied. Re-review the diff (git diff {DEFAULT_BRANCH}..HEAD).
 
      Send me your updated review."
    ```
-5. Wait for auditor's second review
+5. Wait for reviewer's second review
 6. **If issues remain after cycle 2:** Note remaining issues, offer user choice via AskUserQuestion:
    - Option 1: "Proceed anyway" (Recommended) — Continue with noted issues
    - Option 2: "Fix manually" — Stop, user fixes remaining issues
    - Option 3: "Stop" — End workflow
+
+**If no issues after fixes:** Proceed to Step 4.8.
 
 #### Step 4.8: Shutdown Team
 
@@ -631,7 +705,7 @@ State transitions: `pushing` → `pushed` (for non-draft) or `reviewing` (for dr
 - **Handle teammate failures gracefully.** If a teammate stops responding or errors:
   - Architect fails: fall back to invoking `prdx:dev-planner` as a standard subagent (Agent tool)
   - Platform dev fails: offer user choice — retry (spawn new dev), continue manually, or stop
-  - Auditor fails: fall back to invoking `prdx:code-reviewer` as a standard subagent
+  - Auditor fails: fall back to invoking `prdx:ac-verifier` then `prdx:code-reviewer` as standard subagents
 - **Task tools are advisory.** Attempt TaskCreate/TaskList/TaskUpdate for visibility. If they fail (VSCode limitation), skip silently. SendMessage is the primary coordination mechanism.
 
 **Context efficiency:**
@@ -640,7 +714,8 @@ The lead's context stays lean. Teammate messages are the only data entering the 
 - Architect PRD draft: full template (~2KB normal, ~500B quick)
 - Architect dev plan: ~3KB
 - Platform dev summary: ~2KB
-- Auditor review: ~2KB
+- Auditor AC verification: ~1KB
+- Reviewer code quality: ~2KB
 - Total: ~9KB for a full workflow (vs ~8KB in sequential mode — comparable)
 
 **Error handling:**

@@ -347,7 +347,8 @@ prdx/
 ├── agents/                  # Specialized agents
 │   ├── dev-planner.md       # Technical planning (isolated context)
 │   ├── pr-author.md         # PR creation (isolated context)
-│   ├── code-reviewer.md     # Code review (isolated context)
+│   ├── ac-verifier.md       # AC verification (isolated context)
+│   ├── code-reviewer.md     # Code quality review (isolated context)
 │   ├── backend-developer.md # Backend expert (discovers stack)
 │   ├── frontend-developer.md # Frontend/web expert (discovers stack)
 │   ├── android-developer.md # Kotlin/Compose expert
@@ -571,7 +572,7 @@ Same workflow as `/prdx:prdx` but uses Claude Code's experimental agent teams fo
 - **Lead** (main session): Steers project, makes decisions, relays between teammates
 - **Architect** (`prdx:dev-planner`): Explores codebase, creates PRD, creates dev plan, answers questions during implementation
 - **Platform Dev** (`prdx:{platform}-developer`): Implements the dev plan. Strict 1:1 — one dev per platform
-- **Auditor** (`prdx:code-reviewer`): Reviews implementation, verifies ACs, validates tests
+- **Auditor** (`prdx:ac-verifier` + `prdx:code-reviewer`): Verifies ACs, then reviews code quality in 2 passes
 
 **Key differences from `/prdx:prdx`:**
 - Architect handles both PRD creation AND dev planning (persistent context)
@@ -614,10 +615,11 @@ Same workflow as `/prdx:prdx` but uses Claude Code's experimental agent teams fo
 6. Parses dev plan into phases (phase-summary JSON → header regex → single-phase fallback)
 7. Executes phases one at a time — platform agent invoked per phase with focused context
 8. Phase progress displayed: "Phase 2/4: Core Logic (sequential)..."
-9. Invokes `prdx:code-reviewer` agent (isolated) to validate implementation
-10. If issues found: platform agent fixes, re-review (max 2 cycles)
-11. Runs `post-implement.sh` hook (runs tests, updates status)
-12. Appends implementation summary to PRD
+9. Invokes `prdx:ac-verifier` agent (isolated) to verify acceptance criteria
+10. If ACs unmet: loops fix → re-verify until pass or 3 attempts exhausted
+11. Invokes `prdx:code-reviewer` agent (isolated) for bugs/security/quality (max 2 fix cycles)
+12. Runs `post-implement.sh` hook (runs tests, updates status)
+13. Appends implementation summary to PRD
 
 **Phased execution:**
 - Dev plan is parsed into phases using three-layer fallback (phase-summary JSON → header regex → single phase)
@@ -629,9 +631,10 @@ Same workflow as `/prdx:prdx` but uses Claude Code's experimental agent teams fo
 **Agents used (all isolated):**
 - `prdx:dev-planner` → returns dev plan with phase-summary JSON (~3KB)
 - Platform agent → invoked N times (once per phase), returns summary per phase (~1KB each)
+- `prdx:ac-verifier` → returns AC verification status (~1KB)
 - `prdx:code-reviewer` → returns review summary (~2KB)
 
-**Why three agents:** Dev-planner creates the roadmap with phases; platform agent executes one phase at a time; code reviewer catches issues before user handoff.
+**Why four agents:** Dev-planner creates the roadmap with phases; platform agent executes one phase at a time; ac-verifier confirms ACs are met; code reviewer catches quality issues before user handoff.
 
 ### /prdx:push
 
@@ -683,10 +686,15 @@ Agents run in **isolated contexts** to minimize main conversation size.
 - Updates PRD with PR metadata
 - **Returns:** PR URL and number only (~100B)
 
-**3. prdx:code-reviewer**
-- Reviews diff against acceptance criteria
-- Flags bugs, security issues, quality problems
+**3. prdx:ac-verifier**
+- Verifies acceptance criteria with 3-point check (code exists, test exists, coverage)
+- Independent verification — does not trust implementation self-reports
+- **Returns:** AC verification status (~1KB)
+
+**4. prdx:code-reviewer**
+- Reviews diff for bugs, security issues, quality problems, convention adherence
 - Only reports high-confidence issues (>80%)
+- Does NOT check ACs (handled by ac-verifier)
 - **Returns:** Review summary (~2KB)
 
 **Note:** PRD creation uses native plan mode instead of a custom agent.
