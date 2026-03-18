@@ -264,12 +264,11 @@ If no active state file qualifies (or no state files exist), continue with norma
     ```
   - **Validate GitHub CLI:**
     ```bash
-    gh auth status 2>/dev/null
-    ```
-    If not authenticated, error:
-    ```
-    CI mode requires authenticated GitHub CLI.
-    Run: gh auth login
+    if ! gh auth status >/dev/null 2>&1; then
+      echo "CI mode requires authenticated GitHub CLI."
+      echo "Run: gh auth login"
+      exit 1
+    fi
     ```
   - **Fetch issue:**
     ```bash
@@ -503,12 +502,17 @@ Create and checkout the feature branch from the PRD:
 
 ```bash
 BRANCH=$(grep "^\*\*Branch:\*\*" {PLANS_DIR}/prdx-{SLUG}.md | sed 's/\*\*Branch:\*\* //')
-git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+git checkout "$BRANCH" 2>/dev/null || git checkout -b "$BRANCH"
 ```
 
 **3-CI.2: Implement:**
 
-Run `/prdx:implement {SLUG}` — this invokes the full implementation pipeline (dev-planner → platform agent → code reviewer) non-interactively. The `pre-implement.sh` hook will auto-answer prompts because `CI=true` is set in the environment.
+Run `/prdx:implement {SLUG}` — this invokes the full implementation pipeline (dev-planner → platform agent → code reviewer) non-interactively. The `CI=true` env var must be set in the runner environment (GitHub Actions sets this automatically) so that `pre-implement.sh` auto-answers prompts.
+
+**Ensure `CI=true` is set** before invoking implement:
+```bash
+export CI=true
+```
 
 ```
 /prdx:implement {SLUG}
