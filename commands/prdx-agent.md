@@ -50,7 +50,7 @@ echo "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAM
 | **Lead** | _(main session)_ | You | Steers project, makes decisions, relays between teammates |
 | **Architect** | `architect` | `prdx:code-explorer` + `prdx:dev-planner` | Explores codebase, creates PRD, creates dev plan, answers questions |
 | **Platform Dev** | `{platform}-dev` | `prdx:{platform}-developer` | Implements the dev plan for their platform |
-| **Auditor** | `auditor` | `prdx:ac-verifier` + `prdx:code-reviewer` | Verifies ACs, then reviews code quality (2 passes) |
+| **Auditor** | `auditor` | `prdx:ac-verifier` + `prdx:code-reviewer` | Verifies ACs, then reviews code quality |
 
 **Rules:**
 - **1:1 rule**: Exactly one developer per platform. No exceptions.
@@ -445,7 +445,6 @@ Agent tool:
     ## Your Role
 
     Review implementation for bugs, security issues, quality problems, and convention adherence.
-    You always run 2 passes: first review, then verify after fixes.
 
     ## Rules
 
@@ -458,7 +457,7 @@ Agent tool:
 
     - WAIT for the lead to message you before starting
     - Send your review summary to the lead via SendMessage (~2KB max)
-    - You will always be asked to review twice (pass 1 and pass 2)
+    - If the lead asks you to re-review after fixes, do so
 
     WAIT for the lead to tell you when to start."
 ```
@@ -554,15 +553,15 @@ Wait for auditor's AC verification message.
    - Option 2: "Fix manually" — Stop, user fixes AC issues
    - Option 3: "Stop" — End workflow
 
-#### Step 4.7b: Code Review — Pass 1 (Reviewer)
+#### Step 4.7b: Code Review (Reviewer)
 
-Message the reviewer for the first code quality pass:
+Message the reviewer to begin code quality review:
 
 ```
 SendMessage:
   type: "message"
   recipient: "reviewer"
-  content: "Run code review pass 1 of 2.
+  content: "Review the implementation now.
 
   Base branch: {DEFAULT_BRANCH}
   Run: git diff {DEFAULT_BRANCH}..HEAD
@@ -575,7 +574,10 @@ SendMessage:
 
 Wait for reviewer's review message.
 
-**If issues found:**
+**If no issues found:** Proceed to Step 4.8.
+
+**If issues found (review cycle 1):**
+
 1. Display review summary to user
 2. Relay issues to platform dev:
    ```
@@ -589,36 +591,22 @@ Wait for reviewer's review message.
      Commit fixes and message me when done."
    ```
 3. Wait for platform dev's fix confirmation
+4. Message reviewer to re-review:
+   ```
+   SendMessage:
+     type: "message"
+     recipient: "reviewer"
+     content: "Fixes applied. Re-review the diff (git diff {DEFAULT_BRANCH}..HEAD).
 
-**Always proceed to Step 4.7c** (whether issues were found or not).
+     Send me your updated review."
+   ```
+5. Wait for reviewer's second review
+6. **If issues remain after cycle 2:** Note remaining issues, offer user choice via AskUserQuestion:
+   - Option 1: "Proceed anyway" (Recommended) — Continue with noted issues
+   - Option 2: "Fix manually" — Stop, user fixes remaining issues
+   - Option 3: "Stop" — End workflow
 
-#### Step 4.7c: Code Review — Pass 2 (Reviewer)
-
-Message the reviewer for the verification pass:
-
-```
-SendMessage:
-  type: "message"
-  recipient: "reviewer"
-  content: "Run code review pass 2 of 2 (verification).
-
-  Base branch: {DEFAULT_BRANCH}
-  Run: git diff {DEFAULT_BRANCH}..HEAD
-
-  Check for bugs, security issues, quality problems, and convention adherence.
-  Only report issues with >80% confidence.
-
-  Send me your review summary."
-```
-
-Wait for reviewer's second review.
-
-**If issues remain after pass 2:** Note remaining issues, offer user choice via AskUserQuestion:
-- Option 1: "Proceed anyway" (Recommended) — Continue with noted issues
-- Option 2: "Fix manually" — Stop, user fixes remaining issues
-- Option 3: "Stop" — End workflow
-
-**If no issues:** Proceed to Step 4.8.
+**If no issues after fixes:** Proceed to Step 4.8.
 
 #### Step 4.8: Shutdown Team
 
@@ -727,7 +715,7 @@ The lead's context stays lean. Teammate messages are the only data entering the 
 - Architect dev plan: ~3KB
 - Platform dev summary: ~2KB
 - Auditor AC verification: ~1KB
-- Reviewer code quality (2 passes): ~4KB
+- Reviewer code quality: ~2KB
 - Total: ~9KB for a full workflow (vs ~8KB in sequential mode — comparable)
 
 **Error handling:**

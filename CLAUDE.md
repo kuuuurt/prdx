@@ -617,7 +617,7 @@ Same workflow as `/prdx:prdx` but uses Claude Code's experimental agent teams fo
 8. Phase progress displayed: "Phase 2/4: Core Logic (sequential)..."
 9. Invokes `prdx:ac-verifier` agent (isolated) to verify acceptance criteria
 10. If ACs unmet: loops fix → re-verify until pass or 3 attempts exhausted
-11. Invokes `prdx:code-reviewer` agent (isolated) — always 2 passes (review → fix → verify)
+11. Invokes `prdx:code-reviewer` agent (isolated) for bugs/security/quality (max 2 fix cycles)
 12. Runs `post-implement.sh` hook (runs tests, updates status)
 13. Appends implementation summary to PRD
 
@@ -632,9 +632,9 @@ Same workflow as `/prdx:prdx` but uses Claude Code's experimental agent teams fo
 - `prdx:dev-planner` → returns dev plan with phase-summary JSON (~3KB)
 - Platform agent → invoked N times (once per phase), returns summary per phase (~1KB each)
 - `prdx:ac-verifier` → returns AC verification status (~1KB)
-- `prdx:code-reviewer` → returns review summary (~2KB), always runs 2 passes
+- `prdx:code-reviewer` → returns review summary (~2KB)
 
-**Why four agents:** Dev-planner creates the roadmap with phases; platform agent executes one phase at a time; ac-verifier confirms ACs are met; code reviewer catches quality issues in two passes (review → fix → verify).
+**Why four agents:** Dev-planner creates the roadmap with phases; platform agent executes one phase at a time; ac-verifier confirms ACs are met; code reviewer catches quality issues before user handoff.
 
 ### /prdx:push
 
@@ -694,7 +694,6 @@ Agents run in **isolated contexts** to minimize main conversation size.
 **4. prdx:code-reviewer**
 - Reviews diff for bugs, security issues, quality problems, convention adherence
 - Only reports high-confidence issues (>80%)
-- Always runs 2 passes (review → fix → verify)
 - Does NOT check ACs (handled by ac-verifier)
 - **Returns:** Review summary (~2KB)
 

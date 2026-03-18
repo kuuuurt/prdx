@@ -668,7 +668,7 @@ After all phases complete:
 
 **Display progress:**
 ```
-Phase 3/4: AC Verification — Checking acceptance criteria...
+Phase 3/3: AC Verification — Checking acceptance criteria...
 ```
 
 After all platform implementations are complete, verify that acceptance criteria are met before code review.
@@ -750,14 +750,14 @@ Route based on choice:
 
 ---
 
-#### Step 5f: Code Review — Pass 1 (prdx:code-reviewer)
+#### Step 5f: Code Review (prdx:code-reviewer)
 
 **Display progress:**
 ```
-Phase 4/4: Code Review — Pass 1 of 2...
+Code Review — Reviewing for bugs, security, and quality...
 ```
 
-Run the first code review pass focused on bugs, security, quality, and conventions.
+Run code review focused on bugs, security, quality, and conventions (AC verification already done in Step 5e).
 
 Invoke the code-reviewer agent using the Task tool:
 
@@ -808,37 +808,9 @@ prompt: "Fix the following code review issues.
 Return only a summary of fixes applied."
 ```
 
-**After fixes (or if no issues found), always proceed to Step 5g.**
+3. After fixes, re-run the code reviewer to verify (max 2 review cycles to avoid loops)
 
----
-
-#### Step 5g: Code Review — Pass 2 (prdx:code-reviewer)
-
-**Display progress:**
-```
-Code Review — Pass 2 of 2 (verification)...
-```
-
-Always run a second review pass. This catches issues introduced by fixes from Pass 1 and provides a clean verification.
-
-Invoke the code-reviewer agent using the Task tool (same prompt as Pass 1):
-
-```
-subagent_type: "prdx:code-reviewer"
-
-prompt: "Review the implementation for this PRD.
-
-PRD Slug: {SLUG}
-Base Branch: {DEFAULT_BRANCH}
-Platform: {PLATFORM}
-
-Review the diff (git diff {DEFAULT_BRANCH}..HEAD) for bugs, security issues, quality problems, and convention adherence.
-Only report high-confidence issues (>80%).
-
-Return only the review summary."
-```
-
-**If issues found on Pass 2:**
+**If 2 review cycles exhausted and issues remain:**
 
 Use AskUserQuestion to offer options:
 - Option 1: "Proceed anyway" (Recommended) — Continue to Step 6 with remaining issues noted
@@ -850,7 +822,7 @@ Route based on choice:
 - Fix manually → Display remaining issues, end workflow
 - Stop → End workflow, show how to resume with `/prdx:prdx {slug}`
 
-**If no issues found:**
+**If no issues found (or after fixes verified):**
 - Continue to Step 6
 
 ---
