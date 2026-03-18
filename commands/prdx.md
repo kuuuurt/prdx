@@ -489,7 +489,90 @@ cat > .prdx/state/{SLUG}.json << EOF
 EOF
 ```
 
-**2-CI.6: Proceed directly to Step 3-CI** (implementation — added in Phase 4).
+**2-CI.6: Proceed directly to Step 3-CI.**
+
+---
+
+### Step 3-CI: Implement and Push (CI Mode)
+
+**This step runs ONLY when `CI_MODE=true`.** It replaces the interactive Steps 3-4 with a straight-line execution path.
+
+**3-CI.1: Set up git branch:**
+
+Create and checkout the feature branch from the PRD:
+
+```bash
+BRANCH=$(grep "^\*\*Branch:\*\*" {PLANS_DIR}/prdx-{SLUG}.md | sed 's/\*\*Branch:\*\* //')
+git checkout -b "$BRANCH" 2>/dev/null || git checkout "$BRANCH"
+```
+
+**3-CI.2: Implement:**
+
+Run `/prdx:implement {SLUG}` — this invokes the full implementation pipeline (dev-planner → platform agent → code reviewer) non-interactively. The `pre-implement.sh` hook will auto-answer prompts because `CI=true` is set in the environment.
+
+```
+/prdx:implement {SLUG}
+```
+
+Wait for implementation to complete.
+
+**3-CI.3: Push PR with issue reference:**
+
+After implementation completes, create a non-draft PR that references the originating issue.
+
+Update state file:
+```bash
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "pushing", "quick": false}
+EOF
+```
+
+Invoke the pr-author agent with the issue reference:
+
+```
+subagent_type: "prdx:pr-author"
+
+prompt: "Create a pull request for this PRD.
+
+Mode: prd
+PRD Slug: {SLUG}
+PRD File: {PLANS_DIR}/prdx-{SLUG}.md
+Branch: {BRANCH}
+Base Branch: {DEFAULT_BRANCH}
+Draft: false
+
+IMPORTANT: Include 'Closes #{ISSUE_NUMBER}' in the PR body to link and auto-close the GitHub issue.
+
+Read the PRD, analyze commits, create comprehensive PR description,
+execute gh pr create, and update PRD with PR metadata.
+
+Return only the PR summary (number, URL, title)."
+```
+
+**3-CI.4: Update state and display completion:**
+
+After PR is created, transition state to `"pushed"`:
+
+```bash
+mkdir -p .prdx/state
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "pushed", "quick": false, "pr_number": {PR_NUMBER}}
+EOF
+```
+
+Display:
+```
+CI Mode Complete!
+
+PRD: {PLANS_DIR}/prdx-{SLUG}.md
+PR: #{PR_NUMBER}
+Issue: #{ISSUE_NUMBER} (will auto-close on merge)
+
+Lessons will be captured automatically after PR is merged.
+```
+
+**End of CI workflow.** No further decision points.
 
 ---
 
