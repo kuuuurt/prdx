@@ -1,6 +1,6 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[--quick] [--ci] [--issue <number>] [feature description or PRD slug]"
+argument-hint: "[--quick] [--ci] [--issue <number>] [--plan-only] [feature description or PRD slug]"
 ---
 
 # /prdx:prdx - Complete Feature Workflow
@@ -262,7 +262,7 @@ If no active state file qualifies (or no state files exist), continue with norma
     ```bash
     if [ ! -f .prdx/plans-setup-done ]; then
       echo "CI mode requires plans directory to be pre-configured."
-      echo "Run /prdx:config plans local (or global) interactively first."
+      echo "Run /prdx:config plans local interactively first."
       exit 1
     fi
     ```
@@ -274,8 +274,19 @@ If no active state file qualifies (or no state files exist), continue with norma
       exit 1
     fi
     ```
-  - **Jump directly to the CI workflow** (skip all interactive steps — go to Step 2-CI)
+  - **If `PLAN_ONLY=true`:** Jump to Step 2-CI (plan-only path)
+  - **If `PLAN_ONLY=false`:** Jump to Step 3-CI (implement path — reads PRD from existing branch)
 - If `--ci` is NOT present, continue with normal entry point logic below (issue data is available via `HAS_ISSUE` if `--issue` was provided)
+
+**Next, parse `--plan-only` flag:**
+- Strip `--plan-only` from arguments if present
+- If `--plan-only` is present:
+  - Set `PLAN_ONLY=true`
+  - `--ci` and `--issue` are required when `--plan-only` is set — error if either is missing:
+    ```
+    --plan-only requires --ci and --issue. Usage: /prdx:prdx --ci --issue 42 --plan-only
+    ```
+- If `--plan-only` is NOT present, set `PLAN_ONLY=false`
 
 **If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
 - Read PRD and check its `**Status:**` field
