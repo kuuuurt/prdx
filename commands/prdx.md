@@ -15,25 +15,20 @@ Execute the following phases based on the argument provided:
 
 ### Resolve Plans Directory
 
-Before any PRD operations, determine where plans are stored:
+Plans are always stored in `.prdx/plans/` relative to the project root:
 
 ```bash
-PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
-if [ -z "$PLANS_DIR" ]; then
-  PLANS_DIR="$HOME/.claude/plans"
-elif [[ "$PLANS_DIR" != /* ]]; then
-  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
-fi
-echo "Plans directory: $PLANS_DIR"
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PLANS_DIR="$PROJECT_ROOT/.prdx/plans"
 ```
 
-**Use `$PLANS_DIR` instead of `~/.claude/plans/` throughout this command.**
+**Use `$PLANS_DIR` throughout this command.**
 
 ### Step 0: Auto-Capture Lessons from Merged PRs
 
 **Before any other logic, check if this is the first PRDX run in this project (Plans Directory Setup).**
 
-Check if plans directory preference has been configured:
+Check if plans directory has been configured:
 
 ```bash
 ls .prdx/plans-setup-done 2>/dev/null
@@ -43,33 +38,19 @@ If the file does NOT exist (first PRDX run in this project):
 
 **If `CI_MODE=true`:** Skip to Step 1 — CI mode validates plans-setup-done separately and never prompts.
 
-1. Use AskUserQuestion:
-   - Option 1: "Project-local plans" (Recommended) — Plans saved inside this project directory (.prdx/plans/)
-   - Option 2: "Global plans" — Plans saved in ~/.claude/plans/ (shared across projects)
-
-2. If "Project-local":
+1. Auto-configure project-local plans (no user prompt):
    ```bash
    PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
    mkdir -p .claude .prdx .prdx/plans
-   # Merge plansDirectory into settings.local.json (preserve existing keys)
    if [ -f .claude/settings.local.json ]; then
      jq '. + {plansDirectory: ".prdx/plans"}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
    else
      echo '{"plansDirectory": ".prdx/plans"}' > .claude/settings.local.json
    fi
    echo "local" > .prdx/plans-setup-done
-   # Add to .gitignore if not already there
-   grep -qxF '.prdx/plans/' .gitignore 2>/dev/null || echo '.prdx/plans/' >> .gitignore
-   grep -qxF '.prdx/plans-setup-done' .gitignore 2>/dev/null || echo '.prdx/plans-setup-done' >> .gitignore
    ```
 
-3. If "Global":
-   ```bash
-   mkdir -p .prdx
-   echo "global" > .prdx/plans-setup-done
-   ```
-
-4. Re-resolve PLANS_DIR after setup (run the resolution preamble again).
+2. Re-resolve PLANS_DIR after setup.
 
 If the file DOES exist, skip this step entirely and proceed with lesson capture below.
 

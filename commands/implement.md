@@ -21,12 +21,8 @@ done
 [ "$DIR" = "/" ] && echo "Config: (defaults)"
 echo ""
 echo "=== Plans Directory ==="
-PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
-if [ -z "$PLANS_DIR" ]; then
-  PLANS_DIR="$HOME/.claude/plans"
-elif [[ "$PLANS_DIR" != /* ]]; then
-  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
-fi
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PLANS_DIR="$PROJECT_ROOT/.prdx/plans"
 echo "Plans directory: $PLANS_DIR"
 echo ""
 echo "=== Available PRDs (this project) ==="

@@ -30,9 +30,8 @@ Manage PRDX configuration interactively or via command line.
 /prdx:config hooks disable auto-simplify # Disable auto-simplify hook
 
 # Plans Directory
-/prdx:config plans                     # Show current plans directory preference
-/prdx:config plans local               # Use project-local plans directory (.prdx/plans/)
-/prdx:config plans global              # Use global plans directory (~/.claude/plans/)
+/prdx:config plans                     # Show current plans directory
+/prdx:config plans local               # Set up project-local plans (.prdx/plans/)
 ```
 
 ## Workflow
@@ -79,7 +78,7 @@ else
   echo "  /prdx:config [minimal|standard|simple]  # Quick presets"
   echo "  /prdx:config [show|init|set|get]        # Manage config"
   echo "  /prdx:config hooks [enable|disable] [hook-name]  # Manage hooks"
-  echo "  /prdx:config plans [local|global]        # Manage plans directory"
+  echo "  /prdx:config plans [local]              # Set up plans directory"
   exit 1
 fi
 ```
@@ -832,36 +831,16 @@ fi
 
 ```bash
 if [ -z "$PLANS_ACTION" ]; then
-  # Resolve current plans directory using the same logic as hooks
-  CURRENT_PREF="global"
-  RESOLVED_DIR="$HOME/.claude/plans"
-
-  if command -v jq &> /dev/null && [ -f "$SETTINGS_FILE" ]; then
-    PLANS_DIR_VALUE=$(jq -r '.plansDirectory // empty' "$SETTINGS_FILE" 2>/dev/null)
-    if [ -n "$PLANS_DIR_VALUE" ]; then
-      CURRENT_PREF="local"
-      # Expand relative path against project root
-      case "$PLANS_DIR_VALUE" in
-        /*) RESOLVED_DIR="$PLANS_DIR_VALUE" ;;
-        *)  RESOLVED_DIR="$PROJECT_ROOT/$PLANS_DIR_VALUE" ;;
-      esac
-    fi
-  fi
+  RESOLVED_DIR="$PROJECT_ROOT/.prdx/plans"
 
   echo "📁 Plans Directory"
   echo ""
-  echo "  Preference: $CURRENT_PREF"
-  echo "  Resolved:   $RESOLVED_DIR"
+  echo "  Directory: $RESOLVED_DIR"
   echo ""
-  if [ "$CURRENT_PREF" = "local" ]; then
-    echo "  Plans are stored inside this project (.prdx/plans/)."
-  else
-    echo "  Plans are stored in the global directory (~/.claude/plans/)."
-  fi
+  echo "  Plans are always stored inside this project (.prdx/plans/)."
   echo ""
   echo "Commands:"
-  echo "  /prdx:config plans local   # Switch to project-local plans"
-  echo "  /prdx:config plans global  # Switch to global plans"
+  echo "  /prdx:config plans local   # Configure project-local plans (first-time setup)"
   exit 0
 fi
 ```
@@ -888,68 +867,22 @@ if [ "$PLANS_ACTION" = "local" ]; then
   # 2. Create the local plans directory
   mkdir -p "$LOCAL_PLANS_DIR"
 
-  # 3. Write sentinel file so resolve-plans-dir.sh and hooks can detect setup
+  # 3. Write sentinel file so hooks can detect setup
   echo "local" > "$PROJECT_ROOT/.prdx/plans-setup-done"
 
-  # 4. Add .prdx/plans/ to .gitignore (plans contain private context)
-  GITIGNORE="$PROJECT_ROOT/.gitignore"
-  if [ -f "$GITIGNORE" ]; then
-    if ! grep -qF '.prdx/plans/' "$GITIGNORE"; then
-      echo '.prdx/plans/' >> "$GITIGNORE"
-    fi
-  else
-    echo '.prdx/plans/' > "$GITIGNORE"
-  fi
-
-  echo "✅ Switched to project-local plans"
+  echo "✅ Configured project-local plans"
   echo ""
   echo "  Directory: $LOCAL_PLANS_DIR"
   echo "  Setting:   plansDirectory = \".prdx/plans\" in .claude/settings.local.json"
-  echo "  .gitignore: .prdx/plans/ added (plans contain private context)"
   echo ""
   echo "New plans will be saved to $LOCAL_PLANS_DIR."
-  echo "Existing plans in ~/.claude/plans/ are not moved."
-  echo ""
-  echo "To revert: /prdx:config plans global"
-  exit 0
-fi
-```
-
-**Switch to global plans:**
-
-```bash
-if [ "$PLANS_ACTION" = "global" ]; then
-  if ! command -v jq &> /dev/null; then
-    echo "⚠️  jq not installed - cannot modify settings"
-    echo "Install: brew install jq (macOS) or apt-get install jq (Linux)"
-    echo ""
-    echo "Manual: Remove plansDirectory from $SETTINGS_FILE"
-    exit 1
-  fi
-
-  # Remove plansDirectory from settings (revert to global default)
-  jq 'del(.plansDirectory)' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp"
-  mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
-
-  # Update sentinel file
-  echo "global" > "$PROJECT_ROOT/.prdx/plans-setup-done"
-
-  echo "✅ Switched to global plans"
-  echo ""
-  echo "  Directory: $HOME/.claude/plans"
-  echo "  plansDirectory removed from .claude/settings.local.json"
-  echo ""
-  echo "New plans will be saved to ~/.claude/plans/."
-  echo "Plans in .prdx/plans/ are not deleted — you can move them manually."
-  echo ""
-  echo "To switch back: /prdx:config plans local"
   exit 0
 fi
 
 # Unknown action
 echo "❌ Unknown plans action: $PLANS_ACTION"
 echo ""
-echo "Usage: /prdx:config plans [local|global]"
+echo "Usage: /prdx:config plans [local]"
 exit 1
 ```
 
