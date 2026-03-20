@@ -201,12 +201,12 @@ Then add based on config:
 ```
 
 **If `GIT_AUTHOR_NAME` env var is set** (CI mode with `--requested-by`):
-The commit author is already the requestor via exported env vars. Override co-author config to always include both Claude and GitHub Actions:
+The commit author is already the requestor via exported env vars. Override co-author config to always include both Claude Code and GitHub Actions:
 ```
-   - Co-Authored-By: Claude <noreply@anthropic.com>
+   - Co-Authored-By: Claude Code <noreply@anthropic.com>
    - Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
 ```
-This replaces the normal `coAuthor` config — in CI mode, the requestor is the author and Claude + GitHub Actions are always co-authors.
+This replaces the normal `coAuthor` config — in CI mode, the requestor is the author and Claude Code + GitHub Actions are always co-authors. The `includeClaudeCodeLink` and `extendedDescription` settings from prdx.json config are still respected.
 
 **Add an example commit** showing the exact format based on config.
 
