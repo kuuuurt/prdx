@@ -200,11 +200,13 @@ Then add based on config:
    - Co-Authored-By: {coAuthor.name} <{coAuthor.email}>
 ```
 
-**If `GITHUB_ACTOR` env var is set** (CI mode — workflow requestor attribution):
+**If `GIT_AUTHOR_NAME` env var is set** (CI mode with `--requested-by`):
+The commit author is already the requestor via exported env vars. Override co-author config to always include both Claude and GitHub Actions:
 ```
-   - Requested-By: @{GITHUB_ACTOR}
+   - Co-Authored-By: Claude <noreply@anthropic.com>
+   - Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
 ```
-Add this trailer on the same trailer block (after Co-Authored-By if present, or after an empty line if no co-author).
+This replaces the normal `coAuthor` config — in CI mode, the requestor is the author and Claude + GitHub Actions are always co-authors.
 
 **Add an example commit** showing the exact format based on config.
 
