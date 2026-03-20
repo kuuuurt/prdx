@@ -452,7 +452,7 @@ Route based on choice:
 
 **2-CI.1: Derive slug and detect platform:**
 
-Derive `{SLUG}` from `ISSUE_TITLE` by converting to kebab-case (lowercase, spaces/special chars to hyphens, strip leading/trailing hyphens, collapse multiple hyphens).
+Derive `{SLUG}` from `ISSUE_TITLE` by extracting the **core concept** (2-4 words max) and converting to kebab-case. Strip filler words (add, implement, create, update, fix, refactor, improve), prepositions (the, a, for, from, to, in, on, of, with), and implementation details — keep only the domain-specific nouns and key verbs. Examples: "Read monthly report directly from Firestore instead of aggregating daily reports" → `monthly-report-read`, "Add biometric authentication" → `biometric-auth`.
 
 Detect platform from codebase (same logic as `/prdx:plan` Step 1 — check directories, config files, issue title keywords). Use single-platform detection only (CI mode does not support multi-platform).
 
@@ -559,6 +559,47 @@ cat > .prdx/state/{SLUG}.json << EOF
 EOF
 ```
 
+**2-CI.5b: Create draft PR and comment on issue:**
+
+Detect default branch:
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
+```
+
+Invoke the `prdx:pr-author` agent to create a draft PR:
+
+```
+subagent_type: "prdx:pr-author"
+
+prompt: "Create a draft pull request for this PRD.
+
+Mode: prd
+CI: true
+PRD Slug: {SLUG}
+PRD File: {PLANS_DIR}/prdx-{SLUG}.md
+Branch: {BRANCH}
+Base Branch: {DEFAULT_BRANCH}
+Draft: true
+Issue: {ISSUE_NUMBER}
+
+This is a plan-only draft PR for PRD review. The footer should say:
+'Comment `@claude implement` when ready, or `@claude revise` with feedback.'
+
+Read the PRD, create the PR via gh pr create --draft, and return only the PR summary (number, URL, title)."
+```
+
+After PR creation, comment on the issue:
+```bash
+gh issue comment {ISSUE_NUMBER} --body "PRD created in draft PR #${PR_NUMBER}. Review and comment \`@claude implement\` when ready."
+```
+
+Update state file with PR number:
+```bash
+cat > .prdx/state/{SLUG}.json << EOF
+{"slug": "{SLUG}", "phase": "planning", "quick": false, "pr_number": {PR_NUMBER}}
+EOF
+```
+
 Display:
 ```
 CI Plan-Only Complete!
@@ -566,9 +607,8 @@ CI Plan-Only Complete!
 PRD: {PLANS_DIR}/prdx-{SLUG}.md
 Branch: {BRANCH}
 Issue: #{ISSUE_NUMBER}
+Draft PR: #{PR_NUMBER}
 ```
-
-**End of plan-only workflow.** PRDX stops here — PR creation, issue comments, and PR management are the CI workflow's responsibility. See `examples/workflows/mention.claude-code.yml` for a reference workflow.
 
 ---
 
@@ -632,15 +672,43 @@ EOF
 git push origin "$BRANCH"
 ```
 
+**Update PR body after revision:**
+
+```bash
+PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
+```
+
+If PR exists, invoke `prdx:pr-author` agent to update:
+
+```
+subagent_type: "prdx:pr-author"
+
+prompt: "Update the PR body for a revised PRD.
+
+Mode: prd
+CI: true
+PR Number: {PR_NUMBER}
+PRD Slug: {SLUG}
+PRD File: {PLANS_DIR}/prdx-{SLUG}.md
+Branch: {BRANCH}
+Base Branch: {DEFAULT_BRANCH}
+Issue: {ISSUE_NUMBER}
+
+Read the updated PRD and regenerate the PR title and body. Use gh pr edit to update the existing PR.
+The footer should say: 'Comment `@claude implement` when ready, or `@claude revise` with feedback.'
+
+Return confirmation of the update."
+```
+
 Display:
 ```
 PRD Revised!
 
 PRD: {PLANS_DIR}/prdx-{SLUG}.md
 Branch: {BRANCH}
+PR: #{PR_NUMBER} (body updated)
 ```
-
-**End of revision workflow.** PRDX stops here — PR body updates are the CI workflow's responsibility.
 
 ---
 
@@ -650,7 +718,7 @@ Branch: {BRANCH}
 
 **3-CI.1: Derive slug and check for existing PRD:**
 
-Derive `{SLUG}` from `ISSUE_TITLE` by converting to kebab-case (same logic as 2-CI.1).
+Derive `{SLUG}` from `ISSUE_TITLE` by extracting the core concept (2-4 words max, same logic as 2-CI.1).
 
 Determine branch name:
 ```bash
@@ -729,6 +797,35 @@ cat > .prdx/state/{SLUG}.json << EOF
 EOF
 ```
 
+**3-CI.4b: Update PR body with implementation:**
+
+```bash
+PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
+DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
+```
+
+If PR exists, invoke `prdx:pr-author` agent to update:
+
+```
+subagent_type: "prdx:pr-author"
+
+prompt: "Update the PR body for a completed implementation.
+
+Mode: prd
+CI: true
+PR Number: {PR_NUMBER}
+PRD Slug: {SLUG}
+PRD File: {PLANS_DIR}/prdx-{SLUG}.md
+Branch: {BRANCH}
+Base Branch: {DEFAULT_BRANCH}
+Issue: {ISSUE_NUMBER}
+
+Read the PRD (now including Implementation Notes), analyze commits on this branch, and update the PR title and body with full implementation details. Use gh pr edit to update the existing PR.
+The footer should say: 'Comment `@claude review` for code review.'
+
+Return confirmation of the update."
+```
+
 Display:
 ```
 CI Implementation Complete!
@@ -736,9 +833,8 @@ CI Implementation Complete!
 PRD: {PLANS_DIR}/prdx-{SLUG}.md
 Branch: {BRANCH}
 Issue: #{ISSUE_NUMBER}
+PR: #{PR_NUMBER} (body updated with implementation details)
 ```
-
-**End of CI implementation workflow.** PRDX stops here — PR updates and marking ready are the CI workflow's responsibility. See `examples/workflows/mention.claude-code.yml` for a reference workflow.
 
 ---
 

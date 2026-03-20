@@ -939,6 +939,53 @@ Fix the issues and try again.
 
 ---
 
+## Post-Implementation: Update Existing Draft PR
+
+**After all implementation steps complete**, check if a draft PR already exists for this branch:
+
+```bash
+BRANCH=$(git branch --show-current)
+PR_NUMBER=$(gh pr list --head "$BRANCH" --state open --json number,isDraft --jq '.[] | select(.isDraft) | .number' 2>/dev/null)
+```
+
+**If a draft PR exists:**
+
+1. Push implementation commits:
+   ```bash
+   git push origin "$BRANCH"
+   ```
+
+2. Detect default branch:
+   ```bash
+   DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
+   ```
+
+3. Invoke `prdx:pr-author` agent to update PR body:
+   ```
+   subagent_type: "prdx:pr-author"
+
+   prompt: "Update the PR body for a completed implementation.
+
+   Mode: prd
+   PR Number: {PR_NUMBER}
+   PRD Slug: {SLUG}
+   PRD File: {PLANS_DIR}/prdx-{SLUG}.md
+   Branch: {BRANCH}
+   Base Branch: {DEFAULT_BRANCH}
+
+   Read the PRD (now including Implementation Notes), analyze commits, and update the PR title and body.
+   Use gh pr edit to update the existing PR.
+   The footer should say: 'Comment `@claude review` for code review.'
+
+   Return confirmation of the update."
+   ```
+
+4. Display: `PR #{PR_NUMBER} updated with implementation details.`
+
+**If no draft PR exists:** Skip this step entirely.
+
+---
+
 ## Key Points
 
 1. **PRDs from native plan mode** - Read from `{PLANS_DIR}/`
@@ -951,3 +998,4 @@ Fix the issues and try again.
 8. **Multi-platform uses parent-child model** - Parent delegates to child PRDs in separate sessions
 9. **Child PRDs check prerequisites** - Read sibling state files before starting
 10. **Code review before handoff** - prdx:code-reviewer runs after implementation, fixes issues automatically (max 2 cycles)
+11. **Draft PR auto-update** - If a draft PR exists on the branch, pushes and updates its body after implementation

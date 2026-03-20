@@ -131,7 +131,14 @@ If both fail, omit the `**Project:**` field from the PRD.
 
 **Derive slug from description:**
 
-Convert the description to kebab-case to produce `{SLUG}` (e.g., "Add Biometric Login" → `biometric-login`). For quick mode, prefix with `quick-` (e.g., `quick-fix-login-validation`).
+Extract the **core concept** (2-4 words max) from the description and convert to kebab-case to produce `{SLUG}`. Strip filler words (add, implement, create, update, fix, refactor, improve), prepositions (the, a, for, from, to, in, on, of, with), and implementation details — keep only the domain-specific nouns and key verbs. For quick mode, prefix with `quick-`.
+
+Examples:
+- "Add biometric authentication to Android app" → `biometric-auth`
+- "Read monthly report directly from Firestore instead of aggregating daily reports" → `monthly-report-read`
+- "Fix user login failures on slow networks" → `login-failures`
+- "Refactor checkout flow to use new payment provider" → `checkout-payment-refactor`
+- Quick: "fix login validation" → `quick-login-validation`
 
 **Write state file immediately:**
 ```bash
