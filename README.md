@@ -187,13 +187,13 @@ Same pipeline (dev-planner, code review) but with a lightweight PRD that's clean
 
 ## CI Mode
 
-Run PRDX from GitHub Actions or any CI environment. PRDX handles planning and implementation — the CI workflow handles PR and issue management.
+Run PRDX from GitHub Actions or any CI environment. PRDX handles the full lifecycle — planning, implementation, PR creation, and PR updates. The CI workflow is a thin trigger that calls PRDX commands. Only code review remains in the workflow.
 
 ```bash
-# Plan only (generate PRD, commit, push branch)
+# Plan only — generates PRD, commits, pushes branch, creates draft PR, comments on issue
 /prdx:prdx --ci --issue 42 --plan-only --requested-by username
 
-# Implement (read PRD from branch, implement, push)
+# Implement — reads PRD from branch, implements, pushes, updates PR body
 /prdx:implement {slug}
 ```
 
@@ -204,25 +204,23 @@ Run PRDX from GitHub Actions or any CI environment. PRDX handles planning and im
 | **Plan** | | |
 | Explore codebase | PRDX | PRDX |
 | Generate PRD | PRDX (plan mode) | PRDX (direct write) |
-| Create branch | PRDX | PRDX |
-| Commit & push PRD | PRDX | PRDX |
+| Create branch, commit, push | PRDX | PRDX |
+| Create draft PR (PRD review) | — | PRDX (pr-author agent) |
+| Comment on issue | PRDX (`/prdx:publish`) | PRDX |
 | Revise PRD from feedback | PRDX (user iterates in plan mode) | PRDX (reads PR comments) |
+| Update PR body after revision | — | PRDX (pr-author agent) |
 | Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
-| **Publish** | | |
-| Create draft PR (PRD review) | — | **Workflow** |
-| PR title/body | — | **Workflow** |
-| Comment on issue | PRDX (`/prdx:publish`) | **Workflow** |
 | **Implement** | | |
 | Dev-plan, implement, review | PRDX | PRDX |
-| Commit implementation | PRDX | PRDX |
-| Push branch | PRDX | PRDX |
+| Commit implementation, push | PRDX | PRDX |
 | Run tests | PRDX (post-implement hook) | PRDX (post-implement hook) |
+| Update PR body after impl | PRDX (auto, if draft PR exists) | PRDX (pr-author agent) |
 | Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
 | **Push** | | |
-| Create draft PR (implementation) | PRDX (`/prdx:push --draft`) | **Workflow** (update existing draft) |
-| PR title/body | PRDX (pr-author agent) | **Workflow** |
-
-PRDX outputs branch name, slug, and PRD file path. The CI workflow consumes those to manage PRs and issues.
+| Create draft PR (implementation) | PRDX (`/prdx:push --draft`) | _(handled at plan time)_ |
+| PR title/body | PRDX (pr-author agent) | PRDX (pr-author agent) |
+| **Review** | | |
+| Code review | — | **Workflow** |
 
 ### Setup
 
@@ -253,7 +251,8 @@ issue → @claude plan → draft PR with PRD → @claude revise / @claude implem
 - Fetches issue title + body as the feature description
 - Auto-detects platform from codebase
 - `--requested-by` sets commit author (Claude Code + GitHub Actions as co-authors)
-- **Does NOT** create PRs, comment on issues, or manage PR state — that's the workflow's job
+- Creates draft PRs, comments on issues, and updates PR bodies — all via `pr-author` agent
+- **Does NOT** mark PRs as ready for review or perform code reviews — that stays in the workflow
 - Requires pre-configured plans directory (`.prdx/plans-setup-done` must exist)
 
 ## Installation

@@ -443,7 +443,7 @@ Quick mode is for one-off tasks (bugfixes, PR review comments) that need the ful
 issue → @claude plan → draft PR with PRD → @claude revise / @claude implement → @claude review → human review
 ```
 
-CI mode is non-interactive. PRDX handles planning and implementation only — the CI workflow (GitHub Actions) handles all PR and issue management.
+CI mode is non-interactive. PRDX handles the full lifecycle — planning, implementation, PR creation, and PR updates. The CI workflow (GitHub Actions) is a thin trigger that calls PRDX commands. Only code review remains in the workflow.
 
 **Responsibility boundaries:**
 
@@ -453,33 +453,35 @@ CI mode is non-interactive. PRDX handles planning and implementation only — th
 | Explore codebase | PRDX | PRDX |
 | Generate PRD | PRDX (plan mode) | PRDX (direct write) |
 | Create branch, commit, push | PRDX | PRDX |
+| Create draft PR (PRD review) | — | PRDX (pr-author agent) |
+| Comment on issue | PRDX (`/prdx:publish`) | PRDX |
 | Revise PRD from feedback | PRDX (user iterates in plan mode) | PRDX (reads PR comments) |
+| Update PR body after revision | — | PRDX (pr-author agent) |
 | Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
-| **Publish** | | |
-| Create draft PR (PRD review) | — | **Workflow** |
-| PR title/body | — | **Workflow** |
-| Comment on issue | PRDX (`/prdx:publish`) | **Workflow** |
 | **Implement** | | |
 | Dev-plan, implement, review | PRDX | PRDX |
 | Commit implementation, push | PRDX | PRDX |
 | Run tests | PRDX (post-implement hook) | PRDX (post-implement hook) |
+| Update PR body after impl | PRDX (auto, if draft PR exists) | PRDX (pr-author agent) |
 | Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
 | **Push** | | |
-| Create draft PR (implementation) | PRDX (`/prdx:push --draft`) | **Workflow** (update existing draft) |
-| PR title/body | PRDX (pr-author agent) | **Workflow** |
+| Create draft PR (implementation) | PRDX (`/prdx:push --draft`) | _(handled at plan time)_ |
+| PR title/body | PRDX (pr-author agent) | PRDX (pr-author agent) |
+| **Review** | | |
+| Code review | — | **Workflow** |
 
 **CI mode commands:**
 ```bash
-# Plan only — generates PRD, commits, pushes branch, stops
+# Plan only — generates PRD, commits, pushes branch, creates draft PR, comments on issue
 /prdx:prdx --ci --issue 42 --plan-only --requested-by username
 
-# Implement — reads PRD from branch, implements, pushes, stops
+# Implement — reads PRD from branch, implements, pushes, updates PR body
 /prdx:implement {slug}
 ```
 
 **`--requested-by` flag:** Sets git commit author to the specified GitHub user. Claude Code and github-actions[bot] are added as co-authors. Only applies in CI mode.
 
-**PRDX does NOT in CI mode:** Create PRs, comment on issues, update PR title/body, or mark PRs ready. Those are the workflow's responsibility.
+**PRDX does NOT in CI mode:** Mark PRs as ready for review, or perform code reviews. Code review stays in the workflow.
 
 See `examples/workflows/mention.claude-code.yml` for the reference GitHub Actions workflow.
 
@@ -1158,12 +1160,12 @@ Commands automatically adapt to available agents.
 - Composable flags (`--issue` standalone + `--ci` builds on it) provide flexibility for both interactive and non-interactive use
 - Direct PRD generation via `prdx:code-explorer` + Write tool effectively replaces plan mode for non-interactive contexts
 - Checking `CI=true` env var (standard across CI providers) is the cleanest way to bypass interactive prompts in hooks
-- Clear boundary: PRDX owns plan + implement (branch, PRD, commits, push). CI workflow owns PR/issue management (create PR, title/body, comments, mark ready)
+- PRDX owns the full CI lifecycle: plan, implement, PR creation/update, issue comments. Workflow is a thin trigger. Only code review stays in the workflow
+- `pr-author` agent handles both PR creation and updates (via `gh pr edit`), ensuring consistent titles/bodies across local and CI mode
 - `--requested-by` flag sets git author to the workflow requestor; Claude Code + github-actions[bot] as co-authors
 
 **Deviations from Plan:**
 - The CI straight-line flow needed to skip the plans-directory setup prompt entirely, requiring a pre-configured `.prdx/plans-setup-done` marker
-- PR/issue management was moved out of PRDX into the CI workflow to avoid scope creep — PRDX outputs (branch, slug, PRD path) are consumed by the workflow
 
 ## Related Documentation
 
