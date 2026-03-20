@@ -37,19 +37,14 @@ This command is a **thin wrapper** that:
 
 ### Resolve Plans Directory
 
-Before any PRD operations, determine where plans are stored:
+Plans are always stored in `.prdx/plans/` relative to the project root:
 
 ```bash
-PLANS_DIR=$(jq -r '.plansDirectory // empty' .claude/settings.local.json 2>/dev/null)
-if [ -z "$PLANS_DIR" ]; then
-  PLANS_DIR="$HOME/.claude/plans"
-elif [[ "$PLANS_DIR" != /* ]]; then
-  PLANS_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/$PLANS_DIR"
-fi
-echo "Plans directory: $PLANS_DIR"
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+PLANS_DIR="$PROJECT_ROOT/.prdx/plans"
 ```
 
-**Use `$PLANS_DIR` instead of `~/.claude/plans/` throughout this command.**
+**Use `$PLANS_DIR` throughout this command.**
 
 ### Step 0: Validate GitHub CLI
 

@@ -69,7 +69,7 @@ elif [ "$1" = "hooks" ]; then
   HOOK_NAME="$3"     # auto-simplify
 elif [ "$1" = "plans" ]; then
   MODE="plans"
-  PLANS_ACTION="$2"  # local, global, or empty (show)
+  PLANS_ACTION="$2"  # local or empty (show)
 else
   echo "❌ Unknown command: $1"
   echo ""
@@ -1085,54 +1085,31 @@ User: /prdx:config hooks disable auto-simplify
 To re-enable: /prdx:config hooks enable auto-simplify
 ```
 
-### Example 9: Show Plans Directory Preference
+### Example 9: Show Plans Directory
 
 ```
 User: /prdx:config plans
 
 📁 Plans Directory
 
-  Preference: global
-  Resolved:   /Users/alice/.claude/plans
-
-  Plans are stored in the global directory (~/.claude/plans/).
+  Directory: /Users/alice/projects/my-app/.prdx/plans
+  Plans are tracked in git as project documentation.
 
 Commands:
-  /prdx:config plans local   # Switch to project-local plans
-  /prdx:config plans global  # Switch to global plans
+  /prdx:config plans local   # Set up project-local plans
 ```
 
-### Example 10: Switch to Local Plans
+### Example 10: Set Up Local Plans
 
 ```
 User: /prdx:config plans local
 
-✅ Switched to project-local plans
+✅ Project-local plans configured
 
   Directory: /Users/alice/projects/my-app/.prdx/plans
   Setting:   plansDirectory = ".prdx/plans" in .claude/settings.local.json
-  .gitignore: .prdx/plans/ added (plans contain private context)
 
-New plans will be saved to /Users/alice/projects/my-app/.prdx/plans.
-Existing plans in ~/.claude/plans/ are not moved.
-
-To revert: /prdx:config plans global
-```
-
-### Example 11: Switch to Global Plans
-
-```
-User: /prdx:config plans global
-
-✅ Switched to global plans
-
-  Directory: /Users/alice/.claude/plans
-  plansDirectory removed from .claude/settings.local.json
-
-New plans will be saved to ~/.claude/plans/.
-Plans in .prdx/plans/ are not deleted — you can move them manually.
-
-To switch back: /prdx:config plans local
+Plans are saved to .prdx/plans/ and tracked in git as project documentation.
 ```
 
 ## Error Handling

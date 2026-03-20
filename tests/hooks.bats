@@ -195,7 +195,7 @@ load helpers/test_helper
 @test "pre-implement hook has unprefixed fallback" {
     local pre_hook="$REPO_ROOT/hooks/prdx/pre-implement.sh"
 
-    # Should have fallback for plans without prdx- prefix (may use $PLANS_DIR or ~/.claude/plans)
+    # Should have fallback for plans without prdx- prefix (uses $PLANS_DIR)
     grep -qE 'PLANS_DIR.*PRD_SLUG.*\.md|plans/.*PRD_SLUG.*\.md' "$pre_hook"
     [ "$?" -eq 0 ]
 }

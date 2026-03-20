@@ -26,7 +26,7 @@ PRDX is a [Claude Code plugin](https://docs.anthropic.com/en/docs/claude-code) t
 │                    └────────┬────────┘                                      │
 │                             │ yes                                           │
 │                             ▼                                               │
-│               Status: planning ────────────────► ~/.claude/plans/prdx-*.md  │
+│               Status: planning ────────────────► .prdx/plans/prdx-*.md     │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                          ┌────────────┴────────────┐
@@ -164,7 +164,7 @@ Optional: /prdx:publish adds GitHub issue link at any status (metadata, not a wo
 ```
 
 This orchestrates the entire workflow with decision points at each phase.
-Plans auto-save to `~/.claude/plans/prdx-{slug}.md`.
+Plans auto-save to `.prdx/plans/prdx-{slug}.md`.
 Stop anytime and resume with `/prdx:prdx <slug>`.
 
 ### Quick Mode
@@ -273,7 +273,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 
 ## Why This Approach?
 
-**Native plan mode** handles PRD creation — plans auto-save to `~/.claude/plans/prdx-*.md`.
+**Native plan mode** handles PRD creation — plans auto-save to `.prdx/plans/prdx-*.md`.
 
 **Context-isolated agents** handle implementation, keeping the main conversation lightweight:
 
