@@ -437,6 +437,52 @@ Quick mode is for one-off tasks (bugfixes, PR review comments) that need the ful
 - Temporary PRD file deleted after workflow completes
 - Resume with `/prdx:prdx quick-{slug}` if interrupted
 
+### CI Mode (`--ci`)
+
+```
+issue → @claude plan → draft PR with PRD → @claude revise / @claude implement → @claude review → human review
+```
+
+CI mode is non-interactive. PRDX handles planning and implementation only — the CI workflow (GitHub Actions) handles all PR and issue management.
+
+**Responsibility boundaries:**
+
+| Step | Local Mode | CI Mode |
+|------|-----------|---------|
+| **Plan** | | |
+| Explore codebase | PRDX | PRDX |
+| Generate PRD | PRDX (plan mode) | PRDX (direct write) |
+| Create branch, commit, push | PRDX | PRDX |
+| Revise PRD from feedback | PRDX (user iterates in plan mode) | PRDX (reads PR comments) |
+| Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
+| **Publish** | | |
+| Create draft PR (PRD review) | — | **Workflow** |
+| PR title/body | — | **Workflow** |
+| Comment on issue | PRDX (`/prdx:publish`) | **Workflow** |
+| **Implement** | | |
+| Dev-plan, implement, review | PRDX | PRDX |
+| Commit implementation, push | PRDX | PRDX |
+| Run tests | PRDX (post-implement hook) | PRDX (post-implement hook) |
+| Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
+| **Push** | | |
+| Create draft PR (implementation) | PRDX (`/prdx:push --draft`) | **Workflow** (update existing draft) |
+| PR title/body | PRDX (pr-author agent) | **Workflow** |
+
+**CI mode commands:**
+```bash
+# Plan only — generates PRD, commits, pushes branch, stops
+/prdx:prdx --ci --issue 42 --plan-only --requested-by username
+
+# Implement — reads PRD from branch, implements, pushes, stops
+/prdx:implement {slug}
+```
+
+**`--requested-by` flag:** Sets git commit author to the specified GitHub user. Claude Code and github-actions[bot] are added as co-authors. Only applies in CI mode.
+
+**PRDX does NOT in CI mode:** Create PRs, comment on issues, update PR title/body, or mark PRs ready. Those are the workflow's responsibility.
+
+See `examples/workflows/claude-code.yml` for the reference GitHub Actions workflow.
+
 ### Individual Commands
 
 ```
