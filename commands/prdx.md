@@ -52,9 +52,26 @@ If the file does NOT exist (first PRDX run in this project):
 
 2. Re-resolve PLANS_DIR after setup.
 
-If the file DOES exist, skip this step entirely and proceed with lesson capture below.
+If the file DOES exist, skip this step entirely and proceed with the gitignore check below.
 
-**After the setup check (or if already configured), scan for completed workflows that need lesson capture.**
+**After the setup check (or if already configured), ensure `.prdx/state/` is gitignored (runs every time):**
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+GITIGNORE="$PROJECT_ROOT/.gitignore"
+
+# Ensure only .prdx/plans/ is tracked — everything else in .prdx/ is ignored
+if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+  echo '' >> "$GITIGNORE"
+  echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
+  echo '.prdx/*' >> "$GITIGNORE"
+  echo '!.prdx/plans/' >> "$GITIGNORE"
+fi
+```
+
+This ensures plans are committed (tracked in git) while everything else under `.prdx/` stays local.
+
+**After the gitignore check, scan for completed workflows that need lesson capture.**
 
 **Before any other logic, scan for completed workflows that need lesson capture.**
 

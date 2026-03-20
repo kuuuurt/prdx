@@ -17,5 +17,14 @@ fi
 # Ensure plans directory exists
 mkdir -p "$PLANS_DIR"
 
+# Ensure only .prdx/plans/ is tracked — everything else in .prdx/ is ignored
+GITIGNORE="$PROJECT_ROOT/.gitignore"
+if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+    echo '' >> "$GITIGNORE"
+    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
+    echo '.prdx/*' >> "$GITIGNORE"
+    echo '!.prdx/plans/' >> "$GITIGNORE"
+fi
+
 echo "Environment validated"
 exit 0

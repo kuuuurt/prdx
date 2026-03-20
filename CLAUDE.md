@@ -26,7 +26,7 @@ PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document)
 
 Plans are always stored in `.prdx/plans/` relative to the project root. On first run, PRDX auto-creates the directory and sets `plansDirectory: ".prdx/plans"` in `.claude/settings.local.json` so Claude Code's native plan mode saves to the right place. A `.prdx/plans-setup-done` marker prevents repeated setup.
 
-PRD files are tracked in git as project documentation (`.prdx/plans/` is NOT gitignored). Runtime state (`.prdx/state/`) remains gitignored.
+PRD files are tracked in git as project documentation. Only `.prdx/plans/` is tracked — everything else under `.prdx/` (state, markers, etc.) is gitignored via `.prdx/*` + `!.prdx/plans/`.
 
 **Naming convention:** `prdx-{slug}.md` for normal PRDs, `prdx-quick-{slug}.md` for quick mode (ephemeral).
 
@@ -816,7 +816,9 @@ Skills are read by agents during execution:
 **Validates:**
 - Git repository exists
 - Plans directory exists (`.prdx/plans/`)
-- PRDs are in `.gitignore`
+
+**Ensures (every run):**
+- Only `.prdx/plans/` is tracked in git (`.prdx/*` ignored, `!.prdx/plans/` un-ignored)
 
 **On failure:** Stops planning
 
@@ -829,6 +831,9 @@ Skills are read by agents during execution:
 - PRD is not already completed
 - Git branch is correct (or creates it)
 - No uncommitted changes (or warns)
+
+**Ensures (every run):**
+- Only `.prdx/plans/` is tracked in git (`.prdx/*` ignored, `!.prdx/plans/` un-ignored)
 
 **On failure:** Stops implementation
 

@@ -95,6 +95,23 @@ If the file does NOT exist (first PRDX run in this project):
 
 If the file DOES exist, skip this step entirely.
 
+### Gitignore Check (Every Run)
+
+Ensure only `.prdx/plans/` is tracked in git — everything else under `.prdx/` is ignored:
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+GITIGNORE="$PROJECT_ROOT/.gitignore"
+
+# Ensure only .prdx/plans/ is tracked — everything else in .prdx/ is ignored
+if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+  echo '' >> "$GITIGNORE"
+  echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
+  echo '.prdx/*' >> "$GITIGNORE"
+  echo '!.prdx/plans/' >> "$GITIGNORE"
+fi
+```
+
 ### Step 0: Parse Flags, Detect Project, and Derive Slug
 
 **Parse `--quick` flag FIRST (before platform detection):**
