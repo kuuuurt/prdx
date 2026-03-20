@@ -233,7 +233,11 @@ PRDX outputs branch name, slug, and PRD file path. The CI workflow consumes thos
 
 2. Ensure GitHub CLI is authenticated in your CI environment.
 
-3. Copy the reference workflow from `examples/workflows/claude-code.yml` to your repo's `.github/workflows/`.
+3. Install the workflow:
+   ```bash
+   /prdx:setup-github-actions
+   ```
+   Or manually copy `examples/workflows/claude-code.yml` to your repo's `.github/workflows/`.
 
 ### Reference Workflow
 
@@ -302,6 +306,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 | `/prdx:show` | View/list/search PRDs |
 | `/prdx:config` | Configure settings |
 | `/prdx:publish` | Create GitHub issue from PRD |
+| `/prdx:setup-github-actions` | Install CI workflow in current repo |
 
 ## Why This Approach?
 
