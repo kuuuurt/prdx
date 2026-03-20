@@ -187,13 +187,42 @@ Same pipeline (dev-planner, code review) but with a lightweight PRD that's clean
 
 ## CI Mode
 
-Run PRDX from GitHub Actions or any CI environment to automatically plan and implement features from GitHub issues.
+Run PRDX from GitHub Actions or any CI environment. PRDX handles planning and implementation — the CI workflow handles PR and issue management.
 
 ```bash
-/prdx:prdx --ci --issue 42
+# Plan only (generate PRD, commit, push branch)
+/prdx:prdx --ci --issue 42 --plan-only --requested-by username
+
+# Implement (read PRD from branch, implement, push)
+/prdx:implement {slug}
 ```
 
-This fetches the GitHub issue, generates a PRD, implements it, and creates a PR — all non-interactively.
+### Responsibility Boundaries
+
+| Step | Local Mode | CI Mode |
+|------|-----------|---------|
+| **Plan** | | |
+| Explore codebase | PRDX | PRDX |
+| Generate PRD | PRDX (plan mode) | PRDX (direct write) |
+| Create branch | PRDX | PRDX |
+| Commit & push PRD | PRDX | PRDX |
+| Revise PRD from feedback | PRDX (user iterates in plan mode) | PRDX (reads PR comments) |
+| Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
+| **Publish** | | |
+| Create draft PR (PRD review) | — | **Workflow** |
+| PR title/body | — | **Workflow** |
+| Comment on issue | PRDX (`/prdx:publish`) | **Workflow** |
+| **Implement** | | |
+| Dev-plan, implement, review | PRDX | PRDX |
+| Commit implementation | PRDX | PRDX |
+| Push branch | PRDX | PRDX |
+| Run tests | PRDX (post-implement hook) | PRDX (post-implement hook) |
+| Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
+| **Push** | | |
+| Create draft PR (implementation) | PRDX (`/prdx:push --draft`) | **Workflow** (update existing draft) |
+| PR title/body | PRDX (pr-author agent) | **Workflow** |
+
+PRDX outputs branch name, slug, and PRD file path. The CI workflow consumes those to manage PRs and issues.
 
 ### Setup
 
@@ -204,20 +233,23 @@ This fetches the GitHub issue, generates a PRD, implements it, and creates a PR 
 
 2. Ensure GitHub CLI is authenticated in your CI environment.
 
-3. Add to your workflow:
-   ```yaml
-   - name: Implement feature
-     run: |
-       claude "/prdx:prdx --ci --issue ${{ github.event.issue.number }}"
-   ```
+3. Copy the reference workflow from `examples/workflows/claude-code.yml` to your repo's `.github/workflows/`.
+
+### Reference Workflow
+
+See [`examples/workflows/claude-code.yml`](examples/workflows/claude-code.yml) for a complete GitHub Actions workflow that implements the CI flow:
+
+```
+issue → @claude plan → draft PR with PRD → @claude revise / @claude implement → @claude review → human review
+```
 
 ### What CI mode does differently
 
 - Skips all interactive prompts (no "Implement now?" / "Create PR?" decision points)
 - Fetches issue title + body as the feature description
 - Auto-detects platform from codebase
-- Generates PRD, implements, and creates PR in one shot
-- Posts the generated PRD as a comment on the issue
+- `--requested-by` sets commit author (Claude Code + GitHub Actions as co-authors)
+- **Does NOT** create PRs, comment on issues, or manage PR state — that's the workflow's job
 - Requires pre-configured plans directory (`.prdx/plans-setup-done` must exist)
 
 ## Installation

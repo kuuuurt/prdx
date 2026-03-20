@@ -1106,15 +1106,18 @@ Commands automatically adapt to available agents.
 **Challenges & Solutions:**
 - AC fix loops needed a cap (3 attempts) to prevent infinite cycling — escalate to user after exhaustion
 
-### CI Mode for PRDX (2026-03-18) - backend
+### CI Mode for PRDX (2026-03-18, updated 2026-03-21) - backend
 
 **Patterns:**
 - Composable flags (`--issue` standalone + `--ci` builds on it) provide flexibility for both interactive and non-interactive use
 - Direct PRD generation via `prdx:code-explorer` + Write tool effectively replaces plan mode for non-interactive contexts
 - Checking `CI=true` env var (standard across CI providers) is the cleanest way to bypass interactive prompts in hooks
+- Clear boundary: PRDX owns plan + implement (branch, PRD, commits, push). CI workflow owns PR/issue management (create PR, title/body, comments, mark ready)
+- `--requested-by` flag sets git author to the workflow requestor; Claude Code + github-actions[bot] as co-authors
 
 **Deviations from Plan:**
 - The CI straight-line flow needed to skip the plans-directory setup prompt entirely, requiring a pre-configured `.prdx/plans-setup-done` marker
+- PR/issue management was moved out of PRDX into the CI workflow to avoid scope creep — PRDX outputs (branch, slug, PRD path) are consumed by the workflow
 
 ## Related Documentation
 
