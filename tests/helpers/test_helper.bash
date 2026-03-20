@@ -11,9 +11,12 @@ setup() {
     # Create temporary directory for test isolation (use mktemp for portability)
     export TEST_TEMP_DIR="$(mktemp -d)"
 
-    # Set up test plans directory (mimicking ~/.claude/plans/)
-    export TEST_PLANS_DIR="$TEST_TEMP_DIR/.claude/plans"
+    # Set up test plans directory (project-local)
+    export TEST_PLANS_DIR="$TEST_TEMP_DIR/.prdx/plans"
     mkdir -p "$TEST_PLANS_DIR"
+
+    # Point hooks at the temp dir as the project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     # Store original HOME
     export ORIGINAL_HOME="$HOME"
