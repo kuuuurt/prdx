@@ -1166,7 +1166,6 @@ Commands automatically adapt to available agents.
 
 **Deviations from Plan:**
 - The CI straight-line flow needed to skip the plans-directory setup prompt entirely, requiring a pre-configured `.prdx/plans-setup-done` marker
-- Originally PR/issue management was in the workflow YAML, but duplicated PRD-parsing shell scripts caused drift (bad PR titles, verbose slugs). Consolidated into PRDX for single source of truth
 
 ## Related Documentation
 
