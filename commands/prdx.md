@@ -568,7 +568,7 @@ Branch: {BRANCH}
 Issue: #{ISSUE_NUMBER}
 ```
 
-**End of plan-only workflow.** PRDX stops here — PR creation, issue comments, and PR management are the CI workflow's responsibility. See `examples/workflows/claude-code.yml` for a reference workflow.
+**End of plan-only workflow.** PRDX stops here — PR creation, issue comments, and PR management are the CI workflow's responsibility. See `examples/workflows/mention.claude-code.yml` for a reference workflow.
 
 ---
 
@@ -738,7 +738,7 @@ Branch: {BRANCH}
 Issue: #{ISSUE_NUMBER}
 ```
 
-**End of CI implementation workflow.** PRDX stops here — PR updates and marking ready are the CI workflow's responsibility. See `examples/workflows/claude-code.yml` for a reference workflow.
+**End of CI implementation workflow.** PRDX stops here — PR updates and marking ready are the CI workflow's responsibility. See `examples/workflows/mention.claude-code.yml` for a reference workflow.
 
 ---
 

@@ -26,16 +26,22 @@ This command requires a git repository with a GitHub remote.
 ### Step 2: Check for Existing Workflow
 
 ```bash
-ls .github/workflows/claude-code.yml 2>/dev/null
+ls .github/workflows/mention.claude-code.yml 2>/dev/null
 ```
 
-If the file exists, ask the user:
+If the file exists, use AskUserQuestion to ask the user what to do:
 ```
-A Claude Code workflow already exists at .github/workflows/claude-code.yml.
-Overwrite it with the latest PRDX reference workflow?
+A Claude Code workflow already exists at .github/workflows/mention.claude-code.yml.
+
+What would you like to do?
+1. Overwrite with the latest PRDX reference workflow
+2. Show a diff between your current workflow and the latest reference
+3. Skip — keep the existing workflow
 ```
 
-If they decline, stop.
+- Option 1: Continue to Step 3 (overwrite)
+- Option 2: Fetch the reference workflow content, display a diff comparison, then ask again (option 1 or 3)
+- Option 3: Stop
 
 ### Step 3: Find and Copy the Workflow
 
@@ -46,13 +52,13 @@ Locate the PRDX plugin directory and copy the reference workflow:
 mkdir -p .github/workflows
 ```
 
-Read the reference workflow from the PRDX plugin's `examples/workflows/claude-code.yml` file. The plugin could be installed at:
-- `~/.claude/plugins/prdx/examples/workflows/claude-code.yml`
-- Or findable via: `find ~/.claude/plugins -name "claude-code.yml" -path "*/prdx/examples/*" 2>/dev/null`
+Read the reference workflow from the PRDX plugin's `examples/workflows/mention.claude-code.yml` file. The plugin could be installed at:
+- `~/.claude/plugins/prdx/examples/workflows/mention.claude-code.yml`
+- Or findable via: `find ~/.claude/plugins -name "mention.claude-code.yml" -path "*/prdx/examples/*" 2>/dev/null`
 
 If the reference file cannot be found, fetch it from GitHub:
 ```bash
-gh api repos/kuuuurt/prdx/contents/examples/workflows/claude-code.yml --jq '.content' | base64 -d > .github/workflows/claude-code.yml
+gh api repos/kuuuurt/prdx/contents/examples/workflows/mention.claude-code.yml --jq '.content' | base64 -d > .github/workflows/mention.claude-code.yml
 ```
 
 ### Step 4: Verify Secrets
@@ -110,7 +116,7 @@ fi
 ```
 GitHub Actions workflow installed!
 
-  Workflow: .github/workflows/claude-code.yml
+  Workflow: .github/workflows/mention.claude-code.yml
 
   Available commands (comment on issues/PRs):
     @claude plan       — Generate PRD from issue (creates draft PR)
@@ -126,7 +132,7 @@ GitHub Actions workflow installed!
 
 Commit the workflow file:
 ```bash
-git add .github/workflows/claude-code.yml
+git add .github/workflows/mention.claude-code.yml
 git commit -m "ci: add PRDX Claude Code workflow"
 ```
 

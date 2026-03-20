@@ -237,11 +237,11 @@ PRDX outputs branch name, slug, and PRD file path. The CI workflow consumes thos
    ```bash
    /prdx:setup-github-actions
    ```
-   Or manually copy `examples/workflows/claude-code.yml` to your repo's `.github/workflows/`.
+   Or manually copy `examples/workflows/mention.claude-code.yml` to your repo's `.github/workflows/`.
 
 ### Reference Workflow
 
-See [`examples/workflows/claude-code.yml`](examples/workflows/claude-code.yml) for a complete GitHub Actions workflow that implements the CI flow:
+See [`examples/workflows/mention.claude-code.yml`](examples/workflows/mention.claude-code.yml) for a complete GitHub Actions workflow that implements the CI flow:
 
 ```
 issue → @claude plan → draft PR with PRD → @claude revise / @claude implement → @claude review → human review

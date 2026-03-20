@@ -481,7 +481,7 @@ CI mode is non-interactive. PRDX handles planning and implementation only — th
 
 **PRDX does NOT in CI mode:** Create PRs, comment on issues, update PR title/body, or mark PRs ready. Those are the workflow's responsibility.
 
-See `examples/workflows/claude-code.yml` for the reference GitHub Actions workflow.
+See `examples/workflows/mention.claude-code.yml` for the reference GitHub Actions workflow.
 
 ### Individual Commands
 
