@@ -551,20 +551,51 @@ git push -u origin "$BRANCH"
 
 When `REQUESTOR` is set (via `--requested-by`), `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL` are already exported, so the commit author is the requestor while Claude and GitHub Actions appear as co-authors.
 
-Open a draft PR:
+Open a draft PR with a conventional title and PRD summary:
 
 ```bash
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-gh pr create --draft --title "PRD: {ISSUE_TITLE}" --base "$DEFAULT_BRANCH" --body "$(cat <<'PRDBODY'
-## PRD for Review
+```
 
-This PR contains the auto-generated PRD for #{ISSUE_NUMBER}.
+Build the PR title using the type prefix (same one used for the branch):
+- `feature` → `feat: {ISSUE_TITLE}`
+- `bug-fix` → `fix: {ISSUE_TITLE}`
+- `refactor` → `refactor: {ISSUE_TITLE}`
+- `spike` → `chore: {ISSUE_TITLE}`
 
-**Review the PRD file** at `.prdx/plans/prdx-{SLUG}.md` and leave comments.
+Build the PR body by reading the PRD file just written and extracting sections:
 
-Once approved, trigger implementation with `@claude implement`.
+```bash
+# Read PRD to extract summary sections
+PRD_CONTENT=$(cat {PLANS_DIR}/prdx-{SLUG}.md)
+```
+
+Extract `## Problem`, `## Goal`, `## Acceptance Criteria`, and `## Approach` sections from the PRD content to include in the PR body.
+
+Create the draft PR:
+
+```bash
+gh pr create --draft --title "{TYPE_PREFIX}: {ISSUE_TITLE}" --base "$DEFAULT_BRANCH" --body "$(cat <<PRDBODY
+## Summary
+
+{Goal section content from PRD}
+
+## Problem
+
+{Problem section content from PRD}
+
+## Acceptance Criteria
+
+{Acceptance Criteria section content from PRD}
+
+## Approach
+
+{Approach section content from PRD}
 
 ---
+
+**PRD:** \`.prdx/plans/prdx-{SLUG}.md\`
+Review the PRD and trigger implementation with \`@claude implement\` when ready.
 
 Closes #{ISSUE_NUMBER}
 PRDBODY
@@ -775,8 +806,43 @@ PRDBODY
 PR_NUMBER=$(gh pr view --json number --jq '.number')
 ```
 
-If draft PR exists, mark it ready:
+If draft PR exists, update the body with implementation details and mark it ready:
 ```bash
+# Read the PRD (now includes Implementation Notes from the platform agent)
+PRD_CONTENT=$(cat {PLANS_DIR}/prdx-{SLUG}.md)
+```
+
+Extract `## Problem`, `## Goal`, `## Acceptance Criteria`, `## Approach`, and `## Implementation Notes` sections from the PRD.
+
+```bash
+gh pr edit "$PR_NUMBER" --body "$(cat <<PRDBODY
+## Summary
+
+{Goal section content from PRD}
+
+## Problem
+
+{Problem section content from PRD}
+
+## Acceptance Criteria
+
+{Acceptance Criteria section content from PRD}
+
+## Approach
+
+{Approach section content from PRD}
+
+## Implementation Notes
+
+{Implementation Notes section content from PRD, if present}
+
+---
+
+**PRD:** \`.prdx/plans/prdx-{SLUG}.md\`
+
+Closes #{ISSUE_NUMBER}
+PRDBODY
+)"
 gh pr ready "$PR_NUMBER"
 ```
 
