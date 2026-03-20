@@ -4,9 +4,8 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/resolve-plans-dir.sh"
-PLANS_DIR=$(resolve_plans_dir)
+PROJECT_ROOT="${PRDX_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PLANS_DIR="$PROJECT_ROOT/.prdx/plans"
 
 # Check if in git repository
 if ! git rev-parse --git-dir > /dev/null 2>&1; then

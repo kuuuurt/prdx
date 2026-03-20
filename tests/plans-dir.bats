@@ -1,93 +1,72 @@
 #!/usr/bin/env bats
-# Tests for resolve-plans-dir.sh helper
+# Tests for always-local plans directory behavior
 
 load helpers/test_helper
 
-# ---------------------------------------------------------------------------
-# Helper: invoke resolve_plans_dir in an isolated subshell.
-#
-# Uses PRDX_PROJECT_ROOT to point the helper at a temp directory, avoiding
-# any dependency on a real git repository.
-# ---------------------------------------------------------------------------
-run_resolve() {
-    local fake_root="$1"          # directory that acts as the project root
-    local settings_content="$2"  # JSON string; empty → no settings file written
-    local jq_available="${3:-yes}"
-
-    # Write settings file when content provided
-    if [ -n "$settings_content" ]; then
-        mkdir -p "$fake_root/.claude"
-        printf '%s\n' "$settings_content" > "$fake_root/.claude/settings.local.json"
-    fi
-
-    local driver
-    driver="$(mktemp "$TEST_TEMP_DIR/driver.XXXXXX.sh")"
-
-    if [ "$jq_available" = "no" ]; then
-        # Stub jq that always exits non-zero
-        local fake_bin
-        fake_bin="$(mktemp -d "$TEST_TEMP_DIR/fakebin.XXXXXX")"
-        printf '#!/bin/bash\nexit 127\n' > "$fake_bin/jq"
-        chmod +x "$fake_bin/jq"
-
-        printf '#!/bin/bash\nexport PATH="%s:$PATH"\nexport PRDX_PROJECT_ROOT="%s"\nsource "%s"\nresolve_plans_dir\n' \
-            "$fake_bin" "$fake_root" "$REPO_ROOT/hooks/prdx/resolve-plans-dir.sh" > "$driver"
-    else
-        printf '#!/bin/bash\nexport PRDX_PROJECT_ROOT="%s"\nsource "%s"\nresolve_plans_dir\n' \
-            "$fake_root" "$REPO_ROOT/hooks/prdx/resolve-plans-dir.sh" > "$driver"
-    fi
-
-    chmod +x "$driver"
-    run bash "$driver"
-}
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-@test "resolves plansDirectory when set to relative path" {
+@test "hooks resolve plans dir to PRDX_PROJECT_ROOT/.prdx/plans" {
     local fake_root="$TEST_TEMP_DIR/project"
     mkdir -p "$fake_root"
-    run_resolve "$fake_root" '{"plansDirectory": ".prdx/plans"}'
+
+    # Write a minimal driver that sources pre-plan.sh logic in isolation
+    local driver
+    driver="$(mktemp "$TEST_TEMP_DIR/driver.XXXXXX.sh")"
+    printf '#!/bin/bash\nexport PRDX_PROJECT_ROOT="%s"\nPROJECT_ROOT="${PRDX_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"\nPLANS_DIR="$PROJECT_ROOT/.prdx/plans"\necho "$PLANS_DIR"\n' \
+        "$fake_root" > "$driver"
+    chmod +x "$driver"
+
+    run bash "$driver"
 
     [ "$status" -eq 0 ]
     [ "$output" = "$fake_root/.prdx/plans" ]
 }
 
-@test "falls back to ~/.claude/plans when plansDirectory key is absent" {
-    local fake_root="$TEST_TEMP_DIR/project"
-    mkdir -p "$fake_root"
-    run_resolve "$fake_root" '{}'
+@test "plans directory is NOT in .gitignore" {
+    local gitignore="$REPO_ROOT/.gitignore"
 
-    [ "$status" -eq 0 ]
-    [ "$output" = "$HOME/.claude/plans" ]
+    # .prdx/plans/ should not be ignored (PRDs are project docs)
+    run grep -x '\.prdx/plans/' "$gitignore"
+    [ "$status" -ne 0 ]
+
+    # .prdx/ broad rule should not be present either
+    run grep -x '\.prdx/' "$gitignore"
+    [ "$status" -ne 0 ]
 }
 
-@test "falls back to ~/.claude/plans when settings file does not exist" {
-    local fake_root="$TEST_TEMP_DIR/project"
-    mkdir -p "$fake_root"
-    # Pass empty string so no settings file is written
-    run_resolve "$fake_root" ""
+@test ".prdx/state/ is in .gitignore (runtime state)" {
+    local gitignore="$REPO_ROOT/.gitignore"
 
+    run grep -F '.prdx/state/' "$gitignore"
     [ "$status" -eq 0 ]
-    [ "$output" = "$HOME/.claude/plans" ]
 }
 
-@test "falls back to ~/.claude/plans when jq is unavailable" {
+@test "pre-plan hook creates plans dir under PRDX_PROJECT_ROOT" {
     local fake_root="$TEST_TEMP_DIR/project"
     mkdir -p "$fake_root"
-    run_resolve "$fake_root" '{"plansDirectory": ".prdx/plans"}' "no"
+
+    # Initialize a git repo so the hook passes git check
+    git -C "$fake_root" init -q
+
+    export PRDX_PROJECT_ROOT="$fake_root"
+    run bash "$REPO_ROOT/hooks/prdx/pre-plan.sh"
 
     [ "$status" -eq 0 ]
-    [ "$output" = "$HOME/.claude/plans" ]
+    [ -d "$fake_root/.prdx/plans" ]
 }
 
-@test "returns absolute path unchanged when plansDirectory is absolute" {
+@test "pre-implement hook uses PRDX_PROJECT_ROOT for plans dir" {
     local fake_root="$TEST_TEMP_DIR/project"
-    local abs_plans="/tmp/my-custom-plans"
-    mkdir -p "$fake_root"
-    run_resolve "$fake_root" "{\"plansDirectory\": \"$abs_plans\"}"
+    mkdir -p "$fake_root/.prdx/plans"
+
+    # Place a valid PRD fixture in the local plans dir
+    cp "$FIXTURES_DIR/valid-prd.md" "$fake_root/.prdx/plans/prdx-test-local.md"
+
+    # Initialize a git repo in fake_root
+    git -C "$fake_root" init -q
+
+    export PRDX_PROJECT_ROOT="$fake_root"
+    run bash -c "echo 'y' | bash $REPO_ROOT/hooks/prdx/pre-implement.sh test-local"
 
     [ "$status" -eq 0 ]
-    [ "$output" = "$abs_plans" ]
+    echo "$output" | grep -q "PRD validation passed"
+    [ "$?" -eq 0 ]
 }

@@ -7,8 +7,8 @@ load helpers/test_helper
     # Copy fixture without Goal to test plans dir
     copy_fixture_to_plans "missing-goal" "prdx-test-missing-goal"
 
-    # Change HOME to use test plans directory
-    HOME="$TEST_TEMP_DIR"
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     # Run pre-implement hook - should fail
     run run_hook "pre-implement" "test-missing-goal"
@@ -25,8 +25,8 @@ load helpers/test_helper
     # Copy fixture without Acceptance Criteria
     copy_fixture_to_plans "missing-criteria" "prdx-test-missing-criteria"
 
-    # Change HOME to use test plans directory
-    HOME="$TEST_TEMP_DIR"
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     # Run pre-implement hook - should fail
     run run_hook "pre-implement" "test-missing-criteria"
@@ -43,8 +43,8 @@ load helpers/test_helper
     # Copy fixture without Approach
     copy_fixture_to_plans "missing-approach" "prdx-test-missing-approach"
 
-    # Change HOME to use test plans directory
-    HOME="$TEST_TEMP_DIR"
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     # Run pre-implement hook - should fail
     run run_hook "pre-implement" "test-missing-approach"
@@ -61,8 +61,8 @@ load helpers/test_helper
     # Copy valid fixture
     copy_fixture_to_plans "valid-prd" "prdx-test-valid"
 
-    # Change HOME to use test plans directory
-    HOME="$TEST_TEMP_DIR"
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     # Run pre-implement hook with "y" input for uncommitted changes prompt
     run bash -c "echo 'y' | bash $REPO_ROOT/hooks/prdx/pre-implement.sh test-valid"
@@ -79,8 +79,8 @@ load helpers/test_helper
     # Copy completed status fixture
     copy_fixture_to_plans "status-completed" "prdx-test-completed"
 
-    # Change HOME to use test plans directory
-    HOME="$TEST_TEMP_DIR"
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     # Run pre-implement hook - should fail
     run run_hook "pre-implement" "test-completed"
@@ -94,8 +94,8 @@ load helpers/test_helper
 }
 
 @test "pre-implement hook fails when PRD not found" {
-    # Change HOME to use test plans directory
-    HOME="$TEST_TEMP_DIR"
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     # Run pre-implement hook with non-existent PRD
     run run_hook "pre-implement" "nonexistent-prd"
@@ -112,8 +112,8 @@ load helpers/test_helper
     # Copy valid fixture
     copy_fixture_to_plans "valid-prd" "prdx-test-post-impl"
 
-    # Change HOME to use test plans directory
-    HOME="$TEST_TEMP_DIR"
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     local prd_file="$TEST_PLANS_DIR/prdx-test-post-impl.md"
 
@@ -136,8 +136,8 @@ load helpers/test_helper
     # Copy valid fixture
     copy_fixture_to_plans "valid-prd" "prdx-test-msg"
 
-    # Change HOME to use test plans directory
-    HOME="$TEST_TEMP_DIR"
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
 
     # Run post-implement hook
     run run_hook "post-implement" "test-msg"
