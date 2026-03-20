@@ -138,7 +138,7 @@ This runs silently at startup and does not block the user's intent.
    ```
    subagent_type: "general-purpose"
 
-   prompt: "Extract implementation learnings from this completed PRD.
+   prompt: "Extract ONLY repository-wide learnings from this completed PRD.
 
    Platform: {PLATFORM}
    Title: {TITLE}
@@ -155,19 +155,24 @@ This runs silently at startup and does not block the user's intent.
    PR Review Bodies:
    {PR_REVIEW_BODIES}
 
-   Extract concise learnings (3-5 bullet points total) in these categories:
+   IMPORTANT: Only extract learnings that are broadly applicable to the ENTIRE repository — patterns, conventions, or insights that would help ANY future feature in this codebase. Do NOT include learnings that are specific to this particular PR, feature, or task. Skip observations that only matter for this one change.
 
-   **Patterns:** What patterns worked well and should be reused?
-   **Challenges & Solutions:** What problems came up and how were they solved?
-   **Deviations from Plan:** Where did the implementation diverge from the plan and why?
-   **Review Feedback:** What did reviewers flag that should be done differently next time?
+   Extract concise learnings (1-5 bullet points total, fewer is better). Prioritize DO NOT DO entries — anti-patterns, mistakes, and things to avoid are the most valuable learnings. Use these categories:
+
+   **Do NOT:** What mistakes, anti-patterns, or approaches should be avoided repo-wide? (highest priority — always check for these first)
+   **Patterns:** What reusable patterns or conventions were established that apply repo-wide?
+   **Challenges & Solutions:** What problems came up that could recur in unrelated features?
+
+   If no learnings are broadly applicable to the repository, respond with exactly: NO_LEARNINGS
 
    Format your response as markdown bullet points, grouped by category. Only include categories that have learnings. Each bullet should be one line, starting with a dash.
 
-   Keep entries specific and actionable. Skip generic observations."
+   Keep entries specific and actionable. Skip generic observations and anything specific to this PR's feature."
    ```
 
-7. **Append learnings to the project's CLAUDE.md:**
+7. **Append learnings to the project's CLAUDE.md (if any):**
+
+   If the agent responded with `NO_LEARNINGS`, skip this step entirely and go to step 8.
 
    Read the project's `CLAUDE.md` (in the repository root).
 
@@ -183,6 +188,12 @@ This runs silently at startup and does not block the user's intent.
    ```
 
    If the `## Lessons Learned` section exceeds ~200 lines, trim the oldest entries (remove earliest `###` subsections) to stay under the limit.
+
+   **Commit the CLAUDE.md update:**
+   ```bash
+   git add CLAUDE.md
+   git commit -m "chore: update lessons learned from {SLUG}"
+   ```
 
 8. **Clean up state file and PRD (if quick mode):**
 
