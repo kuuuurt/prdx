@@ -200,6 +200,12 @@ Then add based on config:
    - Co-Authored-By: {coAuthor.name} <{coAuthor.email}>
 ```
 
+**If `GITHUB_ACTOR` env var is set** (CI mode — workflow requestor attribution):
+```
+   - Requested-By: @{GITHUB_ACTOR}
+```
+Add this trailer on the same trailer block (after Co-Authored-By if present, or after an empty line if no co-author).
+
 **Add an example commit** showing the exact format based on config.
 
 **Example with all options ENABLED (conventional format):**

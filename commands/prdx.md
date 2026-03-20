@@ -274,6 +274,11 @@ If no active state file qualifies (or no state files exist), continue with norma
     ```
     --ci requires --issue. Usage: /prdx:prdx --ci --issue 42
     ```
+  - **Resolve workflow requestor:**
+    ```bash
+    REQUESTOR="${GITHUB_ACTOR:-}"
+    ```
+    `GITHUB_ACTOR` is set automatically by GitHub Actions to the user who triggered the workflow. Store it for commit trailers and PR attribution.
   - **Skip the state-file resume scan entirely** (do not check `.prdx/state/` for active workflows)
   - **Skip the plans-directory setup prompt** — require `.prdx/plans-setup-done` to exist:
     ```bash
@@ -526,24 +531,39 @@ Use the codebase exploration results from step 2-CI.3 to inform the Approach and
 
 **2-CI.5: Commit PRD, push, and open draft PR:**
 
+If `REQUESTOR` is set, add a `Requested-By` trailer to the commit:
 ```bash
 git add .prdx/plans/prdx-{SLUG}.md
-git commit -m "docs: add PRD for {SLUG}"
+if [ -n "$REQUESTOR" ]; then
+  git commit -m "$(cat <<EOF
+docs: add PRD for {SLUG}
+
+Requested-By: @${REQUESTOR}
+EOF
+)"
+else
+  git commit -m "docs: add PRD for {SLUG}"
+fi
 git push -u origin "$BRANCH"
 ```
 
-Open a draft PR:
+Open a draft PR (include requestor attribution if available):
 
 ```bash
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-gh pr create --draft --title "PRD: {ISSUE_TITLE}" --base "$DEFAULT_BRANCH" --body "$(cat <<'PRDBODY'
+REQUESTOR_LINE=""
+if [ -n "$REQUESTOR" ]; then
+  REQUESTOR_LINE="**Requested by:** @${REQUESTOR}"
+fi
+gh pr create --draft --title "PRD: {ISSUE_TITLE}" --base "$DEFAULT_BRANCH" --body "$(cat <<PRDBODY
 ## PRD for Review
 
 This PR contains the auto-generated PRD for #{ISSUE_NUMBER}.
+${REQUESTOR_LINE}
 
-**Review the PRD file** at `.prdx/plans/prdx-{SLUG}.md` and leave comments.
+**Review the PRD file** at \`.prdx/plans/prdx-{SLUG}.md\` and leave comments.
 
-Once approved, trigger implementation with `@claude implement`.
+Once approved, trigger implementation with \`@claude implement\`.
 
 ---
 
@@ -635,7 +655,16 @@ Use the Write tool to update the PRD file, incorporating the review feedback. Th
 **Commit and push revision:**
 ```bash
 git add .prdx/plans/prdx-{SLUG}.md
-git commit -m "docs: revise PRD for {SLUG}"
+if [ -n "$REQUESTOR" ]; then
+  git commit -m "$(cat <<EOF
+docs: revise PRD for {SLUG}
+
+Requested-By: @${REQUESTOR}
+EOF
+)"
+else
+  git commit -m "docs: revise PRD for {SLUG}"
+fi
 git push origin "$BRANCH"
 ```
 
@@ -736,13 +765,18 @@ Find the existing draft PR and mark it ready for review:
 PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
 ```
 
-If no PR found, create one:
+If no PR found, create one (include requestor attribution if available):
 ```bash
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-gh pr create --title "{ISSUE_TITLE}" --base "$DEFAULT_BRANCH" --body "$(cat <<'PRDBODY'
+REQUESTOR_LINE=""
+if [ -n "$REQUESTOR" ]; then
+  REQUESTOR_LINE="**Requested by:** @${REQUESTOR}"
+fi
+gh pr create --title "{ISSUE_TITLE}" --base "$DEFAULT_BRANCH" --body "$(cat <<PRDBODY
 ## Implementation
 
-Implements the PRD at `.prdx/plans/prdx-{SLUG}.md`.
+Implements the PRD at \`.prdx/plans/prdx-{SLUG}.md\`.
+${REQUESTOR_LINE}
 
 Closes #{ISSUE_NUMBER}
 PRDBODY
