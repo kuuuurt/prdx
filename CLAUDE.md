@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document) workflow leveraging Claude Code's **native plan mode**. Plans are saved automatically by Claude to `~/.claude/plans/` and serve as the single source of truth for feature development.
+PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document) workflow leveraging Claude Code's **native plan mode**. Plans are saved to `.prdx/plans/` inside the project root and serve as the single source of truth for feature development. PRD files are tracked in git as project documentation.
 
 ## Core Philosophy
 
@@ -24,9 +24,9 @@ PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document)
 
 ## Plan Mode Configuration
 
-PRDX uses Claude Code's `plansDirectory` setting to locate plans. By default this is `~/.claude/plans/`. When configured as project-local (via `/prdx:config plans local`), plans are saved to `.prdx/plans/` inside the project root instead.
+Plans are always stored in `.prdx/plans/` relative to the project root. On first run, PRDX auto-creates the directory and sets `plansDirectory: ".prdx/plans"` in `.claude/settings.local.json` so Claude Code's native plan mode saves to the right place. A `.prdx/plans-setup-done` marker prevents repeated setup.
 
-The `resolve-plans-dir.sh` helper resolves the correct directory at runtime. A `.prdx/plans-setup-done` marker file is created the first time a project switches to local mode, preventing repeated setup prompts.
+PRD files are tracked in git as project documentation (`.prdx/plans/` is NOT gitignored). Runtime state (`.prdx/state/`) remains gitignored.
 
 **Naming convention:** `prdx-{slug}.md` for normal PRDs, `prdx-quick-{slug}.md` for quick mode (ephemeral).
 
@@ -505,7 +505,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 
 **Native Plan Mode:**
 - Uses Claude's built-in plan mode for PRD creation
-- Plans auto-saved to the configured plans directory (default: `~/.claude/plans/`)
+- Plans auto-saved to `.prdx/plans/` (project-local, tracked in git)
 - No custom file management needed
 - Interactive iteration until approval
 
@@ -815,7 +815,7 @@ Skills are read by agents during execution:
 
 **Validates:**
 - Git repository exists
-- Plans directory exists (resolved via `resolve-plans-dir.sh`)
+- Plans directory exists (`.prdx/plans/`)
 - PRDs are in `.gitignore`
 
 **On failure:** Stops planning
@@ -1089,6 +1089,27 @@ rm agents/ios-developer.md
 ```
 
 Commands automatically adapt to available agents.
+
+## Lessons Learned
+
+### Split Code Reviewer into AC Verifier + 2-Pass Code Review (2026-03-18) - backend
+
+**Patterns:**
+- Splitting a monolithic agent into two focused single-responsibility agents (ac-verifier + code-reviewer) improves coverage and clarity
+- Sequential phases (AC verification first, then code quality) ensure ACs are met before quality polish
+
+**Challenges & Solutions:**
+- AC fix loops needed a cap (3 attempts) to prevent infinite cycling — escalate to user after exhaustion
+
+### CI Mode for PRDX (2026-03-18) - backend
+
+**Patterns:**
+- Composable flags (`--issue` standalone + `--ci` builds on it) provide flexibility for both interactive and non-interactive use
+- Direct PRD generation via `prdx:code-explorer` + Write tool effectively replaces plan mode for non-interactive contexts
+- Checking `CI=true` env var (standard across CI providers) is the cleanest way to bypass interactive prompts in hooks
+
+**Deviations from Plan:**
+- The CI straight-line flow needed to skip the plans-directory setup prompt entirely, requiring a pre-configured `.prdx/plans-setup-done` marker
 
 ## Related Documentation
 
