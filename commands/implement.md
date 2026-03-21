@@ -317,6 +317,22 @@ EOF
 4. **Update status to `in-progress`:**
    Edit the PRD file to change `**Status:** planning` to `**Status:** in-progress`
 
+5. **Post CI progress comment (CI mode only):**
+
+   If `CI=true` environment variable is set, post a progress comment on the PR:
+   ```bash
+   BRANCH=$(git branch --show-current)
+   PR_NUMBER=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' 2>/dev/null)
+   if [ -n "$PR_NUMBER" ]; then
+     REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+     RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+     PROGRESS_COMMENT_ID=$(gh pr comment "$PR_NUMBER" --body "> Implementing \`{SLUG}\`... 🔨
+   >
+   > [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
+   fi
+   ```
+   Store `PROGRESS_COMMENT_ID` for editing when done (see Step 7).
+
 ### Step 2b: Parent PRD Handling
 
 **This step runs only when the loaded PRD is a parent PRD (contains `## Children` section).**
@@ -863,6 +879,16 @@ Route based on choice:
    ```
 
 ### Step 7: Display Completion
+
+**Edit CI progress comment (CI mode only):**
+
+If `PROGRESS_COMMENT_ID` is set (from Step 2.5), edit the progress comment to show completion:
+```bash
+if [ -n "$PROGRESS_COMMENT_ID" ]; then
+  REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+  gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="Implementation complete. Comment \`@claude review\` for code review, or review the changes yourself."
+fi
+```
 
 **For single-platform PRDs:**
 ```

@@ -45,16 +45,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Comment progress
-        if: steps.check.outputs.found == 'false'
-        id: progress
-        run: |
-          COMMENT_URL=$(gh issue comment ${{ github.event.issue.number }} --body "![Planning](https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f) Planning in progress... [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" | grep -o 'https://[^ ]*')
-          COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
-          echo "comment_id=$COMMENT_ID" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Run Claude Code
         if: steps.check.outputs.found == 'false'
         uses: anthropics/claude-code-action@v1
@@ -69,15 +59,6 @@ jobs:
         env:
           GIT_AUTHOR_NAME: ${{ github.actor }}
           GIT_AUTHOR_EMAIL: ${{ github.actor }}@users.noreply.github.com
-
-      - name: Comment done
-        if: steps.check.outputs.found == 'false' && always()
-        run: |
-          if [ "${{ steps.progress.outputs.comment_id }}" ]; then
-            gh api repos/${{ github.repository }}/issues/comments/${{ steps.progress.outputs.comment_id }} -X PATCH -f body="Planning complete. A draft PR has been created — review the PRD and comment \`@claude implement\` when ready."
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
 
   # @claude revise on PRs — update PRD based on feedback, update PR body
   revise:
@@ -117,15 +98,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Comment progress
-        id: progress
-        run: |
-          COMMENT_URL=$(gh pr comment ${{ github.event.issue.number }} --body "![Revising](https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f) Revising PRD... [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" | grep -o 'https://[^ ]*')
-          COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
-          echo "comment_id=$COMMENT_ID" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
         with:
@@ -139,15 +111,6 @@ jobs:
         env:
           GIT_AUTHOR_NAME: ${{ github.actor }}
           GIT_AUTHOR_EMAIL: ${{ github.actor }}@users.noreply.github.com
-
-      - name: Comment done
-        if: always()
-        run: |
-          if [ "${{ steps.progress.outputs.comment_id }}" ]; then
-            gh api repos/${{ github.repository }}/issues/comments/${{ steps.progress.outputs.comment_id }} -X PATCH -f body="PRD revised. Review the updated PR description and comment \`@claude implement\` when ready."
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
 
   # @claude implement on PRs — implement from PRD, update PR body
   implement:
@@ -195,16 +158,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Comment progress
-        if: steps.prd.outputs.found == 'true'
-        id: progress
-        run: |
-          COMMENT_URL=$(gh pr comment ${{ github.event.issue.number }} --body "![Implementing](https://github.com/user-attachments/assets/5ac382c7-e004-429b-8e35-7feb3e8f9c6f) Implementing \`${{ steps.prd.outputs.slug }}\`... [View run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" | grep -o 'https://[^ ]*')
-          COMMENT_ID=$(echo "$COMMENT_URL" | grep -o '[0-9]*$')
-          echo "comment_id=$COMMENT_ID" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Run Claude Code
         if: steps.prd.outputs.found == 'true'
         uses: anthropics/claude-code-action@v1
@@ -220,15 +173,6 @@ jobs:
           GIT_AUTHOR_NAME: ${{ github.actor }}
           GIT_AUTHOR_EMAIL: ${{ github.actor }}@users.noreply.github.com
           CI: "true"
-
-      - name: Comment done
-        if: steps.prd.outputs.found == 'true' && always()
-        run: |
-          if [ "${{ steps.progress.outputs.comment_id }}" ]; then
-            gh api repos/${{ github.repository }}/issues/comments/${{ steps.progress.outputs.comment_id }} -X PATCH -f body="Implementation complete. Comment \`@claude review\` for code review, or review the changes yourself."
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
 
   # @claude review on PRs — code review
   review:

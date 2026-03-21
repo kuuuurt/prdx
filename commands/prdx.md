@@ -479,6 +479,18 @@ BRANCH_EXISTS=$?
 
 **If branch exists (revision):** Jump to 2-CI.6.
 
+**2-CI.2b: Post progress comment on issue:**
+
+```bash
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+PROGRESS_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "> Planning... 🔨
+>
+> [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
+```
+
+Store `PROGRESS_COMMENT_ID` for editing when done.
+
 **2-CI.3: Explore codebase:**
 
 Use `prdx:code-explorer` agent to understand the codebase context relevant to the issue:
@@ -588,9 +600,10 @@ This is a plan-only draft PR for PRD review. The footer should say:
 Read the PRD, create the PR via gh pr create --draft, and return only the PR summary (number, URL, title)."
 ```
 
-After PR creation, comment on the issue:
+After PR creation, edit the progress comment to show completion:
 ```bash
-gh issue comment {ISSUE_NUMBER} --body "PRD created in draft PR #${PR_NUMBER}. Review and comment \`@claude implement\` when ready."
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="Planning complete. A draft PR has been created — review the PRD and comment \`@claude implement\` when ready."
 ```
 
 Update state file with PR number:
@@ -619,6 +632,19 @@ This runs when `--plan-only` is used and the branch already exists — it means 
 ```bash
 git checkout "$BRANCH"
 git pull origin "$BRANCH"
+```
+
+**Post progress comment on PR:**
+
+```bash
+PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+if [ -n "$PR_NUMBER" ]; then
+  PROGRESS_COMMENT_ID=$(gh pr comment "$PR_NUMBER" --body "> Revising PRD... 🔨
+>
+> [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
+fi
 ```
 
 **Read existing PRD:**
@@ -699,6 +725,15 @@ Read the updated PRD and regenerate the PR title and body. Use gh pr edit to upd
 The footer should say: 'Comment `@claude implement` when ready, or `@claude revise` with feedback.'
 
 Return confirmation of the update."
+```
+
+**Edit progress comment to show completion:**
+
+```bash
+if [ -n "$PROGRESS_COMMENT_ID" ]; then
+  REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+  gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="PRD revised. Review the updated PR description and comment \`@claude implement\` when ready."
+fi
 ```
 
 Display:
