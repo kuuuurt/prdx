@@ -1,14 +1,21 @@
 ---
 description: "Set up GitHub Actions workflow for PRDX CI mode"
-argument-hint: ""
+argument-hint: "[--force]"
 ---
 
 # /prdx:setup-github-actions - Install CI Workflow
 
 > Sets up the PRDX GitHub Actions workflow in the current repository.
 > Copies the reference workflow and guides through secrets configuration.
+> Use `--force` to overwrite without prompts and auto-push.
 
 ## Steps
+
+### Step 0: Parse Flags
+
+- Strip `--force` from arguments if present
+- If `--force` is present: set `FORCE=true`
+- If `--force` is NOT present: set `FORCE=false`
 
 ### Step 1: Verify Prerequisites
 
@@ -29,7 +36,9 @@ This command requires a git repository with a GitHub remote.
 ls .github/workflows/mention.claude-code.yml 2>/dev/null
 ```
 
-If the file exists, use AskUserQuestion to ask the user what to do:
+If the file exists and `FORCE=true`: skip to Step 3 (overwrite silently).
+
+If the file exists and `FORCE=false`, use AskUserQuestion to ask the user what to do:
 ```
 A Claude Code workflow already exists at .github/workflows/mention.claude-code.yml.
 
@@ -136,7 +145,12 @@ git add .github/workflows/mention.claude-code.yml
 git commit -m "ci: add PRDX Claude Code workflow"
 ```
 
-Ask if they want to push:
+If `FORCE=true`: push immediately without asking:
+```bash
+git push
+```
+
+If `FORCE=false`: ask if they want to push:
 ```
 Push the workflow to GitHub? (y/n)
 ```
