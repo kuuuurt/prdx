@@ -613,6 +613,13 @@ cat > .prdx/state/{SLUG}.json << EOF
 EOF
 ```
 
+Add requester as assignee to the draft PR:
+```bash
+if [ -n "$REQUESTOR" ]; then
+  gh pr edit "$PR_NUMBER" --add-assignee "$REQUESTOR" 2>/dev/null || true
+fi
+```
+
 Display:
 ```
 CI Plan-Only Complete!
@@ -859,6 +866,14 @@ Read the PRD (now including Implementation Notes), analyze commits on this branc
 The footer should say: 'Comment `@claude review` for code review.'
 
 Return confirmation of the update."
+```
+
+Mark PR as ready and add requester as reviewer:
+```bash
+gh pr ready "$PR_NUMBER" 2>/dev/null || true
+if [ -n "$REQUESTOR" ]; then
+  gh pr edit "$PR_NUMBER" --add-reviewer "$REQUESTOR" 2>/dev/null || true
+fi
 ```
 
 Display:

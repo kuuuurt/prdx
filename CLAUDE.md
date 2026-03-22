@@ -454,6 +454,7 @@ CI mode is non-interactive. PRDX handles the full lifecycle — planning, implem
 | Generate PRD | PRDX (plan mode) | PRDX (direct write) |
 | Create branch, commit, push | PRDX | PRDX |
 | Create draft PR (PRD review) | — | PRDX (pr-author agent) |
+| Add requester as PR assignee | — | PRDX (`gh pr edit --add-assignee`) |
 | Comment on issue | PRDX (`/prdx:publish`) | PRDX |
 | Revise PRD from feedback | PRDX (user iterates in plan mode) | PRDX (reads PR comments) |
 | Update PR body after revision | — | PRDX (pr-author agent) |
@@ -463,6 +464,8 @@ CI mode is non-interactive. PRDX handles the full lifecycle — planning, implem
 | Commit implementation, push | PRDX | PRDX |
 | Run tests | PRDX (post-implement hook) | PRDX (post-implement hook) |
 | Update PR body after impl | PRDX (auto, if draft PR exists) | PRDX (pr-author agent) |
+| Mark PR ready for review | — | PRDX (`gh pr ready`) |
+| Add requester as PR reviewer | — | PRDX (`gh pr edit --add-reviewer`) |
 | Commit authorship | Config (`prdx.json`) | `--requested-by` flag |
 | **Push** | | |
 | Create draft PR (implementation) | PRDX (`/prdx:push --draft`) | _(handled at plan time)_ |
@@ -475,13 +478,13 @@ CI mode is non-interactive. PRDX handles the full lifecycle — planning, implem
 # Plan only — generates PRD, commits, pushes branch, creates draft PR, comments on issue
 /prdx:prdx --ci --issue 42 --plan-only --requested-by username
 
-# Implement — reads PRD from branch, implements, pushes, updates PR body
-/prdx:implement {slug}
+# Implement — reads PRD from branch, implements, pushes, updates PR body, marks ready, adds reviewer
+/prdx:prdx --ci --issue 42 --requested-by username
 ```
 
-**`--requested-by` flag:** Sets git commit author to the specified GitHub user. Claude Code and github-actions[bot] are added as co-authors. Only applies in CI mode.
+**`--requested-by` flag:** Sets git commit author to the specified GitHub user. Claude Code and github-actions[bot] are added as co-authors. After plan: adds user as PR assignee. After implement: adds user as PR reviewer. Only applies in CI mode.
 
-**PRDX does NOT in CI mode:** Mark PRs as ready for review, or perform code reviews. Code review stays in the workflow.
+**PRDX does NOT in CI mode:** Perform code reviews. Code review stays in the workflow.
 
 See `examples/workflows/mention.claude-code.yml` for the reference GitHub Actions workflow.
 
@@ -1163,6 +1166,8 @@ Commands automatically adapt to available agents.
 - PRDX owns the full CI lifecycle: plan, implement, PR creation/update, issue comments. Workflow is a thin trigger. Only code review stays in the workflow
 - `pr-author` agent handles both PR creation and updates (via `gh pr edit`), ensuring consistent titles/bodies across local and CI mode
 - `--requested-by` flag sets git author to the workflow requestor; Claude Code + github-actions[bot] as co-authors
+- After `@claude plan`, the requester is added as PR assignee. After `@claude implement`, the draft PR is marked ready and the requester is added as reviewer
+- The implement workflow job routes through `prdx.md` CI path (`--ci --issue --requested-by`) so attribution logic stays in PRDX, not the workflow
 
 **Deviations from Plan:**
 - The CI straight-line flow needed to skip the plans-directory setup prompt entirely, requiring a pre-configured `.prdx/plans-setup-done` marker
