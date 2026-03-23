@@ -98,10 +98,10 @@ ls .prdx/plans-setup-done 2>/dev/null
 If not found:
 ```bash
 mkdir -p .claude .prdx .prdx/plans
-if [ -f .claude/settings.local.json ]; then
-  jq '. + {plansDirectory: ".prdx/plans"}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
+if [ -f .claude/settings.json ]; then
+  jq '. + {plansDirectory: ".prdx/plans"}' .claude/settings.json > .claude/settings.json.tmp && mv .claude/settings.json.tmp .claude/settings.json
 else
-  echo '{"plansDirectory": ".prdx/plans"}' > .claude/settings.local.json
+  echo '{"plansDirectory": ".prdx/plans"}' > .claude/settings.json
 fi
 echo "local" > .prdx/plans-setup-done
 ```
