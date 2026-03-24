@@ -57,7 +57,7 @@ git branch --show-current
 **PRD mode:**
 Create PR title and description that:
 - Summarizes the change clearly
-- Links to issue if one exists
+- Includes `Closes #{ISSUE_NUMBER}` if the PRD contains an issue number (check for `**Issue:**` or `**GitHub Issue:**` fields, or `## Pull Request` section with issue references). This is critical for auto-closing the linked issue when the PR merges.
 - Shows acceptance criteria status
 - Describes key changes
 - Notes testing approach
@@ -115,7 +115,7 @@ Deduplication rules:
 
 {Goal from PRD - 1-2 sentences explaining the user/business value}
 
-Closes #{ISSUE_NUMBER}  <!-- if PRD has issue number -->
+Closes #{ISSUE_NUMBER}  <!-- REQUIRED if PRD has **Issue:** field -->
 
 ## Changes
 
