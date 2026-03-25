@@ -177,13 +177,14 @@ planning < in-progress < review < implemented < completed
 The parent's derived status equals the minimum status across all children. For example, if one child is `review` and another is `in-progress`, the parent is `in-progress`.
 
 **Runtime-only phase** (not part of PRD document status, used only in state files):
-- `"pushed"` — Non-draft PR created, awaiting merge. State file includes `pr_number`. At next `/prdx:prdx` startup, merged PRs trigger automatic lesson capture, then the state file is deleted.
+- `"pushed"` — Non-draft PR created, awaiting merge. State file includes `pr_number`. The scheduled `/prdx:cleanup` CI job captures lessons and deletes the state file + PRD after merge.
 
 **Convention:**
 - State files are written/updated by `/prdx:implement` as implementation progresses.
 - Reading `.prdx/state/` lets any session check sibling or child progress without loading full PRDs.
 - State files for quick PRDs are deleted along with the ephemeral PRD after the workflow completes.
-- After non-draft PR creation, state files transition to `"pushed"` (not deleted) to enable automatic lesson capture on next startup.
+- After non-draft PR creation, state files transition to `"pushed"` (not deleted) to enable cleanup by the scheduled `/prdx:cleanup` CI job.
+- After merge, `/prdx:cleanup` captures lessons, deletes both the PRD plan file and state file. Git history preserves the PRD.
 
 ## Parent-Child PRD Model
 
@@ -333,6 +334,7 @@ prdx/
 │   ├── commit.md            # Commit with prdx.json config
 │   ├── simplify.md          # Code cleanup/simplification
 │   ├── config.md            # Configure settings
+│   ├── cleanup.md           # Clean up merged PRD plans (/prdx:cleanup)
 │   └── prdx-agent.md        # Agent teams workflow (/prdx:prdx:agent)
 ├── hooks/prdx/              # Validation hooks
 │   ├── pre-plan.sh          # Pre-planning validation
@@ -487,6 +489,7 @@ CI mode is non-interactive. PRDX handles the full lifecycle — planning, implem
 **PRDX does NOT in CI mode:** Perform code reviews. Code review stays in the workflow.
 
 See `examples/workflows/mention.claude-code.yml` for the reference GitHub Actions workflow.
+See `examples/workflows/cleanup.claude-code.yml` for the scheduled cleanup workflow (lesson capture + PRD deletion after merge).
 
 ### Individual Commands
 
@@ -595,7 +598,7 @@ These commands work independently of the PRDX workflow for quick, ad-hoc work:
 3. Asks: Implement now? → runs `/prdx:implement`
 4. Asks: Create PR? → runs `/prdx:push`
 5. After draft PR: enters reviewing loop (fix from PR comments → push → iterate)
-6. Quick mode only: Cleans up temporary PRD after workflow completes
+6. Quick mode: Cleans up temporary PRD immediately after workflow completes; normal PRDs are cleaned up by the scheduled `/prdx:cleanup` CI job after merge
 
 **Usage:**
 - `/prdx:prdx add user authentication` - Start new feature
@@ -709,6 +712,7 @@ Same workflow as `/prdx:prdx` but uses Claude Code's experimental agent teams fo
 
 - `/prdx:show` - List/search/view PRDs (bash + grep)
 - `/prdx:publish` - Create GitHub issue from PRD
+- `/prdx:cleanup` - Capture lessons from merged PRs + delete PRD plan files (scheduled CI or manual)
 
 ### Standalone-Capable Commands
 
