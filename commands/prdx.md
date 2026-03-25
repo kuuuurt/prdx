@@ -418,7 +418,7 @@ git add .prdx/plans/prdx-{SLUG}.md
 git commit -m "$(cat <<'EOF'
 docs: add PRD for {SLUG}
 
-Co-Authored-By: Claude Code <noreply@anthropic.com>
+Co-Authored-By: claude[bot] <209825114+claude[bot]@users.noreply.github.com>
 Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
 EOF
 )"
@@ -562,7 +562,7 @@ git add .prdx/plans/prdx-{SLUG}.md
 git commit -m "$(cat <<'EOF'
 docs: revise PRD for {SLUG}
 
-Co-Authored-By: Claude Code <noreply@anthropic.com>
+Co-Authored-By: claude[bot] <209825114+claude[bot]@users.noreply.github.com>
 Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
 EOF
 )"
