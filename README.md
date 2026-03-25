@@ -193,8 +193,8 @@ Run PRDX from GitHub Actions or any CI environment. PRDX handles the full lifecy
 # Plan only — generates PRD, commits, pushes branch, creates draft PR, comments on issue
 /prdx:prdx --ci --issue 42 --plan-only --requested-by username
 
-# Implement — reads PRD from branch, implements, pushes, updates PR body
-/prdx:implement {slug}
+# Implement — reads PRD from branch, implements, pushes, updates PR body, marks ready, adds reviewer
+/prdx:prdx --ci --issue 42 --requested-by username
 ```
 
 ### Responsibility Boundaries
@@ -252,7 +252,8 @@ issue → @claude plan → draft PR with PRD → @claude revise / @claude implem
 - Auto-detects platform from codebase
 - `--requested-by` sets commit author (Claude Code + GitHub Actions as co-authors)
 - Creates draft PRs, comments on issues, and updates PR bodies — all via `pr-author` agent
-- **Does NOT** mark PRs as ready for review or perform code reviews — that stays in the workflow
+- Marks PR as ready for review and adds requester as reviewer after implementation
+- **Does NOT** perform code reviews — that stays in the workflow
 - Requires pre-configured plans directory (`.prdx/plans-setup-done` must exist)
 
 ## Installation
@@ -286,6 +287,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 | Command | Description |
 |---------|-------------|
 | **`/prdx:prdx`** | **Complete workflow orchestrator (recommended)** |
+| `/prdx:prdx:agent` | Agent teams mode (experimental, 3-4x token cost) |
 | `/prdx:plan` | Create PRD |
 | `/prdx:implement` | Implement feature |
 | `/prdx:push` | Create pull request (supports `--draft`) |
@@ -305,6 +307,7 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 | `/prdx:show` | View/list/search PRDs |
 | `/prdx:config` | Configure settings |
 | `/prdx:publish` | Create GitHub issue from PRD |
+| `/prdx:cleanup` | Capture lessons from merged PRs + delete PRD plans |
 | `/prdx:setup-github-actions` | Install CI workflow in current repo |
 
 ## Why This Approach?
