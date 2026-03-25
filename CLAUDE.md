@@ -351,10 +351,10 @@ prdx/
 │   ├── pr-author.md         # PR creation (isolated context)
 │   ├── ac-verifier.md       # AC verification (isolated context)
 │   ├── code-reviewer.md     # Code quality review (isolated context)
-│   ├── backend-developer.md # Backend expert (discovers stack)
-│   ├── frontend-developer.md # Frontend/web expert (discovers stack)
-│   ├── android-developer.md # Kotlin/Compose expert
-│   ├── ios-developer.md     # Swift/SwiftUI expert
+│   ├── backend-developer.md # Backend developer (discovers stack and patterns)
+│   ├── frontend-developer.md # Frontend developer (discovers stack and patterns)
+│   ├── android-developer.md # Android developer (discovers stack and patterns)
+│   ├── ios-developer.md     # iOS developer (discovers stack and patterns)
 │   ├── code-explorer.md     # Codebase exploration (isolated context)
 │   └── docs-explorer.md     # Documentation search (isolated context)
 └── install.sh               # Installation script
@@ -757,31 +757,23 @@ Agents run in **isolated contexts** to minimize main conversation size.
 ### Platform Agents
 
 **1. prdx:backend-developer**
-- Framework-agnostic backend expert
-- Discovers stack from codebase (package.json, etc.)
-- API development, validation, services
-- Adapts to project's framework and patterns
+- Discovers stack and patterns from codebase
+- Follows project's existing conventions for APIs, services, and validation
 - **Returns:** Implementation summary (~1KB)
 
 **2. prdx:frontend-developer**
-- Framework-agnostic frontend/web expert
-- Discovers stack from codebase (React, Vue, Svelte, Next.js, etc.)
-- Component development, state management, data fetching
-- Adapts to project's styling and patterns
+- Discovers stack and patterns from codebase
+- Follows project's existing conventions for components, state, and data fetching
 - **Returns:** Implementation summary (~1KB)
 
 **3. prdx:android-developer**
-- Kotlin + Jetpack Compose expert
-- Discovers DI/persistence from build.gradle
-- MVVM architecture, StateFlow
-- Adapts to project's libraries
+- Discovers stack and patterns from codebase
+- Follows project's existing conventions for UI, architecture, and state management
 - **Returns:** Implementation summary (~1KB)
 
 **4. prdx:ios-developer**
-- Swift + SwiftUI expert
-- Discovers dependencies from Package.swift/Podfile
-- MVVM, async/await, NavigationStack
-- Adapts to project's libraries
+- Discovers stack and patterns from codebase
+- Follows project's existing conventions for UI, architecture, and state management
 - **Returns:** Implementation summary (~1KB)
 
 **What platform agents do:**

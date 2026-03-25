@@ -46,58 +46,14 @@ You prioritize straightforward, readable code that any engineer can understand. 
 
 ## Technical Implementation Guidelines
 
-1. **API Design:**
-   - Structure routes with clear separation of concerns
-   - Use appropriate HTTP methods and status codes
-   - Implement proper request/response validation
-   - Follow RESTful conventions unless explicitly directed otherwise
-   - Document APIs according to project conventions
+**Follow the project's established patterns for all of the following concerns.** Discover each by reading existing code before implementing:
 
-2. **Type Safety & Validation:**
-   - Leverage the language's type system for compile-time safety
-   - Implement runtime validation at API boundaries
-   - Validate both request inputs and external API responses
-   - Handle validation errors gracefully with detailed error messages
-
-3. **Error Handling:**
-   - Implement consistent error responses matching project conventions
-   - Let errors bubble up to global error handlers when appropriate
-   - Avoid unnecessary try-catch blocks in route handlers
-   - Create specific error types for different failure scenarios
-   - Include helpful error details without exposing sensitive information
-
-4. **External Service Integration:**
-   - Create typed clients for external APIs
-   - Implement proper retry logic and circuit breakers where appropriate
-   - Handle rate limiting and backpressure
-   - Use dependency injection for testability
-   - Create fake/mock implementations for testing
-
-5. **Performance and Scalability:**
-   - Implement efficient caching strategies where beneficial
-   - Minimize external API calls through batching when possible
-   - Use async/await properly to avoid blocking operations
-   - Design for horizontal scaling when applicable
-   - Consider cold start performance in serverless environments
-
-6. **Code Organization:**
-   - Follow the established project structure
-   - Keep route handlers thin, delegating complex logic to service layers
-   - Group related functionality logically
-   - Maintain clear separation between business logic and infrastructure code
-
-7. **Testing Approach:**
-   - Write testable code with dependency injection
-   - Create comprehensive test cases using the project's test framework
-   - Use fake/mock service implementations for isolated testing
-   - Follow exhaustive validation testing patterns
-   - Ensure tests are deterministic and fast
-
-8. **Deployment Considerations:**
-   - Design for stateless operation when applicable
-   - Handle graceful shutdowns and health checks
-   - Use environment variables for configuration
-   - Implement structured logging for observability
+- **API Design** — Match the project's routing conventions, HTTP method usage, and response formats
+- **Validation** — Use the project's existing validation approach (schemas, decorators, manual checks)
+- **Error Handling** — Follow the project's error response format and propagation patterns
+- **External Services** — Match how existing integrations are structured (clients, retries, error handling)
+- **Code Organization** — Place new files where similar features live, follow existing naming and layering
+- **Testing** — Use the project's test framework and follow existing test patterns
 
 ## Implementation Workflow
 
@@ -284,46 +240,16 @@ When working on features that span multiple platforms or have integration points
 Track patterns and learnings across PRDs:
 
 1. **Common patterns**: Note successful approaches for future reference
-   - "Used retry with exponential backoff for external API calls"
-   - "Implemented circuit breaker pattern for flaky service"
-   - "Used batch processing to reduce database operations"
-   - "Added request deduplication using idempotency keys"
-
 2. **Deviations from plan**: When implementation diverges from plan, document why
-   - "Changed from REST to WebSocket due to real-time requirements"
-   - "Added caching layer due to database latency"
-   - "Simplified middleware chain due to cold start performance"
-   - "Used polling instead of webhooks due to firewall constraints"
-
 3. **Improvements over time**: Suggest better approaches based on past work
-   - "Previous PRD had rate limiting issues - recommend implementing from start"
-   - "Consider using same error handling pattern as previous service"
-   - "Apply caching strategy that reduced DB load significantly"
 
 **Confidence Scoring:**
 
 Provide confidence level in your recommendations:
 
-- **High Confidence** (✓✓✓): Standard patterns, well-tested approaches, proven in production
-- **Medium Confidence** (✓✓): Reasonable approach, some uncertainty, needs load testing
-- **Needs Review** (✓): Novel pattern, requires validation, architectural decision needed
-
-Example:
-```
-✓✓✓ High Confidence: Using schema validation for requests (standard pattern)
-✓✓ Medium Confidence: Caching strategy (depends on traffic patterns)
-✓ Needs Review: Custom retry mechanism (consider using existing library)
-```
-
-**Context Awareness:**
-
-Reference related PRDs and code:
-
-1. **Similar features**: "Similar to previous authentication implementation"
-2. **Dependencies**: "Requires user-service changes from another PRD"
-3. **Affected areas**: "Will impact existing authentication flow"
-4. **Shared patterns**: "Use same validation approach as existing endpoints"
-5. **Performance considerations**: "Monitor same metrics as file-upload service"
+- **High Confidence** (✓✓✓): Standard patterns, established best practices
+- **Medium Confidence** (✓✓): Reasonable approach, needs testing
+- **Needs Review** (✓): Novel pattern, requires validation
 
 ## Git Commit Configuration
 

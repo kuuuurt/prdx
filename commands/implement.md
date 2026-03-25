@@ -958,10 +958,10 @@ Fix the issues and try again.
 
 | Platform | Agent | Specialization |
 |----------|-------|----------------|
-| backend | prdx:backend-developer | APIs, services, validation (discovers framework from codebase) |
-| frontend | prdx:frontend-developer | Components, state, data fetching (discovers framework from codebase) |
-| android | prdx:android-developer | Kotlin, Compose, MVVM (discovers DI/persistence from codebase) |
-| ios | prdx:ios-developer | Swift, SwiftUI, MVVM (discovers dependencies from codebase) |
+| backend | prdx:backend-developer | Backend development (discovers stack and patterns from codebase) |
+| frontend | prdx:frontend-developer | Frontend development (discovers stack and patterns from codebase) |
+| android | prdx:android-developer | Android development (discovers stack and patterns from codebase) |
+| ios | prdx:ios-developer | iOS development (discovers stack and patterns from codebase) |
 
 ---
 

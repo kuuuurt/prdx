@@ -1,108 +1,106 @@
 # PRD Review Skill
 
-Expert skill for reviewing PRDs with platform-specific domain knowledge and best practices.
+Expert skill for reviewing PRDs against the project's actual patterns and best practices. Agents should **discover the project's stack and conventions** before applying review checks.
 
 ## Platform-Specific Review Patterns
 
-### Backend (TypeScript + Hono + Bun)
+### Backend
 
 **Architecture Checks:**
-- API endpoint design follows RESTful conventions
-- Authentication/authorization via JWT tokens properly implemented
-- Error handling uses consistent error response format
-- Rate limiting considered for public endpoints
-- Third-party service integration follows established patterns (payment providers, external APIs, notification services)
+- API endpoint design follows the project's established routing conventions
+- Authentication/authorization follows existing auth patterns
+- Error handling uses the project's consistent error response format
+- Input validation follows project's validation approach
+- Third-party service integration follows established patterns
 
 **Common Pitfalls:**
-- Missing input validation with Zod schemas
-- Not handling third-party API failures gracefully
-- Missing OpenAPI documentation for new endpoints
-- Forgetting to update generated types after API changes
-- Not considering Redis caching for expensive operations
+- Missing input validation at API boundaries
+- Not handling external service failures gracefully
+- Missing API documentation for new endpoints
+- Not considering caching for expensive operations
+- Inconsistent error response format
 
 **Performance Considerations:**
 - Database queries optimized (avoid N+1)
-- Caching strategy for third-party API calls
-- Async operations properly handled with Bun's native APIs
+- Caching strategy for frequently-accessed or expensive data
+- Async operations properly handled
 - Connection pooling for external services
 
 **Testing Requirements:**
 - Unit tests for business logic
 - Integration tests for API endpoints
-- Mock third-party services in tests
+- Mock external services in tests
 - Test error scenarios and edge cases
 
-### Android (Kotlin + Jetpack Compose + Clean Architecture)
+### Android
 
 **Architecture Checks:**
-- Repository pattern used consistently (no Use Cases - deprecated pattern)
-- MVVM structure with ViewModel + State
-- Hilt dependency injection properly configured
-- Navigation follows Compose Navigation patterns
-- State management with StateFlow/SharedFlow
+- Code follows the project's established architecture pattern
+- Dependency injection uses the project's existing DI approach
+- Navigation follows the project's navigation patterns
+- State management uses the project's established approach
+- New code matches existing package/module organization
 
 **Common Pitfalls:**
-- Creating new Use Cases (anti-pattern, use Repositories directly)
 - Not handling configuration changes properly
-- Memory leaks with ViewModels/Coroutines
+- Memory leaks with lifecycle-unaware components
 - Missing loading/error states in UI
-- Not following Material Design 3 guidelines
-- Mixing ViewBinding and Compose patterns inconsistently
+- Inconsistent use of project's established patterns
+- Not following the project's existing UI framework conventions
 
 **Performance Considerations:**
-- Lazy loading for lists with LazyColumn
-- Image loading with Coil properly configured
-- Background operations on IO dispatcher
-- Avoiding recomposition issues in Compose
+- Efficient list rendering for large datasets
+- Image loading follows project's established approach
+- Background operations on appropriate threads/dispatchers
+- Avoiding unnecessary UI rebuilds
 
 **Testing Requirements:**
-- Unit tests for ViewModels
-- Repository tests with mocked data sources
-- UI tests with Compose Testing
-- Screenshot tests for visual regression
+- Unit tests for business logic and state management
+- Tests for data layer with mocked sources
+- UI tests for critical user flows
+- Follow project's existing test conventions
 
-### iOS (Swift + SwiftUI)
+### iOS
 
 **Architecture Checks:**
-- MVVM with @ObservableObject/@StateObject
-- NavigationStack + NavigationPath for navigation
-- Proper use of SwiftUI lifecycle methods
-- Async/await for asynchronous operations
-- Combine for reactive streams where needed
+- Code follows the project's established architecture pattern
+- State management uses the project's existing approach
+- Navigation follows the project's navigation patterns
+- Async operations follow project conventions
+- New code matches existing file/group organization
 
 **Common Pitfalls:**
-- Retaining cycles with closures
-- Not using @MainActor for UI updates
-- Incorrect use of @State vs @StateObject vs @ObservedObject
+- Retain cycles with closures
+- Not updating UI on the main thread
+- Incorrect use of project's state management primitives
 - Missing accessibility labels
 - Not handling background/foreground transitions
 
 **Performance Considerations:**
-- Lazy loading with LazyVStack/LazyHStack
+- Efficient list rendering for large datasets
 - Image caching strategy
 - Avoiding expensive operations on main thread
-- Proper use of task modifiers for async work
+- Proper lifecycle management for async work
 
 **Testing Requirements:**
-- Unit tests for view models
-- XCTest for business logic
-- UI tests for critical flows
-- Snapshot tests for visual regression
+- Unit tests for business logic
+- Tests for critical user flows
+- Follow project's existing test patterns and frameworks
 
-### Frontend (Web)
+### Frontend
 
 **Architecture Checks:**
-- Component structure follows project conventions (pages, components, layouts)
-- State management approach is consistent (Redux, Zustand, Context, signals, etc.)
-- Data fetching uses project's established pattern (React Query, SWR, server components, etc.)
-- Routing follows framework conventions (file-based, programmatic)
-- Form handling uses consistent validation approach (Zod, Yup, native)
+- Component structure follows project conventions
+- State management approach is consistent with existing code
+- Data fetching uses project's established pattern
+- Routing follows framework conventions
+- Form handling uses consistent validation approach
 - API layer is properly abstracted (not fetching directly in components)
 
 **Common Pitfalls:**
 - Missing loading, error, and empty states in UI
 - Not handling form validation on both client and display level
-- Prop drilling instead of using context or state management
+- Prop drilling instead of using project's state management approach
 - Missing responsive design for mobile viewports
 - No error boundaries for graceful failure handling
 - Forgetting accessibility (ARIA labels, keyboard navigation, focus management)
@@ -111,36 +109,33 @@ Expert skill for reviewing PRDs with platform-specific domain knowledge and best
 **Performance Considerations:**
 - Bundle size monitored (code splitting, tree shaking)
 - Lazy loading for routes and heavy components
-- Memoization for expensive computations (useMemo, computed)
-- Image optimization (lazy loading, proper formats, srcset)
+- Memoization for expensive computations
+- Image optimization (lazy loading, proper formats)
 - Avoiding unnecessary re-renders
 
 **Testing Requirements:**
 - Component tests for interactive behavior
 - Integration tests for user flows
-- Accessibility testing (axe, testing-library queries)
-- Visual regression tests for key screens (optional)
+- Accessibility testing
+- Follow project's existing test conventions
 
 ## Cross-Platform Concerns
 
 **Security:**
 - Sensitive data not logged
 - API keys in environment variables
-- Certificate pinning for critical APIs
 - Proper token refresh handling
 - Input sanitization
 
 **Accessibility:**
 - Screen reader support
-- Dynamic type support (mobile)
-- Keyboard navigation (mobile)
+- Keyboard navigation
 - Color contrast ratios
 
 **Observability:**
 - Error tracking configured
 - Analytics events defined
-- Performance monitoring enabled
-- Logging strategy defined
+- Logging strategy follows project conventions
 
 ## Review Checklist
 
@@ -162,7 +157,7 @@ When reviewing a PRD, systematically check:
    - [ ] Written as user stories where applicable
 
 4. **Technical Approach**
-   - [ ] Architecture follows platform patterns
+   - [ ] Architecture follows project's established patterns
    - [ ] Key changes are realistic and scoped
    - [ ] Top risks identified with mitigation
    - [ ] Platform-specific pitfalls addressed
@@ -174,8 +169,8 @@ When reviewing a PRD, systematically check:
    - [ ] Dependencies between phases clear
 
 6. **Multi-Project Impact**
-   - [ ] If backend changes, mobile apps considered
-   - [ ] If mobile changes, backend implications checked
+   - [ ] If backend changes, client apps considered
+   - [ ] If client changes, backend implications checked
    - [ ] Versioning strategy for API changes
    - [ ] Backward compatibility maintained
 
@@ -192,14 +187,14 @@ This skill is automatically invoked during PRD creation to:
 
 When reviewing, provide structured feedback:
 
-**✅ Strengths:**
+**Strengths:**
 - [List what's well-defined in the PRD]
 
-**⚠️ Concerns:**
+**Concerns:**
 - [List potential issues or gaps]
 
-**💡 Suggestions:**
+**Suggestions:**
 - [List specific improvements with rationale]
 
-**🔴 Blockers:**
+**Blockers:**
 - [List critical issues that must be addressed before proceeding]

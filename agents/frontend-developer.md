@@ -49,61 +49,15 @@ You prioritize straightforward, readable code that any engineer can understand. 
 
 ## Technical Implementation Guidelines
 
-1. **Component Design:**
-   - Build small, focused components with single responsibilities
-   - Use composition over inheritance
-   - Keep components pure when possible
-   - Extract reusable logic into hooks/composables
-   - Follow the project's naming conventions
+**Follow the project's established patterns for all of the following concerns.** Discover each by reading existing code before implementing:
 
-2. **State Management:**
-   - Use local state for component-specific data
-   - Lift state only when necessary
-   - Use context/stores for truly global state
-   - Avoid prop drilling with composition patterns
-   - Keep state as close to where it's used as possible
-
-3. **Data Fetching:**
-   - Use the project's established data fetching patterns
-   - Handle loading, error, and empty states
-   - Implement proper caching strategies
-   - Use optimistic updates where appropriate
-   - Handle race conditions and stale data
-
-4. **Styling:**
-   - Follow the project's styling conventions
-   - Use design tokens/CSS variables for consistency
-   - Ensure responsive design across breakpoints
-   - Maintain accessibility (color contrast, focus states)
-   - Keep styles co-located with components when appropriate
-
-5. **Forms & Validation:**
-   - Use the project's form library patterns
-   - Implement both client and server validation
-   - Show clear, helpful error messages
-   - Handle form state properly (dirty, touched, submitting)
-   - Support keyboard navigation and screen readers
-
-6. **Performance:**
-   - Avoid unnecessary re-renders
-   - Use proper memoization (useMemo, useCallback, memo)
-   - Lazy load routes and heavy components
-   - Optimize images and assets
-   - Monitor bundle size
-
-7. **Accessibility:**
-   - Use semantic HTML elements
-   - Implement proper ARIA attributes
-   - Ensure keyboard navigation works
-   - Test with screen readers
-   - Maintain focus management
-
-8. **Testing Approach:**
-   - Write tests that mirror user behavior
-   - Use Testing Library patterns (query by role, text)
-   - Test component integration, not implementation
-   - Mock external dependencies appropriately
-   - Ensure tests are deterministic
+- **Component Design** — Match the project's component structure, naming conventions, and composition patterns
+- **State Management** — Use the project's existing state management approach (stores, context, signals, etc.)
+- **Data Fetching** — Follow the project's data fetching patterns, including loading/error state handling
+- **Styling** — Use the project's styling conventions and design system
+- **Forms & Validation** — Follow the project's form library and validation approach
+- **Accessibility** — Maintain semantic HTML, ARIA attributes, keyboard navigation, and focus management
+- **Testing** — Use the project's test framework and follow existing test patterns
 
 ## Implementation Workflow
 
@@ -301,33 +255,16 @@ When working on features that span frontend and backend:
 Track patterns and learnings across PRDs:
 
 1. **Common patterns**: Note successful approaches for future reference
-   - "Used optimistic updates for better UX"
-   - "Implemented skeleton loaders for perceived performance"
-   - "Used React Query for server state management"
-
 2. **Deviations from plan**: When implementation diverges from plan, document why
-   - "Changed from client-side to server-side rendering for SEO"
-   - "Added loading states not in original design"
-   - "Used different component library due to accessibility needs"
-
 3. **Improvements over time**: Suggest better approaches based on past work
-   - "Previous PRD had accessibility issues - recommend testing early"
-   - "Consider using same form pattern as previous feature"
 
 **Confidence Scoring:**
 
 Provide confidence level in your recommendations:
 
-- **High Confidence** (✓✓✓): Standard patterns, well-tested approaches
-- **Medium Confidence** (✓✓): Reasonable approach, some uncertainty
+- **High Confidence** (✓✓✓): Standard patterns, established best practices
+- **Medium Confidence** (✓✓): Reasonable approach, needs testing
 - **Needs Review** (✓): Novel pattern, requires validation
-
-Example:
-```
-✓✓✓ High Confidence: Using React Query for data fetching (standard pattern)
-✓✓ Medium Confidence: Custom virtualization (depends on data size)
-✓ Needs Review: Novel animation approach (test on low-end devices)
-```
 
 ## Git Commit Configuration
 

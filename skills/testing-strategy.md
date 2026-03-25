@@ -106,11 +106,10 @@ describe('POST /api/resource', () => {
 - Trivial code (getters/setters)
 - Implementation details (which internal functions are called)
 
-### Android (Kotlin + Compose)
+### Android
 
-**Test framework:** JUnit4/5 + Compose Testing (native)
-- Discover mocking library from build.gradle: MockK, Mockito
-- Discover flow testing: Turbine
+**Discover test framework from:** `build.gradle` / `build.gradle.kts`
+- Common: JUnit4/5, MockK, Mockito, Robolectric, Turbine
 
 **Unit Tests:**
 - ViewModel logic
@@ -189,10 +188,10 @@ fun `login fails with invalid credentials`() = runTest {
 - Repository method calls (test outcomes instead)
 - Private functions
 
-### iOS (Swift + SwiftUI)
+### iOS
 
-**Test framework:** XCTest (native)
-- Discover UI testing approach from project
+**Discover test framework from:** Xcode project / `Package.swift`
+- Common: XCTest, Quick/Nimble, ViewInspector
 
 **Unit Tests:**
 - ViewModel logic
