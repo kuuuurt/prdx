@@ -47,6 +47,7 @@ Both agents run in **isolated contexts** to minimize main conversation context u
 /prdx:implement biometric-auth                  # Parent PRD → shows child instructions
 /prdx:implement biometric-auth-backend          # Child PRD → runs implementation
 /prdx:implement biometric-auth-android          # Child PRD → checks prerequisites, runs implementation
+/prdx:implement backend-auth --no-cache         # Force fresh codebase exploration (skip cache)
 ```
 
 ## How It Works
@@ -264,6 +265,23 @@ This replaces the normal `coAuthor` config — in CI mode, the requestor is the 
 ```
 
 **Store the result as `COMMIT_INSTRUCTIONS`.** This will be passed to all platform agent invocations.
+
+### Step 1b.5: Parse Flags
+
+Before loading the PRD, parse flags from the argument string.
+
+**Strip `--no-cache` flag from the slug argument:**
+
+The argument may be `{slug} --no-cache` or `--no-cache {slug}`. Extract and remove the flag:
+
+```
+NO_CACHE=false
+if argument contains "--no-cache":
+    NO_CACHE=true
+    slug = argument with "--no-cache" stripped and trimmed
+```
+
+Store `NO_CACHE` — it will be passed to the dev-planner agent in Step 5a.
 
 ### Step 2: Load PRD
 
@@ -487,6 +505,7 @@ prompt: "Create a detailed implementation plan for this PRD.
 
 PRD File: {PRD_FILE}
 Platform: {PLATFORM}  (e.g., 'android' or 'ios')
+NO_CACHE: {NO_CACHE}  (true = skip exploration cache and force fresh codebase exploration)
 
 {PRD_CONTENT}
 
