@@ -86,3 +86,76 @@ load helpers/test_helper
     [ -n "$cache_line" ]
     [ "$cache_line" -gt "$output_line" ]
 }
+
+# --- dev-planner cache-read tests ---
+
+@test "dev-planner agent contains cache-read section" {
+    local agent_file="$REPO_ROOT/agents/dev-planner.md"
+
+    run grep -q "Cache Read" "$agent_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dev-planner agent instructs checking .prdx/cache directory before spawning code-explorer" {
+    local agent_file="$REPO_ROOT/agents/dev-planner.md"
+
+    # Should reference the cache directory
+    run grep -q "\.prdx/cache" "$agent_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dev-planner agent instructs computing query hash for cache lookup" {
+    local agent_file="$REPO_ROOT/agents/dev-planner.md"
+
+    # Should mention md5 hashing (same as code-explorer)
+    run grep -qE "md5" "$agent_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dev-planner agent instructs validating git SHA on cache hit" {
+    local agent_file="$REPO_ROOT/agents/dev-planner.md"
+
+    # Should reference git_sha validation
+    run grep -q "git_sha" "$agent_file"
+    [ "$status" -eq 0 ]
+
+    # Should reference git rev-parse HEAD for current SHA
+    run grep -q "git rev-parse HEAD" "$agent_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dev-planner agent instructs skipping code-explorer spawn on cache hit" {
+    local agent_file="$REPO_ROOT/agents/dev-planner.md"
+
+    # Should describe skipping or not spawning code-explorer on a cache hit
+    run grep -qE "cache hit|skip.*code-explorer|skip.*spawning" "$agent_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dev-planner agent instructs passing Slug in code-explorer prompt" {
+    local agent_file="$REPO_ROOT/agents/dev-planner.md"
+
+    # dev-planner must pass Slug: {slug} so code-explorer can write to correct cache path
+    run grep -q "Slug:" "$agent_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "dev-planner agent cache-read section appears before code-explorer task call" {
+    local agent_file="$REPO_ROOT/agents/dev-planner.md"
+
+    # Cache Read section should exist before the code-explorer Task tool call
+    local cache_line explorer_line
+    cache_line=$(grep -n "Cache Read" "$agent_file" | head -1 | cut -d: -f1)
+    explorer_line=$(grep -n "code-explorer" "$agent_file" | head -1 | cut -d: -f1)
+
+    [ -n "$cache_line" ]
+    [ -n "$explorer_line" ]
+    [ "$cache_line" -lt "$explorer_line" ]
+}
+
+@test "dev-planner agent respects NO_CACHE env var to skip cache read" {
+    local agent_file="$REPO_ROOT/agents/dev-planner.md"
+
+    run grep -q "NO_CACHE" "$agent_file"
+    [ "$status" -eq 0 ]
+}

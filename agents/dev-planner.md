@@ -44,13 +44,46 @@ Continue with planning regardless — PRD gaps are informational, not blocking.
 
 ### 2. Explore Codebase
 
+#### Cache Read
+
+Before spawning `prdx:code-explorer`, check the exploration cache to avoid redundant codebase scans. The cache is keyed by query content and git HEAD SHA, so any commit to the codebase automatically invalidates stale entries.
+
+For each `prdx:code-explorer` query you plan to run, execute this cache-check via Bash:
+
+```bash
+# 1. Compute query hash (portable across macOS and Linux)
+QUERY="How is [similar feature] implemented?"
+SLUG="my-prd-slug"
+QUERY_HASH=$(echo -n "$QUERY" | md5sum 2>/dev/null | cut -d' ' -f1 || echo -n "$QUERY" | md5 2>/dev/null)
+CACHE_FILE=".prdx/cache/$SLUG/$QUERY_HASH.md"
+CURRENT_SHA=$(git rev-parse HEAD)
+
+# 2. Check for a cache hit
+if [ -z "$NO_CACHE" ] && [ -f "$CACHE_FILE" ]; then
+    CACHED_SHA=$(grep "^git_sha:" "$CACHE_FILE" | head -1 | awk '{print $2}')
+    if [ "$CACHED_SHA" = "$CURRENT_SHA" ]; then
+        echo "CACHE HIT: $CACHE_FILE"
+        # Read cached content (skip the YAML frontmatter lines)
+        sed '/^---$/,/^---$/d' "$CACHE_FILE"
+    else
+        echo "CACHE MISS (stale SHA): spawning code-explorer"
+    fi
+else
+    echo "CACHE MISS: spawning code-explorer"
+fi
+```
+
+**On cache hit:** Read the cached exploration content directly — do NOT spawn `prdx:code-explorer` for that query. Use the content as if the agent had returned it.
+
+**On cache miss (file absent, stale SHA, or `NO_CACHE` set):** Spawn `prdx:code-explorer` normally. Always include `Slug: {slug}` in the prompt so the agent can write the result to the correct cache path.
+
 Use exploration agents for efficient context gathering. **Launch both agents in parallel** when you need both codebase understanding and documentation:
 
 ```
 # Launch BOTH agents in a single message with multiple tool calls:
 
 Task tool with subagent_type: "prdx:code-explorer"
-prompt: "How is [similar feature] implemented? What patterns and architecture does it follow?"
+prompt: "Slug: my-prd-slug\nHow is [similar feature] implemented? What patterns and architecture does it follow?"
 
 Task tool with subagent_type: "prdx:docs-explorer"
 prompt: "What's the current best practice for [technology] in [framework]?"
