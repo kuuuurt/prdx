@@ -159,3 +159,50 @@ load helpers/test_helper
     run grep -q "NO_CACHE" "$agent_file"
     [ "$status" -eq 0 ]
 }
+
+# --- implement command --no-cache flag tests ---
+
+@test "implement command usage section documents --no-cache flag" {
+    local cmd_file="$REPO_ROOT/commands/implement.md"
+
+    # The Usage section should show --no-cache as an option
+    run grep -q "\-\-no-cache" "$cmd_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "implement command --no-cache appears in usage examples" {
+    local cmd_file="$REPO_ROOT/commands/implement.md"
+
+    # Should have a usage example showing --no-cache
+    run grep -qE "implement.*--no-cache|--no-cache.*implement" "$cmd_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "implement command parses --no-cache flag from slug argument" {
+    local cmd_file="$REPO_ROOT/commands/implement.md"
+
+    # Should describe stripping --no-cache from the slug argument
+    run grep -qE "no.cache|NO_CACHE" "$cmd_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "implement command passes NO_CACHE to dev-planner agent prompt" {
+    local cmd_file="$REPO_ROOT/commands/implement.md"
+
+    # The dev-planner agent prompt in Step 5a should reference NO_CACHE
+    run grep -q "NO_CACHE" "$cmd_file"
+    [ "$status" -eq 0 ]
+}
+
+@test "implement command --no-cache flag parsing appears before Step 5a" {
+    local cmd_file="$REPO_ROOT/commands/implement.md"
+
+    # NO_CACHE parsing should appear before Step 5a (dev-planner invocation)
+    local nocache_line step5a_line
+    nocache_line=$(grep -n "no-cache\|NO_CACHE" "$cmd_file" | head -1 | cut -d: -f1)
+    step5a_line=$(grep -n "Step 5a" "$cmd_file" | head -1 | cut -d: -f1)
+
+    [ -n "$nocache_line" ]
+    [ -n "$step5a_line" ]
+    [ "$nocache_line" -lt "$step5a_line" ]
+}
