@@ -96,11 +96,9 @@ After completing exploration and outputting your summary, persist the result to 
 
 2. **Compute a query hash** using the query text:
    ```bash
-   query_hash=$(echo "<query text>" | md5sum | cut -d' ' -f1)
-   # On macOS without md5sum:
-   query_hash=$(echo "<query text>" | md5 | tr -d ' ')
+   query_hash=$(echo -n "<query text>" | md5sum 2>/dev/null | cut -d' ' -f1 || echo -n "<query text>" | md5 2>/dev/null)
    ```
-   Use `md5sum` if available, fall back to `md5`.
+   Use `echo -n` (no trailing newline) to ensure consistent hashing across writer and reader. Uses `md5sum` with fallback to `md5`.
 
 3. **Get the current git SHA:**
    ```bash

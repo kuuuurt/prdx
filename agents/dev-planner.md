@@ -63,8 +63,8 @@ if [ -z "$NO_CACHE" ] && [ -f "$CACHE_FILE" ]; then
     CACHED_SHA=$(grep "^git_sha:" "$CACHE_FILE" | head -1 | awk '{print $2}')
     if [ "$CACHED_SHA" = "$CURRENT_SHA" ]; then
         echo "CACHE HIT: $CACHE_FILE"
-        # Read cached content (skip the YAML frontmatter lines)
-        sed '/^---$/,/^---$/d' "$CACHE_FILE"
+        # Read cached content (skip only the opening YAML frontmatter block)
+        awk 'BEGIN{f=0} /^---$/{if(f<2){f++;next}} f>=2{print}' "$CACHE_FILE"
     else
         echo "CACHE MISS (stale SHA): spawning code-explorer"
     fi
