@@ -83,3 +83,43 @@ You explore codebases to understand patterns, architecture, and implementation d
 ## Output
 
 When complete, output only the exploration summary in the format above. Do not include raw file dumps or extensive code listings.
+
+## Cache Write
+
+After completing exploration and outputting your summary, persist the result to the exploration cache so future runs can skip repeated work.
+
+**When to write cache:** Always, unless the caller explicitly passes `--no-cache` in the prompt.
+
+**Steps:**
+
+1. **Extract the slug** from the `Slug:` field in your prompt (provided by dev-planner). If no slug is present, skip caching.
+
+2. **Compute a query hash** using the query text:
+   ```bash
+   query_hash=$(echo -n "<query text>" | md5sum 2>/dev/null | cut -d' ' -f1 || echo -n "<query text>" | md5 2>/dev/null)
+   ```
+   Use `echo -n` (no trailing newline) to ensure consistent hashing across writer and reader. Uses `md5sum` with fallback to `md5`.
+
+3. **Get the current git SHA:**
+   ```bash
+   git_sha=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+   ```
+
+4. **Create the cache directory:**
+   ```bash
+   mkdir -p ".prdx/cache/<slug>"
+   ```
+
+5. **Write the cache file** to `.prdx/cache/<slug>/<query_hash>.md` with a YAML frontmatter header followed by the exploration summary:
+   ```
+   ---
+   query_hash: <hash>
+   git_sha: <sha>
+   created: <ISO-8601 date, e.g. 2026-03-26T14:00:00Z>
+   slug: <slug>
+   ---
+
+   <exploration summary>
+   ```
+
+Use the Bash tool to run these commands, then use the Write tool to write the cache file.
