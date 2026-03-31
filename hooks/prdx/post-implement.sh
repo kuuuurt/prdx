@@ -78,7 +78,7 @@ elif [ -f "Package.swift" ] || ls *.xcodeproj 1>/dev/null 2>&1; then
         SCHEME=$(xcodebuild -list -project "$XCODEPROJ" 2>/dev/null | awk '/Schemes:/{found=1; next} found && /^$/{exit} found{gsub(/^[[:space:]]+/,""); print; exit}')
         if [ -n "$SCHEME" ]; then
             # Dynamically detect an available iPhone simulator; fall back to iPhone 16
-            SIM_NAME=$(xcrun simctl list devices available 2>/dev/null | grep -E "iPhone [0-9]" | tail -1 | sed 's/.*(\(.*\)).*/\1/')
+            SIM_NAME=$(xcrun simctl list devices available 2>/dev/null | grep -E "iPhone [0-9]" | tail -1 | sed 's/^[[:space:]]*//' | sed 's/ (.*//')
             SIM_DEST="${SIM_NAME:-iPhone 16}"
             TEST_CMD="xcodebuild test -project $XCODEPROJ -scheme $SCHEME -destination 'platform=iOS Simulator,name=$SIM_DEST'"
         fi
