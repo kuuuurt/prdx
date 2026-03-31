@@ -31,7 +31,8 @@ Manage PRDX configuration interactively or via command line.
 
 # Plans Directory
 /prdx:config plans                     # Show current plans directory
-/prdx:config plans local               # Set up project-local plans (.prdx/plans/)
+/prdx:config plans local               # Write configured plansDirectory to settings.local.json
+/prdx:config plans set <path>          # Set custom plans directory in prdx.json and settings.local.json
 ```
 
 ## Workflow
@@ -69,7 +70,8 @@ elif [ "$1" = "hooks" ]; then
   HOOK_NAME="$3"     # auto-simplify
 elif [ "$1" = "plans" ]; then
   MODE="plans"
-  PLANS_ACTION="$2"  # local or empty (show)
+  PLANS_ACTION="$2"  # local, set, or empty (show)
+  PLANS_SET_PATH="$3" # custom path for "set" action
 else
   echo "❌ Unknown command: $1"
   echo ""
@@ -78,7 +80,7 @@ else
   echo "  /prdx:config [minimal|standard|simple]  # Quick presets"
   echo "  /prdx:config [show|init|set|get]        # Manage config"
   echo "  /prdx:config hooks [enable|disable] [hook-name]  # Manage hooks"
-  echo "  /prdx:config plans [local]              # Set up plans directory"
+  echo "  /prdx:config plans [local|set <path>]   # Set up plans directory"
   exit 1
 fi
 ```
@@ -815,8 +817,21 @@ Manage the plans directory preference for the current project.
 
 ```bash
 # Determine project root and settings file
-PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+PROJECT_ROOT="${PRDX_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 SETTINGS_FILE="$PROJECT_ROOT/.claude/settings.local.json"
+
+# Resolve CONFIG_FILE using canonical walk-up resolution
+CONFIG_FILE=""
+SEARCH_DIR="$PROJECT_ROOT"
+while [ "$SEARCH_DIR" != "/" ]; do
+  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
+  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
+  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+done
+
+# Read configured plansDirectory (defaults to .prdx/plans)
+PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
+CONFIGURED_PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
 
 # Ensure .claude directory exists
 mkdir -p "$PROJECT_ROOT/.claude"
@@ -831,21 +846,23 @@ fi
 
 ```bash
 if [ -z "$PLANS_ACTION" ]; then
-  RESOLVED_DIR="$PROJECT_ROOT/.prdx/plans"
-
   echo "📁 Plans Directory"
   echo ""
-  echo "  Directory: $RESOLVED_DIR"
-  echo ""
-  echo "  Plans are always stored inside this project (.prdx/plans/)."
+  echo "  Directory: $CONFIGURED_PLANS_DIR"
+  if [ -n "$CONFIG_FILE" ]; then
+    echo "  Config:    $CONFIG_FILE (plansDirectory = \"$PLANS_SUBDIR\")"
+  else
+    echo "  Config:    (no prdx.json found, using default)"
+  fi
   echo ""
   echo "Commands:"
-  echo "  /prdx:config plans local   # Configure project-local plans (first-time setup)"
+  echo "  /prdx:config plans local           # Write configured directory to settings.local.json"
+  echo "  /prdx:config plans set <path>      # Set custom directory in prdx.json + settings.local.json"
   exit 0
 fi
 ```
 
-**Switch to local plans:**
+**Write configured directory to settings.local.json:**
 
 ```bash
 if [ "$PLANS_ACTION" = "local" ]; then
@@ -854,35 +871,85 @@ if [ "$PLANS_ACTION" = "local" ]; then
     echo "Install: brew install jq (macOS) or apt-get install jq (Linux)"
     echo ""
     echo "Manual: Add to $SETTINGS_FILE:"
-    echo '  { "plansDirectory": ".prdx/plans" }'
+    echo "  { \"plansDirectory\": \"$PLANS_SUBDIR\" }"
     exit 1
   fi
 
-  LOCAL_PLANS_DIR="$PROJECT_ROOT/.prdx/plans"
-
-  # 1. Set plansDirectory in .claude/settings.local.json (merge with jq)
-  jq '. + {"plansDirectory": ".prdx/plans"}' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp"
+  # 1. Set plansDirectory in .claude/settings.local.json using configured value
+  jq --arg dir "$PLANS_SUBDIR" '. + {"plansDirectory": $dir}' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp"
   mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
 
-  # 2. Create the local plans directory
-  mkdir -p "$LOCAL_PLANS_DIR"
+  # 2. Create the plans directory
+  mkdir -p "$CONFIGURED_PLANS_DIR"
 
   # 3. Write sentinel file so hooks can detect setup
   echo "local" > "$PROJECT_ROOT/.prdx/plans-setup-done"
 
-  echo "✅ Configured project-local plans"
+  echo "✅ Configured plans directory"
   echo ""
-  echo "  Directory: $LOCAL_PLANS_DIR"
-  echo "  Setting:   plansDirectory = \".prdx/plans\" in .claude/settings.local.json"
+  echo "  Directory: $CONFIGURED_PLANS_DIR"
+  echo "  Setting:   plansDirectory = \"$PLANS_SUBDIR\" in .claude/settings.local.json"
   echo ""
-  echo "New plans will be saved to $LOCAL_PLANS_DIR."
+  echo "New plans will be saved to $CONFIGURED_PLANS_DIR."
+  exit 0
+fi
+```
+
+**Set custom plans directory in prdx.json and settings.local.json:**
+
+```bash
+if [ "$PLANS_ACTION" = "set" ]; then
+  if [ -z "$PLANS_SET_PATH" ]; then
+    echo "❌ No path provided"
+    echo "Usage: /prdx:config plans set <path>"
+    echo ""
+    echo "Examples:"
+    echo "  /prdx:config plans set docs/plans"
+    echo "  /prdx:config plans set .prdx/plans"
+    exit 1
+  fi
+
+  if ! command -v jq &> /dev/null; then
+    echo "⚠️  jq not installed - cannot modify settings"
+    echo "Install: brew install jq (macOS) or apt-get install jq (Linux)"
+    exit 1
+  fi
+
+  # Resolve target config file (default to prdx.json in project root)
+  TARGET_CONFIG="${CONFIG_FILE:-$PROJECT_ROOT/prdx.json}"
+
+  # 1. Write plansDirectory to prdx.json (create if missing)
+  if [ ! -f "$TARGET_CONFIG" ]; then
+    echo '{}' > "$TARGET_CONFIG"
+  fi
+  jq --arg dir "$PLANS_SET_PATH" '. + {"plansDirectory": $dir}' "$TARGET_CONFIG" > "${TARGET_CONFIG}.tmp"
+  mv "${TARGET_CONFIG}.tmp" "$TARGET_CONFIG"
+
+  # 2. Write plansDirectory to settings.local.json
+  jq --arg dir "$PLANS_SET_PATH" '. + {"plansDirectory": $dir}' "$SETTINGS_FILE" > "${SETTINGS_FILE}.tmp"
+  mv "${SETTINGS_FILE}.tmp" "$SETTINGS_FILE"
+
+  # 3. Create the plans directory
+  NEW_PLANS_DIR="$PROJECT_ROOT/$PLANS_SET_PATH"
+  mkdir -p "$NEW_PLANS_DIR"
+
+  # 4. Write sentinel file
+  echo "local" > "$PROJECT_ROOT/.prdx/plans-setup-done"
+
+  echo "✅ Plans directory configured"
+  echo ""
+  echo "  Directory: $NEW_PLANS_DIR"
+  echo "  prdx.json: plansDirectory = \"$PLANS_SET_PATH\""
+  echo "  settings.local.json: plansDirectory = \"$PLANS_SET_PATH\""
+  echo ""
+  echo "New plans will be saved to $NEW_PLANS_DIR."
   exit 0
 fi
 
 # Unknown action
 echo "❌ Unknown plans action: $PLANS_ACTION"
 echo ""
-echo "Usage: /prdx:config plans [local]"
+echo "Usage: /prdx:config plans [local|set <path>]"
 exit 1
 ```
 
