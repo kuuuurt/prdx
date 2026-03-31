@@ -24,11 +24,54 @@ PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document)
 
 ## Plan Mode Configuration
 
-Plans are always stored in `.prdx/plans/` relative to the project root. On first run, PRDX auto-creates the directory and sets `plansDirectory: ".prdx/plans"` in `.claude/settings.local.json` so Claude Code's native plan mode saves to the right place. A `.prdx/plans-setup-done` marker prevents repeated setup.
+Plans are stored in a configurable directory relative to the project root. The default is `.prdx/plans/`. Projects can override this via the `plansDirectory` property in `prdx.json` (e.g. `"plansDirectory": "docs/plans"`).
 
-PRD files are tracked in git as project documentation. Only `.prdx/plans/` is tracked — everything else under `.prdx/` (state, markers, etc.) is gitignored via `.prdx/*` + `!.prdx/plans/`.
+On first run, PRDX auto-creates the plans directory and sets `plansDirectory` in `.claude/settings.local.json` so Claude Code's native plan mode saves to the right place. A `.prdx/plans-setup-done` marker prevents repeated setup.
+
+PRD files are tracked in git as project documentation. When plans are under `.prdx/` (the default), everything else in `.prdx/` is gitignored via `.prdx/*` + `!.prdx/plans/`. When plans are configured outside `.prdx/`, only `.prdx/*` is added to `.gitignore` (no exception needed).
 
 **Naming convention:** `prdx-{slug}.md` for normal PRDs, `prdx-quick-{slug}.md` for quick mode (ephemeral).
+
+### Canonical PLANS_DIR Resolution (use everywhere in hooks and commands)
+
+All hooks and commands MUST use this snippet to resolve the plans directory. Do not hardcode `.prdx/plans`.
+
+```bash
+PROJECT_ROOT="${PRDX_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+CONFIG_FILE=""
+SEARCH_DIR="$PROJECT_ROOT"
+while [ "$SEARCH_DIR" != "/" ]; do
+  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
+  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
+  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+done
+PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
+PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
+```
+
+### Conditional Gitignore Management
+
+After resolving `PLANS_SUBDIR`, use this pattern for `.gitignore` updates:
+
+```bash
+GITIGNORE="$PROJECT_ROOT/.gitignore"
+if echo "$PLANS_SUBDIR" | grep -q "^\.prdx/"; then
+  # Plans are under .prdx/ — ignore everything except the plans subdir
+  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+    echo '' >> "$GITIGNORE"
+    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
+    echo '.prdx/*' >> "$GITIGNORE"
+    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
+  fi
+else
+  # Plans are outside .prdx/ — just ignore .prdx/* entirely
+  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+    echo '' >> "$GITIGNORE"
+    echo '# PRDX state (ignore all)' >> "$GITIGNORE"
+    echo '.prdx/*' >> "$GITIGNORE"
+  fi
+fi
+```
 
 ## PRD Format (Plan Mode Template)
 

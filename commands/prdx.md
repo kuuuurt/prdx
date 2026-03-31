@@ -15,11 +15,19 @@ Execute the following phases based on the argument provided:
 
 ### Resolve Plans Directory
 
-Plans are always stored in `.prdx/plans/` relative to the project root:
+Read the configured plans directory from `prdx.json`, falling back to `.prdx/plans` if not set:
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-PLANS_DIR="$PROJECT_ROOT/.prdx/plans"
+CONFIG_FILE=""
+SEARCH_DIR="$PROJECT_ROOT"
+while [ "$SEARCH_DIR" != "/" ]; do
+  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
+  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
+  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+done
+PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
+PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
 ```
 
 **Use `$PLANS_DIR` throughout this command.**
@@ -41,11 +49,11 @@ If the file does NOT exist (first PRDX run in this project):
 1. Auto-configure project-local plans (no user prompt):
    ```bash
    PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-   mkdir -p .claude .prdx .prdx/plans
+   mkdir -p .claude .prdx "$PLANS_DIR"
    if [ -f .claude/settings.local.json ]; then
-     jq '. + {plansDirectory: ".prdx/plans"}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
+     jq --arg dir "$PLANS_SUBDIR" '. + {plansDirectory: $dir}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
    else
-     echo '{"plansDirectory": ".prdx/plans"}' > .claude/settings.local.json
+     echo "{\"plansDirectory\": \"$PLANS_SUBDIR\"}" > .claude/settings.local.json
    fi
    echo "local" > .prdx/plans-setup-done
    ```
@@ -54,18 +62,27 @@ If the file does NOT exist (first PRDX run in this project):
 
 If the file DOES exist, skip this step entirely and proceed with the gitignore check below.
 
-**After the setup check (or if already configured), ensure `.prdx/state/` is gitignored (runs every time):**
+**After the setup check (or if already configured), ensure the gitignore is configured appropriately (runs every time):**
 
 ```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-
-# Ensure only .prdx/plans/ is tracked — everything else in .prdx/ is ignored
-if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
-  echo '' >> "$GITIGNORE"
-  echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
-  echo '.prdx/*' >> "$GITIGNORE"
-  echo '!.prdx/plans/' >> "$GITIGNORE"
+if echo "$PLANS_SUBDIR" | grep -q "^\.prdx/"; then
+  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+    # Neither rule exists — add both
+    echo '' >> "$GITIGNORE"
+    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
+    echo '.prdx/*' >> "$GITIGNORE"
+    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
+  elif ! grep -qxF "!$PLANS_SUBDIR/" "$GITIGNORE"; then
+    # .prdx/* exists but exception is wrong/missing — add correct exception
+    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
+  fi
+else
+  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+    echo '' >> "$GITIGNORE"
+    echo '# PRDX state (ignore all)' >> "$GITIGNORE"
+    echo '.prdx/*' >> "$GITIGNORE"
+  fi
 fi
 ```
 
