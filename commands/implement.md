@@ -318,7 +318,7 @@ mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-{slug}.md
 Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 
 3. Read the PRD file and extract:
-   - **Platform** (single-platform PRDs: backend/frontend/android/ios)
+   - **Platform** (single-platform PRDs: free-form string, e.g., backend, frontend, android, ios, python, go, etc.)
    - **Platforms** (multi-platform PRDs: e.g., "backend, android, ios")
    - **Implementation Order** (multi-platform PRDs: ordered steps)
    - Type (feature/bug-fix/refactor/spike)
@@ -571,11 +571,7 @@ Parsed dev plan: {N} phases ({list of "Phase N: Name (mode)" entries})
 
 #### Step 5c: Phased Execution Loop
 
-Determine agent based on platform:
-- backend → `prdx:backend-developer`
-- frontend → `prdx:frontend-developer`
-- android → `prdx:android-developer`
-- ios → `prdx:ios-developer`
+Use `prdx:developer` for all platforms. The platform field is a free-form string (e.g., `backend`, `ios`, `android`, `frontend`, `python`, `go`, `rust`, `flutter`, or any other value). Pass it as a hint so the agent can prioritize which dependency files and patterns to look for.
 
 Initialize `COMPLETED_PHASES` as an empty list (stores summaries from each completed phase).
 
@@ -586,12 +582,14 @@ Initialize `COMPLETED_PHASES` as an empty list (stores summaries from each compl
 Phase {PHASE_NUM}/{TOTAL_PHASES}: {PHASE_NAME} ({PHASE_MODE})...
 ```
 
-Invoke the platform agent using the Task tool with **phase-scoped context**:
+Invoke the developer agent using the Task tool with **phase-scoped context**:
 
 ```
-subagent_type: "{AGENT}"
+subagent_type: "prdx:developer"
 
 prompt: "Implement Phase {PHASE_NUM}/{TOTAL_PHASES}: {PHASE_NAME}
+
+Platform hint: {PLATFORM_FROM_PRD}
 
 ## PRD (for reference)
 
@@ -745,7 +743,7 @@ Return only the AC verification summary."
 2. Feed the unmet/partial ACs back to the platform agent for fixing:
 
 ```
-subagent_type: "{PLATFORM_AGENT}"
+subagent_type: "prdx:developer"
 
 prompt: "Fix the following unmet acceptance criteria.
 
@@ -828,7 +826,7 @@ Return only the review summary."
 2. Feed each issue back to the platform agent for fixing:
 
 ```
-subagent_type: "{PLATFORM_AGENT}"
+subagent_type: "prdx:developer"
 
 prompt: "Fix the following code review issues.
 
@@ -981,14 +979,15 @@ Fix the issues and try again.
 
 ---
 
-## Platform Agents
+## Developer Agent
 
-| Platform | Agent | Specialization |
-|----------|-------|----------------|
-| backend | prdx:backend-developer | Backend development (discovers stack and patterns from codebase) |
-| frontend | prdx:frontend-developer | Frontend development (discovers stack and patterns from codebase) |
-| android | prdx:android-developer | Android development (discovers stack and patterns from codebase) |
-| ios | prdx:ios-developer | iOS development (discovers stack and patterns from codebase) |
+A single unified agent handles all platforms. The `**Platform:**` field in a PRD is a free-form string — not limited to a fixed set of values.
+
+| Agent | Handles |
+|-------|---------|
+| prdx:developer | All platforms and stacks — backend, frontend, Android, iOS, Flutter, Go, Rust, Python, Ruby, PHP, and more |
+
+The platform value is passed as `Platform hint: {PLATFORM}` in the agent prompt so it can prioritize the relevant dependency files and ecosystem patterns during discovery.
 
 ---
 
