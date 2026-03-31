@@ -909,6 +909,18 @@ if [ "$PLANS_ACTION" = "set" ]; then
     exit 1
   fi
 
+  # Validate path: reject absolute paths and parent traversal segments
+  if echo "$PLANS_SET_PATH" | grep -q "^/"; then
+    echo "❌ Absolute paths are not allowed"
+    echo "Provide a relative path, e.g.: docs/plans or .prdx/plans"
+    exit 1
+  fi
+  if echo "$PLANS_SET_PATH" | grep -qE "(^|/)\.\.(/|$)"; then
+    echo "❌ Parent directory traversal (..) is not allowed"
+    echo "Provide a path relative to the project root, e.g.: docs/plans"
+    exit 1
+  fi
+
   if ! command -v jq &> /dev/null; then
     echo "⚠️  jq not installed - cannot modify settings"
     echo "Install: brew install jq (macOS) or apt-get install jq (Linux)"
