@@ -97,11 +97,22 @@ ls .prdx/plans-setup-done 2>/dev/null
 
 If not found:
 ```bash
-mkdir -p .claude .prdx .prdx/plans
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+CONFIG_FILE=""
+SEARCH_DIR="$PROJECT_ROOT"
+while [ "$SEARCH_DIR" != "/" ]; do
+  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
+  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
+  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+done
+PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
+PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
+
+mkdir -p .claude .prdx "$PLANS_DIR"
 if [ -f .claude/settings.json ]; then
-  jq '. + {plansDirectory: ".prdx/plans"}' .claude/settings.json > .claude/settings.json.tmp && mv .claude/settings.json.tmp .claude/settings.json
+  jq --arg dir "$PLANS_SUBDIR" '. + {plansDirectory: $dir}' .claude/settings.json > .claude/settings.json.tmp && mv .claude/settings.json.tmp .claude/settings.json
 else
-  echo '{"plansDirectory": ".prdx/plans"}' > .claude/settings.json
+  echo "{\"plansDirectory\": \"$PLANS_SUBDIR\"}" > .claude/settings.json
 fi
 echo "local" > .prdx/plans-setup-done
 ```
@@ -111,12 +122,19 @@ echo "local" > .prdx/plans-setup-done
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-
-if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
-  echo '' >> "$GITIGNORE"
-  echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
-  echo '.prdx/*' >> "$GITIGNORE"
-  echo '!.prdx/plans/' >> "$GITIGNORE"
+if echo "$PLANS_SUBDIR" | grep -q "^\.prdx/"; then
+  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+    echo '' >> "$GITIGNORE"
+    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
+    echo '.prdx/*' >> "$GITIGNORE"
+    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
+  fi
+else
+  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
+    echo '' >> "$GITIGNORE"
+    echo '# PRDX state (ignore all)' >> "$GITIGNORE"
+    echo '.prdx/*' >> "$GITIGNORE"
+  fi
 fi
 ```
 
