@@ -310,6 +310,177 @@ SCRIPT
     [ "$status" -ne 0 ]
 }
 
+@test "first-run setup with custom plansDirectory creates configured dir and writes sentinel" {
+    local fake_root="$TEST_TEMP_DIR/first-run-custom"
+    mkdir -p "$fake_root/.prdx"
+    git -C "$fake_root" init -q
+
+    # Write prdx.json with custom plansDirectory
+    cat > "$fake_root/prdx.json" <<'EOF'
+{
+  "version": "1.0",
+  "plansDirectory": "docs/plans",
+  "commits": {
+    "coAuthor": {"enabled": true},
+    "extendedDescription": {"enabled": true},
+    "format": "conventional"
+  }
+}
+EOF
+
+    # No sentinel file yet (first run)
+
+    local driver
+    driver="$(mktemp "$TEST_TEMP_DIR/driver.XXXXXX.sh")"
+    cat > "$driver" <<SCRIPT
+#!/bin/bash
+set -e
+export PRDX_PROJECT_ROOT="$fake_root"
+PROJECT_ROOT="\${PRDX_PROJECT_ROOT:-\$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+CONFIG_FILE=""
+SEARCH_DIR="\$PROJECT_ROOT"
+while [ "\$SEARCH_DIR" != "/" ]; do
+  [ -f "\$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="\$SEARCH_DIR/prdx.json" && break
+  [ -f "\$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="\$SEARCH_DIR/.prdx/prdx.json" && break
+  SEARCH_DIR="\$(dirname "\$SEARCH_DIR")"
+done
+PLANS_SUBDIR=\$(jq -r '.plansDirectory // ".prdx/plans"' "\$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
+PLANS_DIR="\$PROJECT_ROOT/\$PLANS_SUBDIR"
+
+# First-run setup (sentinel absent)
+if ! ls "\$PROJECT_ROOT/.prdx/plans-setup-done" 2>/dev/null; then
+  mkdir -p "\$PROJECT_ROOT/.claude" "\$PROJECT_ROOT/.prdx" "\$PLANS_DIR"
+  if [ -f "\$PROJECT_ROOT/.claude/settings.local.json" ]; then
+    jq --arg dir "\$PLANS_SUBDIR" '. + {plansDirectory: \$dir}' "\$PROJECT_ROOT/.claude/settings.local.json" > "\$PROJECT_ROOT/.claude/settings.local.json.tmp" && mv "\$PROJECT_ROOT/.claude/settings.local.json.tmp" "\$PROJECT_ROOT/.claude/settings.local.json"
+  else
+    echo "{\\"plansDirectory\\": \\"\$PLANS_SUBDIR\\"}" > "\$PROJECT_ROOT/.claude/settings.local.json"
+  fi
+  echo "local" > "\$PROJECT_ROOT/.prdx/plans-setup-done"
+fi
+
+# Output results for assertions
+echo "plans_dir:\$PLANS_DIR"
+echo "sentinel:\$(cat "\$PROJECT_ROOT/.prdx/plans-setup-done")"
+echo "settings_value:\$(jq -r '.plansDirectory' "\$PROJECT_ROOT/.claude/settings.local.json")"
+SCRIPT
+    chmod +x "$driver"
+
+    run bash "$driver"
+
+    [ "$status" -eq 0 ]
+    # Custom directory created (not .prdx/plans)
+    [ -d "$fake_root/docs/plans" ]
+    # Sentinel created
+    [ -f "$fake_root/.prdx/plans-setup-done" ]
+    # settings.local.json has the configured value
+    echo "$output" | grep -q "settings_value:docs/plans"
+    [ "$?" -eq 0 ]
+    # .prdx/plans should NOT have been created
+    [ ! -d "$fake_root/.prdx/plans" ]
+}
+
+@test "first-run setup is skipped when sentinel already exists" {
+    local fake_root="$TEST_TEMP_DIR/first-run-skip"
+    mkdir -p "$fake_root/.prdx" "$fake_root/.claude"
+    git -C "$fake_root" init -q
+
+    # Pre-existing sentinel — setup should be skipped entirely
+    echo "local" > "$fake_root/.prdx/plans-setup-done"
+    echo '{"plansDirectory": ".prdx/plans"}' > "$fake_root/.claude/settings.local.json"
+
+    local driver
+    driver="$(mktemp "$TEST_TEMP_DIR/driver.XXXXXX.sh")"
+    cat > "$driver" <<SCRIPT
+#!/bin/bash
+export PRDX_PROJECT_ROOT="$fake_root"
+PROJECT_ROOT="\${PRDX_PROJECT_ROOT:-\$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PLANS_SUBDIR=".prdx/plans"
+PLANS_DIR="\$PROJECT_ROOT/\$PLANS_SUBDIR"
+
+SETUP_RAN=0
+if ! ls "\$PROJECT_ROOT/.prdx/plans-setup-done" 2>/dev/null; then
+  SETUP_RAN=1
+  mkdir -p "\$PLANS_DIR"
+fi
+echo "setup_ran:\$SETUP_RAN"
+SCRIPT
+    chmod +x "$driver"
+
+    run bash "$driver"
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "setup_ran:0"
+    [ "$?" -eq 0 ]
+}
+
+@test "config plans local writes configured plansDirectory to settings.local.json" {
+    local fake_root="$TEST_TEMP_DIR/config-plans-local"
+    mkdir -p "$fake_root/.prdx" "$fake_root/.claude"
+
+    # prdx.json with custom plansDirectory
+    cat > "$fake_root/prdx.json" <<'EOF'
+{
+  "version": "1.0",
+  "plansDirectory": "docs/plans",
+  "commits": {
+    "coAuthor": {"enabled": true},
+    "extendedDescription": {"enabled": true},
+    "format": "conventional"
+  }
+}
+EOF
+
+    # Pre-existing settings.local.json with other keys
+    echo '{"env": {"TEST": "1"}}' > "$fake_root/.claude/settings.local.json"
+
+    local driver
+    driver="$(mktemp "$TEST_TEMP_DIR/driver.XXXXXX.sh")"
+    cat > "$driver" <<SCRIPT
+#!/bin/bash
+set -e
+export PRDX_PROJECT_ROOT="$fake_root"
+PROJECT_ROOT="\${PRDX_PROJECT_ROOT:-\$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+SETTINGS_FILE="\$PROJECT_ROOT/.claude/settings.local.json"
+CONFIG_FILE=""
+SEARCH_DIR="\$PROJECT_ROOT"
+while [ "\$SEARCH_DIR" != "/" ]; do
+  [ -f "\$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="\$SEARCH_DIR/prdx.json" && break
+  [ -f "\$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="\$SEARCH_DIR/.prdx/prdx.json" && break
+  SEARCH_DIR="\$(dirname "\$SEARCH_DIR")"
+done
+PLANS_SUBDIR=\$(jq -r '.plansDirectory // ".prdx/plans"' "\$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
+CONFIGURED_PLANS_DIR="\$PROJECT_ROOT/\$PLANS_SUBDIR"
+
+# Simulate: config plans local
+mkdir -p "\$PROJECT_ROOT/.claude"
+if [ ! -f "\$SETTINGS_FILE" ]; then
+  echo '{}' > "\$SETTINGS_FILE"
+fi
+
+jq --arg dir "\$PLANS_SUBDIR" '. + {"plansDirectory": \$dir}' "\$SETTINGS_FILE" > "\${SETTINGS_FILE}.tmp"
+mv "\${SETTINGS_FILE}.tmp" "\$SETTINGS_FILE"
+
+mkdir -p "\$CONFIGURED_PLANS_DIR"
+echo "local" > "\$PROJECT_ROOT/.prdx/plans-setup-done"
+
+echo "\$(jq -r '.plansDirectory' "\$SETTINGS_FILE")"
+SCRIPT
+    chmod +x "$driver"
+
+    run bash "$driver"
+
+    [ "$status" -eq 0 ]
+    # Must write the configured value (docs/plans), NOT the hardcoded .prdx/plans
+    [ "$output" = "docs/plans" ]
+    # Directory created
+    [ -d "$fake_root/docs/plans" ]
+    # Sentinel written
+    [ -f "$fake_root/.prdx/plans-setup-done" ]
+    # Pre-existing keys in settings.local.json must be preserved
+    run bash -c "jq -r '.env.TEST' \"$fake_root/.claude/settings.local.json\""
+    [ "$output" = "1" ]
+}
+
 @test "settings.local.json plansDirectory is synced with configured value" {
     local fake_root="$TEST_TEMP_DIR/settings-sync-test"
     mkdir -p "$fake_root"
