@@ -9,6 +9,11 @@
       "description": "Configuration version",
       "default": "1.0"
     },
+    "plansDirectory": {
+      "type": "string",
+      "description": "Directory for storing PRD plan files, relative to project root. Defaults to .prdx/plans if not set.",
+      "default": ".prdx/plans"
+    },
     "commits": {
       "type": "object",
       "description": "Git commit configuration",

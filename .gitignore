@@ -30,3 +30,7 @@ build/
 
 # Test temporary files
 tests/tmp/
+
+# PRDX - only track plans (ignore state, markers, etc.)
+.prdx/*
+!.prdx/plans/
