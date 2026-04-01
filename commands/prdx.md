@@ -62,31 +62,16 @@ If the file does NOT exist (first PRDX run in this project):
 
 If the file DOES exist, skip this step entirely and proceed with the gitignore check below.
 
-**After the setup check (or if already configured), ensure the gitignore is configured appropriately (runs every time):**
+**After the setup check (or if already configured), ensure `.prdx/` is fully ignored (runs every time):**
 
 ```bash
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-if echo "$PLANS_SUBDIR" | grep -q "^\.prdx/"; then
-  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
-    # Neither rule exists — add both
-    echo '' >> "$GITIGNORE"
-    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
-    echo '.prdx/*' >> "$GITIGNORE"
-    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
-  elif ! grep -qxF "!$PLANS_SUBDIR/" "$GITIGNORE"; then
-    # .prdx/* exists but exception is wrong/missing — add correct exception
-    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
-  fi
-else
-  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
-    echo '' >> "$GITIGNORE"
-    echo '# PRDX state (ignore all)' >> "$GITIGNORE"
-    echo '.prdx/*' >> "$GITIGNORE"
-  fi
+if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/' "$GITIGNORE"; then
+  echo '' >> "$GITIGNORE"
+  echo '# PRDX' >> "$GITIGNORE"
+  echo '.prdx/' >> "$GITIGNORE"
 fi
 ```
-
-This ensures plans are committed (tracked in git) while everything else under `.prdx/` stays local.
 
 **Lesson capture and plan cleanup are handled by the scheduled CI workflow (`/prdx:cleanup`).** No startup scan is performed.
 
