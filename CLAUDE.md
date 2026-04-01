@@ -312,7 +312,7 @@ Non-interactive. PRD is stored as a GitHub issue comment (not committed to the r
 
 **`--requested-by`:** Sets git author to specified GitHub user. Claude Code + github-actions[bot] as co-authors.
 
-See `examples/workflows/mention.claude-code.yml` and `examples/workflows/cleanup.claude-code.yml`.
+See `examples/workflows/mention.claude-code.yml`.
 
 ### Standalone Commands (No PRD Required)
 

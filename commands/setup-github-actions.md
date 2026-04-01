@@ -129,55 +129,32 @@ if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.p
 fi
 ```
 
-### Step 7: Offer Cleanup Workflow
-
-If `FORCE=true`: install the cleanup workflow automatically (skip to copying).
-
-If `FORCE=false`: use AskUserQuestion:
-```
-Also install the weekly cleanup workflow?
-(Captures lessons from merged PRs + removes completed PRD plan files)
-
-1. Yes — install cleanup.claude-code.yml
-2. No — skip
-```
-
-If yes (or `FORCE=true`):
-
-Locate and copy the cleanup workflow from the PRDX plugin's `examples/workflows/cleanup.claude-code.yml` (same lookup logic as Step 3). If not found locally, fetch from GitHub:
-```bash
-gh api repos/kuuuurt/prdx/contents/examples/workflows/cleanup.claude-code.yml --jq '.content' | base64 -d > .github/workflows/cleanup.claude-code.yml
-```
-
-### Step 8: Display Summary
+### Step 7: Display Summary
 
 ```
 GitHub Actions workflow installed!
 
-  Workflows:
+  Workflow:
     .github/workflows/mention.claude-code.yml  — CI commands
-    .github/workflows/cleanup.claude-code.yml  — Weekly cleanup (if installed)
 
-  Available commands (comment on issues/PRs):
-    @claude plan       — Generate PRD from issue (creates draft PR)
+  Available commands (comment on issues):
+    @claude plan       — Generate PRD (posted as issue comment)
     @claude revise     — Revise PRD based on feedback
-    @claude implement  — Implement the PRD
+    @claude implement  — Implement the PRD (creates branch + PR)
+
+  Available commands (comment on PRs):
+    @claude implement  — Apply fixes to existing branch
     @claude review     — Code review the implementation
 
-  Cleanup:
-    Runs weekly (Monday midnight UTC) or manually via workflow_dispatch.
-    Captures lessons from merged PRs, then removes PRD plan + state files.
-
   Flow:
-    Issue → @claude plan → Draft PR → @claude implement → @claude review → Human review
+    Issue → @claude plan → PRD comment → @claude implement → PR → @claude review → Human review
 
   Required secret: CLAUDE_CODE_OAUTH_TOKEN
 ```
 
-Commit the workflow file(s):
+Commit the workflow file:
 ```bash
 git add .github/workflows/mention.claude-code.yml
-git add .github/workflows/cleanup.claude-code.yml 2>/dev/null
 git commit -m "ci: add PRDX Claude Code workflow"
 ```
 
