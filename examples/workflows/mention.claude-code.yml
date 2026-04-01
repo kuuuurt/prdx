@@ -5,15 +5,14 @@ on:
     types: [created]
 
 jobs:
-  # @claude plan on issues — generate PRD, create draft PR, comment on issue
+  # @claude plan on issues — generate PRD, post as issue comment
   plan:
     if: |
       !github.event.issue.pull_request &&
       contains(github.event.comment.body, '@claude plan')
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
       issues: write
       id-token: write
     steps:
@@ -25,28 +24,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - name: Check for existing draft PRs
-        id: check
-        run: |
-          ISSUE=${{ github.event.issue.number }}
-          LINKED_PRS=$(gh pr list --search "issue:$ISSUE" --json number,state,url,isDraft --jq '.[] | "#\(.number) (\(.state), draft=\(.isDraft)) \(.url)"' 2>/dev/null || true)
-
-          if [ -n "$LINKED_PRS" ]; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            gh issue comment "$ISSUE" --body "Already has linked PRs:
-          $LINKED_PRS
-
-          Use \`@claude revise\` on the PR to update the PRD, or close the PR to start fresh."
-          else
-            echo "found=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
+          fetch-depth: 1
 
       - name: Run Claude Code
-        if: steps.check.outputs.found == 'false'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -56,20 +36,16 @@ jobs:
           prompt: |
             Generate a PRD for issue #${{ github.event.issue.number }} using:
             /prdx:prdx --ci --issue ${{ github.event.issue.number }} --plan-only --requested-by ${{ github.actor }}
-        env:
-          GIT_AUTHOR_NAME: ${{ github.actor }}
-          GIT_AUTHOR_EMAIL: ${{ github.actor }}@users.noreply.github.com
 
-  # @claude revise on PRs — update PRD based on feedback, update PR body
+  # @claude revise on issues — update the existing PRD comment in-place
   revise:
     if: |
-      github.event.issue.pull_request &&
+      !github.event.issue.pull_request &&
       contains(github.event.comment.body, '@claude revise')
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
-      issues: read
+      contents: read
+      issues: write
       id-token: write
     steps:
       - name: Acknowledge comment
@@ -80,23 +56,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-
-      - name: Checkout PR branch
-        run: |
-          PR_BRANCH=$(gh pr view ${{ github.event.issue.number }} --json headRefName --jq '.headRefName')
-          git fetch origin "$PR_BRANCH"
-          git checkout "$PR_BRANCH"
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Extract linked issue
-        id: issue
-        run: |
-          ISSUE_NUM=$(gh pr view ${{ github.event.issue.number }} --json body --jq '.body' | grep -oP 'Closes #\K\d+' || echo "")
-          echo "number=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ github.token }}
+          fetch-depth: 1
 
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
@@ -106,16 +66,12 @@ jobs:
           plugins: "prdx@prdx"
           claude_args: "--allowedTools Bash,Read,Write,Edit,Glob,Grep,Agent,Skill,TodoWrite,TodoRead"
           prompt: |
-            Revise the PRD based on PR feedback:
-            /prdx:prdx --ci --issue ${{ steps.issue.outputs.number }} --plan-only --requested-by ${{ github.actor }}
-        env:
-          GIT_AUTHOR_NAME: ${{ github.actor }}
-          GIT_AUTHOR_EMAIL: ${{ github.actor }}@users.noreply.github.com
+            Revise the PRD for issue #${{ github.event.issue.number }} based on feedback:
+            /prdx:prdx --ci --issue ${{ github.event.issue.number }} --plan-only --requested-by ${{ github.actor }}
 
-  # @claude implement on PRs — implement from PRD, update PR body
+  # @claude implement on issues or PRs — create branch + PR (issue) or apply fixes (PR)
   implement:
     if: |
-      github.event.issue.pull_request &&
       contains(github.event.comment.body, '@claude implement')
     runs-on: ubuntu-latest
     permissions:
@@ -134,26 +90,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Checkout PR branch and extract issue
-        id: prd
+      - name: Resolve issue number
+        id: resolve
         run: |
-          PR_BRANCH=$(gh pr view ${{ github.event.issue.number }} --json headRefName --jq '.headRefName')
-          git fetch origin "$PR_BRANCH"
-          git checkout "$PR_BRANCH"
-
-          ISSUE_NUM=$(gh pr view ${{ github.event.issue.number }} --json body --jq '.body' | grep -oP 'Closes #\K\d+' || echo "")
-          if [ -z "$ISSUE_NUM" ]; then
-            echo "found=false" >> "$GITHUB_OUTPUT"
-            gh pr comment ${{ github.event.issue.number }} --body "No linked issue found in PR body. Ensure the PR body contains \`Closes #<issue>\`."
+          if [ -z "${{ github.event.issue.pull_request }}" ]; then
+            # Comment on an issue — use issue number directly
+            echo "issue=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+            echo "is_pr=false" >> "$GITHUB_OUTPUT"
           else
-            echo "found=true" >> "$GITHUB_OUTPUT"
-            echo "issue=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+            # Comment on a PR — extract linked issue from PR body
+            ISSUE_NUM=$(gh pr view ${{ github.event.issue.number }} --json body --jq '.body' | grep -oP 'Closes #\K\d+' || echo "")
+            if [ -z "$ISSUE_NUM" ]; then
+              echo "found=false" >> "$GITHUB_OUTPUT"
+              gh pr comment ${{ github.event.issue.number }} --body "No linked issue found in PR body. Ensure the PR body contains \`Closes #<issue>\`."
+            else
+              echo "issue=$ISSUE_NUM" >> "$GITHUB_OUTPUT"
+              echo "is_pr=true" >> "$GITHUB_OUTPUT"
+              echo "found=true" >> "$GITHUB_OUTPUT"
+            fi
           fi
         env:
           GH_TOKEN: ${{ github.token }}
 
+      - name: Checkout PR branch
+        if: steps.resolve.outputs.is_pr == 'true'
+        run: |
+          PR_BRANCH=$(gh pr view ${{ github.event.issue.number }} --json headRefName --jq '.headRefName')
+          git fetch origin "$PR_BRANCH"
+          git checkout "$PR_BRANCH"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
       - name: Run Claude Code
-        if: steps.prd.outputs.found == 'true'
+        if: steps.resolve.outputs.issue != ''
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -161,8 +130,8 @@ jobs:
           plugins: "prdx@prdx"
           claude_args: "--allowedTools Bash,Read,Write,Edit,Glob,Grep,Agent,Skill,TodoWrite,TodoRead"
           prompt: |
-            Implement the PRD for issue #${{ steps.prd.outputs.issue }}:
-            /prdx:prdx --ci --issue ${{ steps.prd.outputs.issue }} --requested-by ${{ github.actor }}
+            Implement the PRD for issue #${{ steps.resolve.outputs.issue }}:
+            /prdx:prdx --ci --issue ${{ steps.resolve.outputs.issue }} --requested-by ${{ github.actor }}
         env:
           GIT_AUTHOR_NAME: ${{ github.actor }}
           GIT_AUTHOR_EMAIL: ${{ github.actor }}@users.noreply.github.com
