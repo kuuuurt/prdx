@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document) workflow leveraging Claude Code's **native plan mode**. Plans are saved to `.prdx/plans/` inside the project root and serve as the single source of truth for feature development. PRD files are tracked in git as project documentation.
+PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document) workflow leveraging Claude Code's **native plan mode**. Plans are saved locally to `.prdx/plans/` as a working copy; in CI mode the authoritative PRD is stored as a GitHub issue comment.
 
 ## Core Philosophy
 
@@ -24,11 +24,9 @@ PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document)
 
 ## Plan Mode Configuration
 
-Plans are stored in a configurable directory relative to the project root. The default is `.prdx/plans/`. Projects can override this via the `plansDirectory` property in `prdx.json` (e.g. `"plansDirectory": "docs/plans"`).
+Plans are stored locally in a configurable directory (default `.prdx/plans/`). The entire `.prdx/` directory is gitignored. Projects can override the plans directory via the `plansDirectory` property in `prdx.json` (e.g. `"plansDirectory": "docs/plans"`).
 
 On first run, PRDX auto-creates the plans directory and sets `plansDirectory` in `.claude/settings.local.json` so Claude Code's native plan mode saves to the right place. A `.prdx/plans-setup-done` marker prevents repeated setup.
-
-PRD files are tracked in git as project documentation. When plans are under `.prdx/` (the default), everything else in `.prdx/` is gitignored via `.prdx/*` + `!.prdx/plans/`. When plans are configured outside `.prdx/`, only `.prdx/*` is added to `.gitignore` (no exception needed).
 
 **Naming convention:** `prdx-{slug}.md` for normal PRDs, `prdx-quick-{slug}.md` for quick mode (ephemeral).
 
@@ -49,27 +47,16 @@ PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/nu
 PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
 ```
 
-### Conditional Gitignore Management
+### Gitignore Management
 
-After resolving `PLANS_SUBDIR`, use this pattern for `.gitignore` updates:
+Use this pattern for `.gitignore` updates:
 
 ```bash
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-if echo "$PLANS_SUBDIR" | grep -q "^\.prdx/"; then
-  # Plans are under .prdx/ — ignore everything except the plans subdir
-  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
-    echo '' >> "$GITIGNORE"
-    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
-    echo '.prdx/*' >> "$GITIGNORE"
-    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
-  fi
-else
-  # Plans are outside .prdx/ — just ignore .prdx/* entirely
-  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
-    echo '' >> "$GITIGNORE"
-    echo '# PRDX state (ignore all)' >> "$GITIGNORE"
-    echo '.prdx/*' >> "$GITIGNORE"
-  fi
+if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.prdx/*' "$GITIGNORE"; }; then
+  echo '' >> "$GITIGNORE"
+  echo '# PRDX' >> "$GITIGNORE"
+  echo '.prdx/' >> "$GITIGNORE"
 fi
 ```
 
@@ -313,17 +300,17 @@ Same workflow as `/prdx:prdx` but with persistent teammates (Lead, Architect, Pl
 
 ### CI Mode (`--ci`)
 
-Non-interactive. PRDX handles the full lifecycle (plan, implement, PR creation/update, issue comments). Only code review stays in the workflow.
+Non-interactive. PRD is stored as a GitHub issue comment (not committed to the repo).
 
 ```bash
-# Plan only — generates PRD, commits, pushes, creates draft PR, comments on issue
+# Plan only — generates PRD, posts as issue comment
 /prdx:prdx --ci --issue 42 --plan-only --requested-by username
 
-# Implement — reads PRD from branch, implements, pushes, updates PR, marks ready, adds reviewer
+# Implement — reads PRD from issue comment, implements, creates PR
 /prdx:prdx --ci --issue 42 --requested-by username
 ```
 
-**`--requested-by`:** Sets git author to specified GitHub user. Claude Code + github-actions[bot] as co-authors. After plan: adds user as PR assignee. After implement: adds user as PR reviewer.
+**`--requested-by`:** Sets git author to specified GitHub user. Claude Code + github-actions[bot] as co-authors.
 
 See `examples/workflows/mention.claude-code.yml` and `examples/workflows/cleanup.claude-code.yml`.
 
@@ -437,8 +424,8 @@ Skills in `skills/` are read by agents during execution:
 
 | Hook | Trigger | Purpose |
 |------|---------|---------|
-| `pre-plan.sh` | Before `/prdx:plan` | Validates git repo + plans dir exist. Ensures `.prdx/plans/` git tracking |
-| `pre-implement.sh` | Before `/prdx:implement` | Validates PRD completeness, branch state, uncommitted changes. Ensures git tracking |
+| `pre-plan.sh` | Before `/prdx:plan` | Validates git repo + plans dir exist |
+| `pre-implement.sh` | Before `/prdx:implement` | Validates PRD completeness, branch state, uncommitted changes |
 | `post-implement.sh` | After `/prdx:implement` | Runs tests (blocks on failure), updates status to `review` |
 | `post-edit-simplify.sh` | After Edit/Write on source files | Detects changed lines, prompts simplification. Enable: `/prdx:config hooks enable auto-simplify` |
 
@@ -471,13 +458,14 @@ When modifying PRDX itself:
 **Challenges & Solutions:**
 - AC fix loops needed a cap (3 attempts) to prevent infinite cycling — escalate to user after exhaustion
 
-### CI Mode for PRDX (2026-03-18, updated 2026-03-21) - backend
+### CI Mode for PRDX (2026-03-18, updated 2026-04-01) - backend
 
 **Patterns:**
 - Composable flags (`--issue` standalone + `--ci` builds on it) provide flexibility for both interactive and non-interactive use
 - Direct PRD generation via `prdx:code-explorer` + Write tool effectively replaces plan mode for non-interactive contexts
 - Checking `CI=true` env var (standard across CI providers) is the cleanest way to bypass interactive prompts in hooks
-- PRDX owns the full CI lifecycle: plan, implement, PR creation/update, issue comments. Workflow is a thin trigger. Only code review stays in the workflow
+- Storing PRDs as issue comments (with `<!-- prdx-prd -->` marker) avoids polluting git history with planning documents
+- PRDX owns the full CI lifecycle: plan (issue comment), revise (update comment), implement (branch + PR). Only code review stays in the workflow
 - `pr-author` agent handles both PR creation and updates (via `gh pr edit`), ensuring consistent titles/bodies across local and CI mode
 - `--requested-by` flag sets git author to the workflow requestor; Claude Code + github-actions[bot] as co-authors
 - After `@claude plan`, the requester is added as PR assignee. After `@claude implement`, the draft PR is marked ready and the requester is added as reviewer

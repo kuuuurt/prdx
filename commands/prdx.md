@@ -62,31 +62,16 @@ If the file does NOT exist (first PRDX run in this project):
 
 If the file DOES exist, skip this step entirely and proceed with the gitignore check below.
 
-**After the setup check (or if already configured), ensure the gitignore is configured appropriately (runs every time):**
+**After the setup check (or if already configured), ensure `.prdx/` is fully ignored (runs every time):**
 
 ```bash
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-if echo "$PLANS_SUBDIR" | grep -q "^\.prdx/"; then
-  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
-    # Neither rule exists — add both
-    echo '' >> "$GITIGNORE"
-    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "$GITIGNORE"
-    echo '.prdx/*' >> "$GITIGNORE"
-    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
-  elif ! grep -qxF "!$PLANS_SUBDIR/" "$GITIGNORE"; then
-    # .prdx/* exists but exception is wrong/missing — add correct exception
-    echo "!$PLANS_SUBDIR/" >> "$GITIGNORE"
-  fi
-else
-  if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/*' "$GITIGNORE"; then
-    echo '' >> "$GITIGNORE"
-    echo '# PRDX state (ignore all)' >> "$GITIGNORE"
-    echo '.prdx/*' >> "$GITIGNORE"
-  fi
+if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.prdx/*' "$GITIGNORE"; }; then
+  echo '' >> "$GITIGNORE"
+  echo '# PRDX' >> "$GITIGNORE"
+  echo '.prdx/' >> "$GITIGNORE"
 fi
 ```
-
-This ensures plans are committed (tracked in git) while everything else under `.prdx/` stays local.
 
 **Lesson capture and plan cleanup are handled by the scheduled CI workflow (`/prdx:cleanup`).** No startup scan is performed.
 
@@ -329,7 +314,7 @@ Route based on choice:
 
 ### Step 2-CI: Plan-Only Path (CI Mode)
 
-**This step runs ONLY when `CI_MODE=true` and `PLAN_ONLY=true`.** It generates a PRD and opens a draft PR for review.
+**This step runs ONLY when `CI_MODE=true` and `PLAN_ONLY=true`.** It generates a PRD and posts it as an issue comment.
 
 **2-CI.1: Derive slug and detect platform:**
 
@@ -342,23 +327,15 @@ Detect project name:
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
 ```
 
-Determine branch name from type:
-```bash
-# Auto-detect type: "bug-fix" if title/body contains "bug"/"fix"/"broken", "refactor" if "refactor"/"cleanup", else "feature"
-# Branch prefix: feature → feat/, bug-fix → fix/, refactor → refactor/
-BRANCH="{TYPE_PREFIX}/{SLUG}"
-```
-
-**2-CI.2: Check for existing branch (revision detection):**
+**2-CI.2: Check for existing PRD comment (revision detection):**
 
 ```bash
-git fetch origin "$BRANCH" 2>/dev/null
-BRANCH_EXISTS=$?
+PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
 ```
 
-**If branch does NOT exist (fresh plan):** Continue to 2-CI.3.
+**If no PRD comment exists (fresh plan):** Continue to 2-CI.2b.
 
-**If branch exists (revision):** Jump to 2-CI.6.
+**If a PRD comment exists (revision):** Jump to 2-CI.6.
 
 **2-CI.2b: Post progress comment on issue:**
 
@@ -387,13 +364,11 @@ Description: {ISSUE_BODY}
 Focus on: existing patterns, relevant files, architecture layers, and conventions that would inform implementation. Return a concise summary."
 ```
 
-**2-CI.4: Write PRD file and create branch:**
+**2-CI.4: Generate PRD content:**
 
-```bash
-git checkout -b "$BRANCH"
-```
+Generate the PRD using the full PRD template. Do NOT create a branch or write to a file — the content will be posted as an issue comment in the next step.
 
-Use the Write tool to create `{PLANS_DIR}/prdx-{SLUG}.md` with the full PRD template:
+PRD content to generate:
 
 ```markdown
 # {ISSUE_TITLE}
@@ -403,7 +378,6 @@ Use the Write tool to create `{PLANS_DIR}/prdx-{SLUG}.md` with the full PRD temp
 **Platform:** {DETECTED_PLATFORM}
 **Status:** planning
 **Created:** {TODAY's DATE}
-**Branch:** {BRANCH}
 
 ## Problem
 
@@ -428,191 +402,76 @@ Use the Write tool to create `{PLANS_DIR}/prdx-{SLUG}.md` with the full PRD temp
 
 Use the codebase exploration results from step 2-CI.3 to inform the Approach and Risks sections.
 
-**2-CI.5: Commit PRD and push branch:**
+**2-CI.5: Post PRD as issue comment:**
 
 ```bash
-git add .prdx/plans/prdx-{SLUG}.md
-git commit -m "$(cat <<'EOF'
-docs: add PRD for {SLUG}
-
-Co-Authored-By: claude[bot] <209825114+claude[bot]@users.noreply.github.com>
-Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-EOF
-)"
-git push -u origin "$BRANCH"
+PRD_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "$(cat <<'PRDBODY'
+<!-- prdx-prd -->
+{FULL PRD CONTENT}
+PRDBODY
+)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
 ```
 
-When `REQUESTOR` is set (via `--requested-by`), `GIT_AUTHOR_NAME`/`GIT_AUTHOR_EMAIL` are already exported, so the commit author is the requestor while Claude Code and GitHub Actions appear as co-authors.
-
-Write state file:
-```bash
-mkdir -p .prdx/state
-cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "planning", "quick": false}
-EOF
-```
-
-**2-CI.5b: Create draft PR and comment on issue:**
-
-Detect default branch:
-```bash
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-```
-
-Invoke the `prdx:pr-author` agent to create a draft PR:
-
-```
-subagent_type: "prdx:pr-author"
-
-prompt: "Create a draft pull request for this PRD.
-
-Mode: prd
-CI: true
-PRD Slug: {SLUG}
-PRD File: {PLANS_DIR}/prdx-{SLUG}.md
-Branch: {BRANCH}
-Base Branch: {DEFAULT_BRANCH}
-Draft: true
-Issue: {ISSUE_NUMBER}
-
-This is a plan-only draft PR for PRD review. The footer should say:
-'Comment `@claude implement` when ready, or `@claude revise` with feedback.'
-
-Read the PRD, create the PR via gh pr create --draft, and return only the PR summary (number, URL, title)."
-```
-
-After PR creation, edit the progress comment to show completion:
+Edit the progress comment to show completion:
 ```bash
 REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="Planning complete. A draft PR has been created — review the PRD and comment \`@claude implement\` when ready."
-```
-
-Update state file with PR number:
-```bash
-cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "planning", "quick": false, "pr_number": {PR_NUMBER}}
-EOF
-```
-
-Add requester as assignee to the draft PR:
-```bash
-if [ -n "$REQUESTOR" ]; then
-  gh pr edit "$PR_NUMBER" --add-assignee "$REQUESTOR" 2>/dev/null || true
-fi
+gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="Planning complete. PRD posted above — review it and comment \`@claude implement\` when ready, or \`@claude revise\` with feedback."
 ```
 
 Display:
 ```
-CI Plan-Only Complete!
+CI Planning Complete!
 
-PRD: {PLANS_DIR}/prdx-{SLUG}.md
-Branch: {BRANCH}
-Issue: #{ISSUE_NUMBER}
-Draft PR: #{PR_NUMBER}
+PRD posted as comment on issue #{ISSUE_NUMBER}
+Comment `@claude implement` when ready, or `@claude revise` with feedback.
 ```
 
 ---
 
-**2-CI.6: Revision path (existing branch + PRD):**
+**2-CI.6: Revision path (existing PRD comment):**
 
-This runs when `--plan-only` is used and the branch already exists — it means the user wants to revise the PRD based on feedback.
+This runs when `--plan-only` is used and a PRD comment already exists on the issue — it means the user wants to revise the PRD based on feedback.
 
-```bash
-git checkout "$BRANCH"
-git pull origin "$BRANCH"
-```
-
-**Post progress comment on PR:**
+**Post progress comment on issue:**
 
 ```bash
-PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
 REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
 RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
-if [ -n "$PR_NUMBER" ]; then
-  PROGRESS_COMMENT_ID=$(gh pr comment "$PR_NUMBER" --body "> Revising PRD... 🔨
+PROGRESS_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "> Revising PRD... 🔨
 >
 > [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
-fi
 ```
 
-**Read existing PRD:**
-```bash
-cat {PLANS_DIR}/prdx-{SLUG}.md
-```
-
-If the PRD file does not exist on the branch, error:
-```
-Branch {BRANCH} exists but no PRD file found at .prdx/plans/prdx-{SLUG}.md.
-Cannot revise — create a fresh PRD instead by deleting the branch and re-running.
-```
-
-**Fetch PR review comments:**
+**Find existing PRD comment and extract content:**
 
 ```bash
-PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
+PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
+PRD_COMMENT_ID=$(echo "$PRD_COMMENT" | jq -r '.databaseId // .id' 2>/dev/null)
+PRD_COMMENT_BODY=$(echo "$PRD_COMMENT" | jq -r '.body' 2>/dev/null)
 ```
 
-If no PR found, warn but continue (PRD can still be revised without PR comments).
+**Read issue comments posted after the PRD comment (feedback/revision requests):**
 
-If PR exists, fetch review feedback:
 ```bash
-# PR-level review bodies
-REVIEW_BODIES=$(gh pr view "$PR_NUMBER" --json reviews --jq '[.reviews[] | .body | select(length > 0)] | join("\n---\n")' 2>/dev/null)
-
-# Inline code review comments
-REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-REVIEW_COMMENTS=$(gh api "repos/$REPO/pulls/$PR_NUMBER/comments" --jq '[.[] | "[\(.path):\(.line // .position)] \(.body)"] | join("\n---\n")' 2>/dev/null)
-
-# PR conversation comments
-PR_COMMENTS=$(gh pr view "$PR_NUMBER" --json comments --jq '[.comments[] | .body] | join("\n---\n")' 2>/dev/null)
+gh issue view "$ISSUE_NUMBER" --json comments --jq \
+  --argjson prd_id "$PRD_COMMENT_ID" \
+  '[.comments[] | select((.databaseId // .id) > $prd_id) | .body] | join("\n---\n")' 2>/dev/null
 ```
+
+These later comments contain the user's revision feedback to incorporate.
 
 **Re-explore codebase if needed** (use `prdx:code-explorer` same as 2-CI.3).
 
-**Revise PRD:**
+**Generate revised PRD content:**
 
-Use the Write tool to update the PRD file, incorporating the review feedback. The revised PRD should address all review comments while maintaining the same format.
+Incorporate the feedback from the post-PRD comments into the existing PRD. The revised PRD should address all feedback while maintaining the same format and the `<!-- prdx-prd -->` marker.
 
-**Commit and push revision:**
-```bash
-git add .prdx/plans/prdx-{SLUG}.md
-git commit -m "$(cat <<'EOF'
-docs: revise PRD for {SLUG}
-
-Co-Authored-By: claude[bot] <209825114+claude[bot]@users.noreply.github.com>
-Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-EOF
-)"
-git push origin "$BRANCH"
-```
-
-**Update PR body after revision:**
+**Update the PRD comment in-place:**
 
 ```bash
-PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-```
-
-If PR exists, invoke `prdx:pr-author` agent to update:
-
-```
-subagent_type: "prdx:pr-author"
-
-prompt: "Update the PR body for a revised PRD.
-
-Mode: prd
-CI: true
-PR Number: {PR_NUMBER}
-PRD Slug: {SLUG}
-PRD File: {PLANS_DIR}/prdx-{SLUG}.md
-Branch: {BRANCH}
-Base Branch: {DEFAULT_BRANCH}
-Issue: {ISSUE_NUMBER}
-
-Read the updated PRD and regenerate the PR title and body. Use gh pr edit to update the existing PR.
-The footer should say: 'Comment `@claude implement` when ready, or `@claude revise` with feedback.'
-
-Return confirmation of the update."
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+gh api "repos/$REPO/issues/comments/$PRD_COMMENT_ID" -X PATCH -f body="<!-- prdx-prd -->
+{REVISED PRD CONTENT}"
 ```
 
 **Edit progress comment to show completion:**
@@ -620,7 +479,7 @@ Return confirmation of the update."
 ```bash
 if [ -n "$PROGRESS_COMMENT_ID" ]; then
   REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-  gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="PRD revised. Review the updated PR description and comment \`@claude implement\` when ready."
+  gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="PRD revised. Review the updated comment and comment \`@claude implement\` when ready."
 fi
 ```
 
@@ -628,18 +487,17 @@ Display:
 ```
 PRD Revised!
 
-PRD: {PLANS_DIR}/prdx-{SLUG}.md
-Branch: {BRANCH}
-PR: #{PR_NUMBER} (body updated)
+PRD comment updated on issue #{ISSUE_NUMBER}
+Comment `@claude implement` when ready, or `@claude revise` with more feedback.
 ```
 
 ---
 
 ### Step 3-CI: Implement Path (CI Mode)
 
-**This step runs ONLY when `CI_MODE=true` and `PLAN_ONLY=false`.** It reads an existing PRD from the branch and implements it.
+**This step runs ONLY when `CI_MODE=true` and `PLAN_ONLY=false`.** It reads the PRD from an issue comment and implements it, creating a new branch and PR. If a PR already exists for the branch, it applies fixes to the existing branch instead.
 
-**3-CI.1: Derive slug and check for existing PRD:**
+**3-CI.1: Derive slug and detect platform:**
 
 Derive `{SLUG}` from `ISSUE_TITLE` by extracting the core concept (2-4 words max, same logic as 2-CI.1).
 
@@ -649,52 +507,73 @@ Determine branch name:
 BRANCH="{TYPE_PREFIX}/{SLUG}"
 ```
 
-**Check that the branch exists:**
+Detect platform from codebase (same logic as 2-CI.1).
+
+Detect project name:
 ```bash
-git fetch origin "$BRANCH" 2>/dev/null
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+PROJECT_NAME=$(echo "$REPO" | cut -d'/' -f2)
 ```
 
-If the branch does NOT exist, error:
-```
-No PRD found for issue #{ISSUE_NUMBER}.
+**3-CI.2: Find PRD from issue comment:**
 
-Branch {BRANCH} does not exist. Run with --plan-only first:
-  /prdx:prdx --ci --issue {ISSUE_NUMBER} --plan-only
-```
-
-**Check out the existing branch:**
 ```bash
-git checkout "$BRANCH"
-git pull origin "$BRANCH"
+PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
+PRD_BODY=$(echo "$PRD_COMMENT" | jq -r '.body' 2>/dev/null)
+PRD_COMMENT_ID=$(echo "$PRD_COMMENT" | jq -r '.databaseId // .id' 2>/dev/null)
 ```
 
-**Verify PRD file exists:**
+**If a PRD comment was found:** Check whether a PR already exists for this branch:
 ```bash
-ls {PLANS_DIR}/prdx-{SLUG}.md
+PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
+```
+- If `PR_NUMBER` is non-empty → this is a **fix iteration** (PR already exists). Jump to the fix iteration path below.
+- If `PR_NUMBER` is empty → this is a **fresh implementation**. Continue to 3-CI.2b.
+
+**If no PRD comment was found:** Check if this is an `@claude implement` on a PR:
+```bash
+PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
+```
+- If `PR_NUMBER` is non-empty → PR exists, find the linked issue from the PR body (`Closes #N` pattern) and fetch the PRD comment from that issue.
+- If `PR_NUMBER` is empty → error:
+  ```
+  No PRD found for issue #{ISSUE_NUMBER}.
+  Run `@claude plan` first to generate a PRD.
+  ```
+
+**3-CI.2b: Post progress comment on issue:**
+
+```bash
+RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+PROGRESS_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "> Implementing... 🔨
+>
+> [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
 ```
 
-If the PRD file does not exist, error:
+Store `PROGRESS_COMMENT_ID` for editing when done.
+
+**3-CI.3: Write PRD locally and set up branch:**
+
+Write the PRD to the local plans directory (this path is gitignored — it will NOT appear in any commit or PR diff):
+```bash
+mkdir -p "$PLANS_DIR"
+echo "$PRD_BODY" | sed 's/<!-- prdx-prd -->//' > "$PLANS_DIR/prdx-${SLUG}.md"
 ```
-Branch {BRANCH} exists but no PRD file found at .prdx/plans/prdx-{SLUG}.md.
 
-Run with --plan-only first to generate the PRD:
-  /prdx:prdx --ci --issue {ISSUE_NUMBER} --plan-only
+Create the feature branch:
+```bash
+git checkout -b "$BRANCH"
 ```
 
-**3-CI.2: Implement:**
+**3-CI.4: Run implement:**
 
-Update state file:
+Write state file and run the implementation pipeline:
 ```bash
 mkdir -p .prdx/state
-cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "implementing", "quick": false}
+cat > .prdx/state/${SLUG}.json << EOF
+{"slug": "${SLUG}", "phase": "implementing", "quick": false}
 EOF
-```
 
-Run `/prdx:implement {SLUG}` — this invokes the full implementation pipeline (dev-planner → platform agent → ac-verifier → code-reviewer) non-interactively. The `CI=true` env var must be set in the runner environment (GitHub Actions sets this automatically) so that `pre-implement.sh` auto-answers prompts.
-
-**Ensure `CI=true` is set** before invoking implement:
-```bash
 export CI=true
 ```
 
@@ -704,67 +583,128 @@ export CI=true
 
 Wait for implementation to complete.
 
-**3-CI.3: Push implementation:**
+**3-CI.5: Push and create PR:**
 
-After implementation completes, push the implementation commits:
+After implementation completes, push the branch:
 ```bash
-git push origin "$BRANCH"
+git push -u origin "$BRANCH"
 ```
 
-**3-CI.4: Update state and display completion:**
-
+Determine the default base branch:
 ```bash
-mkdir -p .prdx/state
-cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "review", "quick": false}
-EOF
-```
-
-**3-CI.4b: Update PR body with implementation:**
-
-```bash
-PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
 ```
 
-If PR exists, invoke `prdx:pr-author` agent to update:
+Invoke `prdx:pr-author` agent to create a real (non-draft) PR:
 
 ```
 subagent_type: "prdx:pr-author"
 
-prompt: "Update the PR body for a completed implementation.
+prompt: "Create a PR for a completed CI implementation.
 
 Mode: prd
 CI: true
-PR Number: {PR_NUMBER}
 PRD Slug: {SLUG}
 PRD File: {PLANS_DIR}/prdx-{SLUG}.md
 Branch: {BRANCH}
 Base Branch: {DEFAULT_BRANCH}
 Issue: {ISSUE_NUMBER}
 
-Read the PRD (now including Implementation Notes), analyze commits on this branch, and update the PR title and body with full implementation details. Use gh pr edit to update the existing PR.
+Analyze commits on this branch and create a PR with a clear title and body.
+Include 'Closes #{ISSUE_NUMBER}' in the body.
 The footer should say: 'Comment `@claude review` for code review.'
+Create a real (non-draft) PR using gh pr create.
 
-Return confirmation of the update."
+Return the PR number."
 ```
 
-Mark PR as ready and add requester as reviewer:
+After PR creation, add the requestor as reviewer:
 ```bash
-gh pr ready "$PR_NUMBER" 2>/dev/null || true
 if [ -n "$REQUESTOR" ]; then
   gh pr edit "$PR_NUMBER" --add-reviewer "$REQUESTOR" 2>/dev/null || true
 fi
+```
+
+**3-CI.6: Update progress comment and complete:**
+
+Edit the progress comment:
+```bash
+gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="Implementation complete. PR #${PR_NUMBER} created. Comment \`@claude review\` for code review."
+```
+
+Update state file:
+```bash
+cat > .prdx/state/${SLUG}.json << EOF
+{"slug": "${SLUG}", "phase": "review", "quick": false, "pr_number": ${PR_NUMBER}}
+EOF
 ```
 
 Display:
 ```
 CI Implementation Complete!
 
-PRD: {PLANS_DIR}/prdx-{SLUG}.md
-Branch: {BRANCH}
 Issue: #{ISSUE_NUMBER}
-PR: #{PR_NUMBER} (body updated with implementation details)
+Branch: {BRANCH}
+PR: #{PR_NUMBER}
+```
+
+---
+
+**Fix Iteration Path (PR already exists):**
+
+This runs when `@claude implement` is triggered and a PR already exists for the branch — the user wants to apply fixes.
+
+0. **Resolve repo:**
+   ```bash
+   REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+   ```
+
+1. **Check out the existing branch:**
+   ```bash
+   git fetch origin "$BRANCH"
+   git checkout "$BRANCH"
+   git pull origin "$BRANCH"
+   ```
+
+2. **Read PRD from issue comment** (already fetched in 3-CI.2 — `PRD_BODY` is available). Write it locally:
+   ```bash
+   mkdir -p "$PLANS_DIR"
+   echo "$PRD_BODY" | sed 's/<!-- prdx-prd -->//' > "$PLANS_DIR/prdx-${SLUG}.md"
+   ```
+
+3. **Post progress comment on issue:**
+   ```bash
+   RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+   PROGRESS_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "> Applying fixes... 🔨
+   >
+   > [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
+   ```
+
+4. **Run implement** to apply fixes:
+   ```bash
+   export CI=true
+   ```
+   ```
+   /prdx:implement {SLUG}
+   ```
+
+5. **Push fixes:**
+   ```bash
+   git push origin "$BRANCH"
+   ```
+
+6. **Update progress comment:**
+   ```bash
+   gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="Fixes applied to PR #${PR_NUMBER}. Comment \`@claude review\` for another code review."
+   ```
+
+Display:
+```
+CI Fix Iteration Complete!
+
+Issue: #{ISSUE_NUMBER}
+Branch: {BRANCH}
+PR: #{PR_NUMBER} (fixes pushed)
 ```
 
 ---

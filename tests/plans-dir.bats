@@ -20,15 +20,15 @@ load helpers/test_helper
     [ "$output" = "$fake_root/.prdx/plans" ]
 }
 
-@test "plans directory is NOT in .gitignore" {
+@test ".prdx/ is fully gitignored" {
     local gitignore="$REPO_ROOT/.gitignore"
 
-    # .prdx/plans/ should not be ignored (PRDs are project docs)
-    run grep -x '\.prdx/plans/' "$gitignore"
-    [ "$status" -ne 0 ]
-
-    # .prdx/ broad rule should not be present either
+    # .prdx/ should be fully ignored
     run grep -x '\.prdx/' "$gitignore"
+    [ "$status" -eq 0 ]
+
+    # No exception for .prdx/plans/ should be present
+    run grep -xF '!.prdx/plans/' "$gitignore"
     [ "$status" -ne 0 ]
 }
 
@@ -228,86 +228,62 @@ SCRIPT
     [ "$output" = "$fake_root/my-plans" ]
 }
 
-@test "gitignore gets .prdx/* exception when plans under .prdx/" {
+@test "gitignore gets .prdx/ entry" {
     local fake_root="$TEST_TEMP_DIR/gitignore-test"
     mkdir -p "$fake_root"
 
     local gitignore="$fake_root/.gitignore"
-    local plans_subdir=".prdx/plans"
 
-    # Simulate the conditional gitignore logic
+    # Simulate the simplified gitignore logic
     local driver
     driver="$(mktemp "$TEST_TEMP_DIR/driver.XXXXXX.sh")"
     cat > "$driver" <<SCRIPT
 #!/bin/bash
 GITIGNORE="$gitignore"
-PLANS_SUBDIR="$plans_subdir"
-
-if echo "\$PLANS_SUBDIR" | grep -q "^\.prdx/"; then
-  if [ ! -f "\$GITIGNORE" ] || ! grep -qxF '.prdx/*' "\$GITIGNORE"; then
-    echo '' >> "\$GITIGNORE"
-    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "\$GITIGNORE"
-    echo '.prdx/*' >> "\$GITIGNORE"
-    echo "!\$PLANS_SUBDIR/" >> "\$GITIGNORE"
-  fi
-else
-  if [ ! -f "\$GITIGNORE" ] || ! grep -qxF '.prdx/*' "\$GITIGNORE"; then
-    echo '' >> "\$GITIGNORE"
-    echo '# PRDX state (ignore all)' >> "\$GITIGNORE"
-    echo '.prdx/*' >> "\$GITIGNORE"
-  fi
+if [ ! -f "\$GITIGNORE" ] || ! grep -qxF '.prdx/' "\$GITIGNORE"; then
+  echo '' >> "\$GITIGNORE"
+  echo '# PRDX' >> "\$GITIGNORE"
+  echo '.prdx/' >> "\$GITIGNORE"
 fi
 SCRIPT
     chmod +x "$driver"
     bash "$driver"
 
-    # Should have .prdx/* and exception
-    grep -qxF '.prdx/*' "$gitignore"
+    # Should have .prdx/ entry
+    grep -qxF '.prdx/' "$gitignore"
     [ "$?" -eq 0 ]
 
-    grep -qxF '!.prdx/plans/' "$gitignore"
-    [ "$?" -eq 0 ]
+    # Should NOT have a plans exception line
+    run grep -qxF '!.prdx/plans/' "$gitignore"
+    [ "$status" -ne 0 ]
 }
 
-@test "gitignore gets only .prdx/* when plans outside .prdx/" {
-    local fake_root="$TEST_TEMP_DIR/gitignore-custom-test"
+@test "gitignore .prdx/ entry is idempotent" {
+    local fake_root="$TEST_TEMP_DIR/gitignore-idempotent-test"
     mkdir -p "$fake_root"
 
     local gitignore="$fake_root/.gitignore"
-    local plans_subdir="docs/plans"
+    # Pre-populate with the entry
+    printf '\n# PRDX\n.prdx/\n' > "$gitignore"
 
     local driver
     driver="$(mktemp "$TEST_TEMP_DIR/driver.XXXXXX.sh")"
     cat > "$driver" <<SCRIPT
 #!/bin/bash
 GITIGNORE="$gitignore"
-PLANS_SUBDIR="$plans_subdir"
-
-if echo "\$PLANS_SUBDIR" | grep -q "^\.prdx/"; then
-  if [ ! -f "\$GITIGNORE" ] || ! grep -qxF '.prdx/*' "\$GITIGNORE"; then
-    echo '' >> "\$GITIGNORE"
-    echo '# PRDX - only track plans (ignore state, markers, etc.)' >> "\$GITIGNORE"
-    echo '.prdx/*' >> "\$GITIGNORE"
-    echo "!\$PLANS_SUBDIR/" >> "\$GITIGNORE"
-  fi
-else
-  if [ ! -f "\$GITIGNORE" ] || ! grep -qxF '.prdx/*' "\$GITIGNORE"; then
-    echo '' >> "\$GITIGNORE"
-    echo '# PRDX state (ignore all)' >> "\$GITIGNORE"
-    echo '.prdx/*' >> "\$GITIGNORE"
-  fi
+if [ ! -f "\$GITIGNORE" ] || ! grep -qxF '.prdx/' "\$GITIGNORE"; then
+  echo '' >> "\$GITIGNORE"
+  echo '# PRDX' >> "\$GITIGNORE"
+  echo '.prdx/' >> "\$GITIGNORE"
 fi
 SCRIPT
     chmod +x "$driver"
     bash "$driver"
 
-    # Should have .prdx/*
-    grep -qxF '.prdx/*' "$gitignore"
-    [ "$?" -eq 0 ]
-
-    # Should NOT have the exception line
-    run grep -qxF '!docs/plans/' "$gitignore"
-    [ "$status" -ne 0 ]
+    # Entry appears exactly once
+    local count
+    count=$(grep -cxF '.prdx/' "$gitignore")
+    [ "$count" -eq 1 ]
 }
 
 @test "first-run setup with custom plansDirectory creates configured dir and writes sentinel" {
