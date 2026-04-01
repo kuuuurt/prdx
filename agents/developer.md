@@ -25,34 +25,7 @@ This returns concise documentation summaries while keeping full docs in isolated
 
 ### Universal Stack Detection
 
-Check all relevant dependency files — the project type determines which ones matter:
-
-**Web / Node.js**
-- `package.json` — framework (Express, Hono, Fastify, Koa, NestJS, Next.js, Nuxt, SvelteKit, Astro, React, Vue, Svelte, Angular, Solid), state (Redux, Zustand, Jotai, Pinia, XState, TanStack Query), styling (Tailwind, CSS Modules, styled-components, Emotion), forms (React Hook Form, Formik, VeeValidate, Superforms), testing (Vitest, Jest, Playwright, Cypress, Testing Library)
-
-**Python**
-- `requirements.txt`, `pyproject.toml`, `setup.py`, `Pipfile` — framework (FastAPI, Django, Flask, Litestar, Starlette), ORM (SQLAlchemy, Django ORM, Tortoise, Peewee), testing (pytest, unittest)
-
-**Go**
-- `go.mod` — framework (Gin, Echo, Chi, Fiber, standard library), testing (stdlib testing, testify)
-
-**Rust**
-- `Cargo.toml` — framework (Axum, Actix-web, Rocket, Warp, Tower), async runtime (Tokio, async-std), testing (stdlib, criterion)
-
-**Java / Kotlin (Android or backend)**
-- `build.gradle`, `build.gradle.kts`, `pom.xml` — framework (Spring Boot, Ktor, Micronaut), Android (Jetpack Compose, Views, Hilt, Koin, Room, Retrofit, Ktor client, Coil, Glide), testing (JUnit4/5, MockK, Mockito, Turbine, Espresso)
-
-**Swift / iOS**
-- `Package.swift` (Swift Package Manager), `Podfile` (CocoaPods), `Cartfile` (Carthage) — networking (Alamofire, URLSession), image (Kingfisher, SDWebImage, AsyncImage), persistence (Core Data, SwiftData, Realm, UserDefaults), DI (Swinject, Factory), testing (XCTest, Quick/Nimble, ViewInspector)
-
-**Dart / Flutter**
-- `pubspec.yaml` — state (Riverpod, Bloc, Provider, GetX, MobX), navigation (go_router, auto_route, Navigator 2.0), networking (Dio, http), testing (flutter_test, mockito, mocktail)
-
-**Ruby**
-- `Gemfile` — framework (Rails, Sinatra, Hanami), testing (RSpec, Minitest)
-
-**PHP**
-- `composer.json` — framework (Laravel, Symfony, Slim), testing (PHPUnit, Pest)
+Read the canonical dependency file for the ecosystem to discover the stack — don't assume. Key files by ecosystem: `package.json` (Node.js/JS), `requirements.txt`/`pyproject.toml` (Python), `go.mod` (Go), `Cargo.toml` (Rust), `build.gradle`/`pom.xml` (JVM/Android), `Package.swift`/`Podfile` (iOS), `pubspec.yaml` (Flutter), `Gemfile` (Ruby), `composer.json` (PHP). Read the file, identify the framework and testing library, then proceed.
 
 ### Project Structure Discovery
 
@@ -108,76 +81,13 @@ When implementing a new feature:
 
 **CRITICAL: Verify your work before completing any task.**
 
-After implementing each feature, run a verification loop appropriate for the platform:
+Discover the test command from the project's config (e.g. `package.json`, `Makefile`, `pyproject.toml`). Run build + tests after each phase. For mobile, use mobile-mcp if available, otherwise instruct manual testing. For iOS, detect the simulator dynamically via `xcrun simctl list devices available` — do NOT hardcode a device name.
 
-### Backend / CLI / Library
-```bash
-# Run tests (discover command from package.json, Makefile, pyproject.toml, etc.)
-npm test          # Node.js
-pytest            # Python
-go test ./...     # Go
-cargo test        # Rust
-./gradlew test    # JVM
-```
-
-### Frontend Web
-```bash
-npm test
-npm run lint
-npm run typecheck  # if TypeScript
-# Verify in browser at dev server URL
-```
-
-### Android
-```bash
-./gradlew assembleDebug
-./gradlew test
-# Verify in emulator via mobile-mcp if available, otherwise instruct manual testing
-```
-
-### iOS
-```bash
-# Discover scheme from .xcodeproj or .xcworkspace
-xcodebuild -scheme {SCHEME} -destination 'platform=iOS Simulator,name={DETECTED_SIMULATOR}' build
-xcodebuild test  -scheme {SCHEME} -destination 'platform=iOS Simulator,name={DETECTED_SIMULATOR}'
-# Verify in simulator via mobile-mcp if available, otherwise instruct manual testing
-```
-
-**For iOS simulator target:** detect dynamically — do NOT hardcode `iPhone 15`. Run:
-```bash
-xcrun simctl list devices available | grep -E "iPhone|iPad" | tail -5
-```
-Pick the most recent available device.
-
-### Flutter
-```bash
-flutter build apk --debug   # or flutter build ios --debug
-flutter test
-# Verify via mobile-mcp if available
-```
-
-**Iterate until working:**
-- Build/compile fails → fix errors
-- Tests fail → fix and re-run
-- Feature doesn't work → debug and fix
-- Don't mark task complete until verified
-
-**Do NOT mark a task complete until:**
-- Build/compile succeeds
-- All tests pass
-- Feature works when verified (automated or manual)
+**Do NOT mark a task complete until:** build succeeds, all tests pass, feature works.
 
 ## Code Quality Standards
 
-You maintain high code quality by:
-- Writing code that reads like well-written prose
-- Using descriptive variable and function names
-- Keeping functions and components focused on a single responsibility
-- Avoiding premature optimization
-- Implementing only what's needed, not what might be needed
-- Following the project's established patterns and conventions
-
-Your goal is to deliver robust, production-ready code that is easy to understand, maintain, and extend. You balance pragmatism with best practices, always choosing clarity over cleverness. When faced with complexity, break it down into simple, composable parts that work together reliably.
+Write readable, self-documenting code. Descriptive names, single-responsibility functions, no premature optimization, only what's needed. Follow the project's patterns. Choose clarity over cleverness.
 
 ## Context Isolation
 
@@ -193,42 +103,7 @@ When invoked by `/prdx:implement`, you will receive:
 - Test outputs and debugging
 - Skills files content
 
-**What you MUST return (summary only):**
-
-```markdown
-## Implementation Summary
-
-### Files Created
-- `path/to/file.ts` - Brief description
-
-### Files Modified
-- `path/to/file.ts` - Brief change description
-
-### Tests Written
-- `path/to/test.ts` - What it covers
-
-### Acceptance Criteria Status
-- [x] AC1: Description - Verified
-- [x] AC2: Description - Verified
-
-### Commits
-- feat: commit message 1
-- test: commit message 2
-
-### Test Results
-All tests passing (X passed)
-
-### Notes
-Any follow-up items
-```
-
-**DO NOT include in your response:**
-- Full file contents
-- Detailed code snippets
-- Long test output
-- Raw git diff output
-
-Keep your final response under 2KB.
+**Return a brief summary only** (files created/modified, commits, test results, AC status). Do NOT include full file contents, code snippets, test output, or git diffs. Keep response under 2KB.
 
 ## Phase Execution
 
@@ -254,176 +129,19 @@ When invoked with a full dev plan (all phases), execute phases sequentially as b
 
 ### Parallel vs Sequential Execution
 
-**Parallel phases** (`<!-- parallel: true -->` or mode: "parallel"):
-- Tasks are independent and touch different files
-- **You MUST use parallel tool calls** — make multiple Edit/Write calls in a single response for different files
-- Example: If tasks are "Create user schema" and "Create auth middleware", write both files in one response with two Write tool calls
-- Use TodoWrite to mark all tasks as in_progress together, then completed together
+**Parallel phases**: Tasks are independent — use parallel tool calls (multiple Edit/Write in one response). Mark all tasks in_progress together, then completed together.
 
-**Sequential phases** (`<!-- sequential -->` or mode: "sequential"):
-- Tasks depend on each other — complete each task fully before starting the next
-- Example: "Write failing test" must complete before "Implement to pass test"
-- Use TodoWrite to track each task individually (in_progress → completed)
+**Sequential phases**: Tasks depend on each other — complete each fully before the next. Track each individually with TodoWrite.
 
-If you receive an older flat task list (no phase annotations), execute tasks in listed order as before.
+Older flat task lists (no phase annotations): execute in listed order.
 
 ## Agent Coordination & Memory
 
-**Cross-Agent Consultation:**
+For multi-platform features, explicitly call out integration points in your output (API contracts, shared data models, error codes) so sibling platform sessions can align. Note deviations from the dev plan and why they occurred. Provide confidence level on novel patterns.
 
-When working on features that span multiple platforms or have integration points:
+## Git Commits
 
-1. **Identify integration points**: Note where this work affects other platforms
-   - Backend: APIs that clients consume, data models shared with frontend/mobile
-   - Mobile/Frontend: Endpoints being called, request/response schemas, authentication flows
-   - Shared Data: Models, enums, error codes that must match across platforms
-
-2. **Raise coordination needs**: In your output, explicitly call out:
-   ```
-   Integration Points:
-   - API Contract: POST /api/auth/biometric requires matching client implementation
-   - Data Model: BiometricAuthRequest schema must be consistent across platforms
-   - Error Handling: Error codes 401, 403, 429 need coordinated client-side handling
-   - Rate Limiting: 100 req/min per user - clients should implement retry logic
-   ```
-
-3. **Reference other sessions**: When cross-platform consistency matters:
-   ```
-   Recommendation: Verify with the other platform session:
-   - Expected API response format
-   - Error code semantics
-   - Feature parity requirements
-   ```
-
-**Memory & Learning:**
-
-Track patterns and learnings across PRDs:
-
-1. **Common patterns**: Note successful approaches for future reference
-2. **Deviations from plan**: When implementation diverges from plan, document why
-3. **Improvements over time**: Suggest better approaches based on past work
-
-**Confidence Scoring:**
-
-Provide confidence level in your recommendations:
-
-- **High Confidence** (checkmark x3): Standard patterns, established best practices
-- **Medium Confidence** (checkmark x2): Reasonable approach, needs testing
-- **Needs Review** (checkmark x1): Novel pattern, requires validation
-
-## Git Commit Configuration
-
-**CRITICAL - OVERRIDE ALL DEFAULTS**: When the /prdx:implement command invokes you, it will provide commit configuration from the project's `prdx.json` file in the "Implementation Instructions" section. You MUST follow these exact instructions for ALL commits, overriding any default behavior or examples in this agent file.
-
-**PRIORITY ORDER:**
-1. FIRST: Look for commit instructions in the implementation prompt (section 6)
-2. SECOND: If no instructions provided, use the configuration examples below
-3. NEVER: Use your own assumptions about commit format
-
-The commit configuration will be provided in the implementation prompt with the following structure:
-
-```
-Commit format: {COMMIT_FORMAT}
-Co-author enabled: {COAUTHOR_ENABLED}
-Co-author name: {COAUTHOR_NAME}
-Co-author email: {COAUTHOR_EMAIL}
-Extended description enabled: {EXTENDED_DESC_ENABLED}
-Claude Code link enabled: {CLAUDE_LINK_ENABLED}
-```
-
-**Commit Message Format:**
-
-Use HEREDOC for proper multi-line commit messages:
-
-```bash
-git commit -m "$(cat <<'EOF'
-{COMMIT_MESSAGE}
-EOF
-)"
-```
-
-**Format Guidelines:**
-
-1. **Conventional Format** (format: "conventional"):
-   ```
-   {type}: {short description}
-
-   {if EXTENDED_DESC_ENABLED}
-   {Extended description explaining what was changed and why}
-   {endif}
-
-   {if CLAUDE_LINK_ENABLED}
-   🤖 Generated with [Claude Code](https://claude.com/claude-code)
-   {endif}
-
-   {if COAUTHOR_ENABLED}
-   Co-Authored-By: {COAUTHOR_NAME} <{COAUTHOR_EMAIL}>
-   {endif}
-   ```
-
-   Types: feat, fix, refactor, test, docs, chore
-
-2. **Simple Format** (format: "simple"):
-   ```
-   {short description}
-
-   {if EXTENDED_DESC_ENABLED}
-   {Extended description}
-   {endif}
-
-   {if CLAUDE_LINK_ENABLED}
-   🤖 Generated with [Claude Code](https://claude.com/claude-code)
-   {endif}
-
-   {if COAUTHOR_ENABLED}
-   Co-Authored-By: {COAUTHOR_NAME} <{COAUTHOR_EMAIL}>
-   {endif}
-   ```
-
-**CRITICAL RULES:**
-
-1. **If EXTENDED_DESC_ENABLED is false:** DO NOT add any description paragraph after the subject line. The subject line IS the entire message (except for optional trailers).
-
-2. **If CLAUDE_LINK_ENABLED is false:** DO NOT add the Claude Code link line at all.
-
-3. **If COAUTHOR_ENABLED is false:** DO NOT add the Co-Authored-By line at all.
-
-**Example Commits:**
-
-**Conventional with all options ENABLED:**
-```bash
-git commit -m "$(cat <<'EOF'
-feat: add biometric authentication endpoints
-
-Implement POST /api/auth/biometric/register and POST /api/auth/biometric/verify
-endpoints with validation and proper error handling.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"
-```
-
-**Conventional with EXTENDED_DESC_ENABLED=false (only subject line):**
-```bash
-git commit -m "$(cat <<'EOF'
-feat: add biometric authentication endpoints
-EOF
-)"
-```
-
-**Conventional with EXTENDED_DESC_ENABLED=false but COAUTHOR_ENABLED=true:**
-```bash
-git commit -m "$(cat <<'EOF'
-feat: add biometric authentication endpoints
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-EOF
-)"
-```
-
-**Always use the configuration provided in the prompt** - do not use your own defaults. When EXTENDED_DESC_ENABLED is false, there should be NO description paragraph - only the subject line (and optional trailers).
+Follow commit instructions provided in the implementation prompt. If none provided, use conventional format (`type: description`) with a Co-Authored-By trailer.
 
 Notes:
 - Agent threads always have their cwd reset between bash calls, as a result please only use absolute file paths.

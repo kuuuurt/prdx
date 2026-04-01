@@ -30,11 +30,9 @@ Expert skill for generating **effective, efficient** testing strategies based on
    - Skip testing getters/setters, trivial code
 
 5. **Given-When-Then pattern** (everywhere):
-   ```
-   Given: Setup/preconditions
-   When: Action/trigger
-   Then: Expected result
-   ```
+   - Given: Setup/preconditions
+   - When: Action/trigger
+   - Then: Expected result
 
 ## Platform-Specific Testing Approaches
 
@@ -58,40 +56,6 @@ Expert skill for generating **effective, efficient** testing strategies based on
 - Database operations
 - Authentication/authorization flows
 - Error handling scenarios
-
-**Testing Pattern (Given-When-Then):**
-
-```
-// Test end-to-end API flow
-describe('POST /api/resource', () => {
-  test('creates resource with valid data', async () => {
-    // Given: Authenticated user with valid input
-    const token = generateAuthToken(userId)
-    const input = { name: 'Test', value: 123 }
-
-    // When: Request is made
-    const response = await app.request('/api/resource', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify(input)
-    })
-
-    // Then: Resource is created
-    expect(response.status).toBe(201)
-    expect(await response.json()).toMatchObject({
-      id: expect.any(String),
-      name: 'Test'
-    })
-  })
-
-  test('rejects invalid data', async () => {
-    // Given: Invalid input
-    // When: Request is made
-    // Then: Request rejected with validation error
-    expect(response.status).toBe(400)
-  })
-})
-```
 
 **What to Test:**
 - API endpoints (full request → response)
@@ -123,59 +87,6 @@ describe('POST /api/resource', () => {
 - Database operations (if applicable)
 - Repository with real data sources
 
-**UI Testing Pattern (Given-When-Then):**
-
-```kotlin
-// Test user-facing behavior
-@Test
-fun `user can login with valid credentials`() {
-    // Given: Login screen is displayed
-    composeTestRule.setContent {
-        LoginScreen(viewModel = viewModel)
-    }
-
-    // When: User enters credentials and submits
-    composeTestRule
-        .onNodeWithTag("email_field")
-        .performTextInput("user@example.com")
-    composeTestRule
-        .onNodeWithTag("password_field")
-        .performTextInput("password123")
-    composeTestRule
-        .onNodeWithTag("login_button")
-        .performClick()
-
-    // Then: User sees home screen
-    composeTestRule
-        .onNodeWithText("Welcome")
-        .assertIsDisplayed()
-}
-
-// Test ViewModel behavior (end result)
-@Test
-fun `login succeeds with valid credentials`() = runTest {
-    // Given: Valid credentials
-    val email = "user@example.com"
-    val password = "password123"
-
-    // When: User attempts login
-    viewModel.login(email, password)
-
-    // Then: User is authenticated
-    val state = viewModel.state.value
-    assertTrue(state.isAuthenticated)
-    assertNull(state.error)
-}
-
-// Test error handling
-@Test
-fun `login fails with invalid credentials`() = runTest {
-    // Given: Invalid credentials (mock failure)
-    // When: User attempts login
-    // Then: Error is shown
-}
-```
-
 **What to Test:**
 - User flows (login, navigation, submission)
 - ViewModel state changes (input → state)
@@ -204,30 +115,6 @@ fun `login fails with invalid credentials`() = runTest {
 - Navigation scenarios
 - Error state handling
 - Screenshot generation (optional)
-
-**Testing Pattern:**
-```swift
-func testLoginSuccess() async throws {
-    // Given: Mock service returns success
-    let mockService = MockAuthService()
-    mockService.loginResult = .success(User(id: "1", name: "Test"))
-
-    let viewModel = LoginViewModel(authService: mockService)
-
-    // When: User attempts login
-    await viewModel.login(email: "test@example.com", password: "pass")
-
-    // Then: User is authenticated
-    XCTAssertTrue(viewModel.isAuthenticated)
-    XCTAssertNil(viewModel.error)
-}
-
-func testLoginFailure() async throws {
-    // Given: Mock service returns error
-    // When: User attempts login
-    // Then: Error is displayed
-}
-```
 
 **What to Test:**
 - ViewModel state changes
@@ -265,32 +152,6 @@ func testLoginFailure() async throws {
 - Navigation between pages
 - Form submissions with API calls
 - Error recovery flows
-
-**Testing Pattern (Given-When-Then):**
-
-```
-// Test user-facing behavior with Testing Library
-describe('LoginForm', () => {
-  test('submits with valid credentials', async () => {
-    // Given: Login form is rendered
-    render(<LoginForm />)
-
-    // When: User fills form and submits
-    await userEvent.type(screen.getByLabelText('Email'), 'user@example.com')
-    await userEvent.type(screen.getByLabelText('Password'), 'password123')
-    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-
-    // Then: Success message shown
-    expect(await screen.findByText('Welcome')).toBeInTheDocument()
-  })
-
-  test('shows validation error for empty email', async () => {
-    // Given: Login form is rendered
-    // When: User submits without email
-    // Then: Validation error displayed
-  })
-})
-```
 
 **What to Test:**
 - User interactions (click, type, select)
@@ -392,59 +253,7 @@ describe('LoginForm', () => {
 
 ## Testing Checklist Template
 
-When creating a testing strategy for a PRD, include:
-
-### Unit Tests
-- [ ] [Component/Class]: [Specific test scenario]
-- [ ] [Component/Class]: [Specific test scenario]
-
-### Integration Tests
-- [ ] [Flow/Endpoint]: [End-to-end scenario]
-- [ ] [Flow/Endpoint]: [Error scenario]
-
-### UI Tests (Mobile Only)
-- [ ] [Screen/Flow]: [User interaction scenario]
-- [ ] [Screen/Flow]: [Visual regression test]
-
-### Manual Tests
-- [ ] [Critical flow]: [Step-by-step verification]
-- [ ] [Edge case]: [Manual verification needed]
-
-## Commands Reference
-
-**Discover test commands from project configuration:**
-- Check `package.json` scripts for backend
-- Check `build.gradle` tasks for Android
-- Check Xcode scheme for iOS
-
-**Common patterns:**
-- Backend: `npm test`, `yarn test`, `bun test`, `pytest`, `go test`
-- Android: `./gradlew test`, `./gradlew connectedAndroidTest`
-- iOS: `xcodebuild test -scheme YourApp`
-
-## Usage in PRD Workflow
-
-This skill is used to:
-1. Generate Testing phase in PRD Implementation section
-2. Provide test scenarios during /prdx:implement
-3. Validate test coverage during implementation
-4. Suggest additional test cases based on feature complexity
-
-## Output Format
-
-When generating a testing strategy, provide:
-
-**Test Plan:**
-- Unit tests: [List specific test files/scenarios]
-- Integration tests: [List end-to-end scenarios]
-- UI tests: [List user flows to test]
-- Manual tests: [List scenarios requiring manual verification]
-
-**Coverage Goals:**
-- [Specific coverage percentage for each layer]
-
-**Commands:**
-- [Platform-specific commands discovered from project]
-
-**Risks:**
-- [Testing challenges or areas needing extra attention]
+- [ ] Unit: [Component/Class] — [scenario]
+- [ ] Integration: [Flow/Endpoint] — [end-to-end scenario]
+- [ ] UI (mobile): [Screen/Flow] — [user interaction scenario]
+- [ ] Manual: [Critical flow] — [step-by-step verification]
