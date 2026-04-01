@@ -31,6 +31,8 @@ build/
 # Test temporary files
 tests/tmp/
 
-# PRDX - only track plans (ignore state, markers, etc.)
-.prdx/*
-!.prdx/plans/
+# PRDX state and plans
+.prdx/
+
+# Claude Code local settings
+.claude/settings.local.json
