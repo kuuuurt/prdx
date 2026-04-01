@@ -169,50 +169,143 @@ This ensures the workflow is recoverable from the very start. The slug is derive
 
 ### Step 1: Platform Detection
 
-Auto-detect ALL potential platforms from the description and codebase:
+Auto-detect ALL potential platforms from the description and codebase using an expanded heuristic scan:
 
 **1. Description keywords (track all matches):**
-- "backend", "API", "endpoint", "server" → `HAS_BACKEND`
-- "frontend", "web", "UI", "React", "Vue", "Svelte", "Next.js" → `HAS_FRONTEND`
-- "Android", "Kotlin", "Compose" → `HAS_ANDROID`
-- "iOS", "Swift", "SwiftUI" → `HAS_IOS`
-- "mobile", "app" (without platform specifics) → `HAS_ANDROID` + `HAS_IOS`
+- "backend", "API", "endpoint", "server", "REST", "GraphQL", "gRPC", "microservice" → `DETECTED_CONTEXTS` += `backend`
+- "frontend", "web", "UI", "React", "Vue", "Svelte", "Next.js", "HTML", "CSS", "browser" → `DETECTED_CONTEXTS` += `frontend`
+- "Android", "Kotlin", "Compose", "Jetpack" → `DETECTED_CONTEXTS` += `android`
+- "iOS", "Swift", "SwiftUI", "UIKit", "Xcode" → `DETECTED_CONTEXTS` += `ios`
+- "mobile", "app" (without platform specifics) → `DETECTED_CONTEXTS` += `android` + `ios`
+- "Python", "Django", "FastAPI", "Flask", "pip", "conda", "ML", "machine learning" → `DETECTED_CONTEXTS` += `python`
+- "Go", "Golang" → `DETECTED_CONTEXTS` += `go`
+- "Rust", "Cargo", "crate" → `DETECTED_CONTEXTS` += `rust`
+- "Flutter", "Dart" → `DETECTED_CONTEXTS` += `flutter`
+- "React Native", "Expo" → `DETECTED_CONTEXTS` += `react-native`
+- "Java", "Spring", "Maven", "Gradle" (without Kotlin/Android) → `DETECTED_CONTEXTS` += `java`
+- "data pipeline", "ETL", "dbt", "Airflow", "Spark", "Kafka", "warehouse" → `DETECTED_CONTEXTS` += `data`
+- "infrastructure", "Terraform", "Ansible", "Kubernetes", "k8s", "Helm", "IaC" → `DETECTED_CONTEXTS` += `infra`
+- "CLI", "command line", "terminal tool", "shell script" → `DETECTED_CONTEXTS` += `cli`
 
-**2. Directory structure:**
+**2. File system heuristics (check in project root):**
 ```bash
-if [ -d "backend" ] || [ -d "server" ] || [ -d "api" ]; then HAS_BACKEND=true; fi
-if [ -d "frontend" ] || [ -d "web" ] || [ -d "client" ]; then HAS_FRONTEND=true; fi
-if [ -d "android" ]; then HAS_ANDROID=true; fi
-if [ -d "ios" ]; then HAS_IOS=true; fi
+# Python
+[ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "setup.py" ] || ls *.py 2>/dev/null | head -1
+→ DETECTED_CONTEXTS += python
+
+# Go
+[ -f "go.mod" ]
+→ DETECTED_CONTEXTS += go
+
+# Rust
+[ -f "Cargo.toml" ]
+→ DETECTED_CONTEXTS += rust
+
+# Flutter / Dart
+[ -f "pubspec.yaml" ]
+→ DETECTED_CONTEXTS += flutter
+
+# Java / Spring (without Kotlin)
+([ -f "pom.xml" ] || [ -f "build.gradle" ]) && ! [ -f "build.gradle.kts" ]
+→ DETECTED_CONTEXTS += java
+
+# Android (Kotlin)
+[ -f "build.gradle.kts" ] || [ -d "android" ]
+→ DETECTED_CONTEXTS += android
+
+# iOS
+[ -f "Package.swift" ] || [ -d "ios" ]
+→ DETECTED_CONTEXTS += ios
+
+# React Native
+[ -f "react-native.config.js" ]
+→ DETECTED_CONTEXTS += react-native
+
+# Node.js / backend or frontend
+[ -f "package.json" ]: inspect for React/Vue/Svelte/Next → frontend; Express/Fastify/Hono/Koa/NestJS → backend
+[ -f "tsconfig.json" ] (without frontend framework) → backend
+
+# Data pipelines
+grep -r "dbt\|airflow\|spark\|kafka" requirements.txt pyproject.toml package.json 2>/dev/null
+→ DETECTED_CONTEXTS += data
+
+# Infrastructure
+[ -d "terraform" ] || [ -d "ansible" ] || ls *.tf 2>/dev/null | head -1
+→ DETECTED_CONTEXTS += infra
+
+# Dockerfile only (no other strong signal)
+[ -f "Dockerfile" ] && [ ${#DETECTED_CONTEXTS[@]} -eq 0 ]
+→ DETECTED_CONTEXTS += infra
+
+# CLI tools (Makefile present, no web/app deps)
+[ -f "Makefile" ] && [ ${#DETECTED_CONTEXTS[@]} -eq 0 ]
+→ DETECTED_CONTEXTS += cli
+
+# Directory structure fallbacks
+[ -d "backend" ] || [ -d "server" ] || [ -d "api" ] → DETECTED_CONTEXTS += backend (if not already present)
+[ -d "frontend" ] || [ -d "web" ] || [ -d "client" ] → DETECTED_CONTEXTS += frontend (if not already present)
 ```
 
-**3. Config files:**
-- `package.json` + `tsconfig.json` → `HAS_BACKEND` (or `HAS_FRONTEND` if React/Vue/etc. detected)
-- `build.gradle.kts` → `HAS_ANDROID`
-- `Package.swift` → `HAS_IOS`
+**Deduplication:** `DETECTED_CONTEXTS` is a unique list. Do not add the same context twice.
+
+**3. Branch convention detection (run before deriving branch name):**
+
+Scan existing branches to identify the dominant naming pattern:
+
+```bash
+git branch -a --format='%(refname:short)' 2>/dev/null | head -50
+```
+
+Look for prefix patterns in the results:
+- `feature/` or `feat/` → note as `PREFIX_FEAT`
+- `fix/` or `bugfix/` or `hotfix/` → note as `PREFIX_FIX`
+- `chore/` → note as `PREFIX_CHORE`
+- `refactor/` → note as `PREFIX_REFACTOR`
+- Ticket patterns like `ABC-\d+/` (e.g., `PROJ-123/some-feature`) → note as `PREFIX_TICKET`
+
+Count occurrences of each pattern. If a single pattern appears 2+ times and accounts for >50% of prefixed branches, treat it as the **dominant pattern** and use it when constructing branch names:
+- If `feature/` is dominant, use `feature/{slug}` (not `feat/{slug}`)
+- If `feat/` is dominant, use `feat/{slug}`
+- Ticket patterns: preserve the ticket prefix style but append the slug (e.g., `PROJ-{NEXT_NUMBER}/{slug}` — if no ticket number is available, fall back to conventional)
+
+If no dominant pattern is found, fall back to the conventional PRDX defaults:
+- feature → `feat/{slug}`
+- bug-fix → `fix/{slug}`
+- refactor → `refactor/{slug}`
+- spike → `chore/{slug}`
 
 **4. Multi-Platform Selection:**
 
-**If QUICK_MODE is true:** Skip multi-platform selection entirely. Auto-detect the single most relevant platform from the description (prefer the most specific match). Quick mode always targets a single platform — omit `**Platforms:**` and `**Implementation Order:**` fields.
+**If QUICK_MODE is true:** Skip multi-platform selection entirely. Auto-detect the single most relevant context from the description (prefer the most specific match). Quick mode always targets a single platform — omit `**Platforms:**` and `**Implementation Order:**` fields.
 
-If **multiple platform types detected** AND **QUICK_MODE is false** (e.g., backend + android, or android + ios):
+**If exactly one context is detected** AND **QUICK_MODE is false:** Auto-select it without asking. No AskUserQuestion needed.
 
-Use **AskUserQuestion** with `multiSelect: true` to ask which platforms this PRD should target. Only show detected platforms as options:
+**If multiple contexts detected** AND **QUICK_MODE is false:**
+
+Use **AskUserQuestion** with `multiSelect: true` to ask which platforms this PRD should target. **Only show detected contexts as options** — do not show a fixed list of 4 options:
 
 ```
 Question: "Which platforms should this PRD cover?"
 Header: "Platforms"
 multiSelect: true
-Options: [only the detected platforms from the list below]
-  - Label: "Backend"
-    Description: "API, server-side logic"
-  - Label: "Frontend"
-    Description: "Web UI"
-  - Label: "Android"
-    Description: "Android app"
-  - Label: "iOS"
-    Description: "iOS app"
+Options: [dynamically built from DETECTED_CONTEXTS only]
+  Example entries (use only what was detected):
+  - Label: "backend"      Description: "API, server-side logic"
+  - Label: "frontend"     Description: "Web UI"
+  - Label: "android"      Description: "Android app"
+  - Label: "ios"          Description: "iOS app"
+  - Label: "python"       Description: "Python service or script"
+  - Label: "go"           Description: "Go service or tool"
+  - Label: "rust"         Description: "Rust application or library"
+  - Label: "flutter"      Description: "Flutter cross-platform app"
+  - Label: "react-native" Description: "React Native mobile app"
+  - Label: "java"         Description: "Java / Spring service"
+  - Label: "data"         Description: "Data pipeline or analytics"
+  - Label: "infra"        Description: "Infrastructure / IaC"
+  - Label: "cli"          Description: "CLI tool"
 ```
+
+The `**Platform:**` field in the PRD is **free-form** — it accepts any string value, not just the 4 legacy values. Use the detected context label directly (e.g., `python`, `go`, `rust`, `flutter`, `data`, `infra`, `cli`).
 
 **5. Implementation Order (when 2+ platforms selected):**
 
@@ -308,7 +401,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 **Type:** feature | bug-fix | refactor | spike
 **Project:** {PROJECT_NAME}
-**Platform:** {DETECTED_PLATFORM}
+**Platform:** {DETECTED_PLATFORM}   ← free-form: any string (python, go, rust, flutter, data, infra, cli, etc.)
 **Status:** planning
 **Created:** {TODAY's DATE}
 **Branch:** {BRANCH_NAME}
@@ -321,7 +414,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 [What outcome do we want? Express in terms of user/business benefit.]
 
-## User Stories
+## User Stories   ← include only when the feature has identifiable end users (omit for infra, data pipelines, CLI tools, libraries)
 
 - As a [user type], I want to [action] so that [benefit]
 
@@ -330,7 +423,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 - [ ] [User-observable outcome - testable]
 - [ ] [User-observable outcome - testable]
 
-## Scope
+## Scope   ← include only when there are meaningful exclusions worth calling out (omit if scope is obvious)
 
 ### Included
 - [What this PRD covers]
@@ -342,10 +435,15 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 [High-level strategy - general direction, NOT detailed dev tasks]
 
-## Risks & Considerations
+## Risks & Considerations   ← include only when non-trivial risks or constraints exist (omit for straightforward changes)
 
 - [Technical/business risks and constraints]
 ```
+
+**Conditional section guidance:**
+- **User Stories** — include when end users interact with the feature (web/mobile/API consumers). Omit for infrastructure changes, data pipelines, internal tooling, CLI tools, and library/SDK work where there are no human end users.
+- **Scope** — include when meaningful boundaries need to be drawn or when the feature could easily be misinterpreted as covering more ground. Omit when scope is self-evident from Problem + Goal.
+- **Risks & Considerations** — include when there are real technical risks (performance, security, backwards compatibility), external dependencies, or significant unknowns. Omit for well-understood, low-risk changes.
 
 **Multi-platform (parent) template** — used when 2+ platforms are selected:
 
@@ -365,15 +463,15 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 ...
 ## Goal
 ...
-## User Stories
+## User Stories   (include if relevant — see guidance above)
 ...
 ## Acceptance Criteria
 ...
-## Scope
+## Scope   (include if relevant — see guidance above)
 ...
 ## Approach
 ...
-## Risks & Considerations
+## Risks & Considerations   (include if relevant — see guidance above)
 ...
 ```
 
@@ -384,8 +482,10 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 - **Multiple platforms (parent):** Include `**Platforms:**` and `**Implementation Order:**`. Omit `**Platform:**` and `**Branch:**`.
 
 **Branch naming convention (single-platform and child PRDs):**
-- feature → `feat/{slug}`
-- bug-fix → `fix/{slug}`
+
+Use the dominant pattern detected in Step 1 (sub-step 3) if one was found. Otherwise fall back to conventional defaults:
+- feature → `feat/{slug}` (or `feature/{slug}` if that prefix is dominant)
+- bug-fix → `fix/{slug}` (or `bugfix/{slug}` / `hotfix/{slug}` if dominant)
 - refactor → `refactor/{slug}`
 - spike → `chore/{slug}`
 
