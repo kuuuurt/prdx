@@ -199,3 +199,39 @@ load helpers/test_helper
     grep -qE 'PLANS_DIR.*PRD_SLUG.*\.md|plans/.*PRD_SLUG.*\.md' "$pre_hook"
     [ "$?" -eq 0 ]
 }
+
+@test "pre-implement hook accepts PRD with free-form platform: python" {
+    # Copy fixture with python platform value
+    copy_fixture_to_plans "platform-python" "prdx-test-python"
+
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    # Run pre-implement hook - should succeed
+    run bash -c "echo 'y' | bash $REPO_ROOT/hooks/prdx/pre-implement.sh test-python"
+
+    # Should succeed
+    [ "$status" -eq 0 ]
+
+    # Should mention validation passed
+    echo "$output" | grep -q "PRD validation passed"
+    [ "$?" -eq 0 ]
+}
+
+@test "pre-implement hook accepts PRD with free-form platform: flutter" {
+    # Copy fixture with flutter platform value
+    copy_fixture_to_plans "platform-flutter" "prdx-test-flutter"
+
+    # Point hooks at the test project root
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    # Run pre-implement hook - should succeed
+    run bash -c "echo 'y' | bash $REPO_ROOT/hooks/prdx/pre-implement.sh test-flutter"
+
+    # Should succeed
+    [ "$status" -eq 0 ]
+
+    # Should mention validation passed
+    echo "$output" | grep -q "PRD validation passed"
+    [ "$?" -eq 0 ]
+}

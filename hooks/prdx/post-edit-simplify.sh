@@ -26,7 +26,7 @@ FILE="$CLAUDE_FILE_PATH"
 
 # Skip non-source files
 case "$FILE" in
-  *.kt|*.kts|*.swift|*.ts|*.tsx|*.js|*.jsx|*.py|*.go|*.rs)
+  *.kt|*.kts|*.swift|*.ts|*.tsx|*.js|*.jsx|*.py|*.go|*.rs|*.java|*.c|*.cpp|*.cs|*.rb|*.dart|*.ex|*.exs|*.scala|*.clj|*.zig|*.php|*.r|*.R|*.lua|*.ml|*.mli)
     ;;
   *)
     exit 0

@@ -189,3 +189,44 @@ load helpers/test_helper
     run run_hook "pre-implement" "workflow-closed"
     [ "$status" -ne 0 ]
 }
+
+@test "free-form platform go does not cause pre-implement to fail" {
+    # Create a PRD with go platform value
+    copy_fixture_to_plans "valid-prd" "prdx-workflow-go"
+
+    HOME="$TEST_TEMP_DIR"
+
+    local prd_file="$TEST_PLANS_DIR/prdx-workflow-go.md"
+
+    # Swap the platform to go
+    sed -i.bak 's/^\*\*Platform:\*\* .*/\*\*Platform:\*\* go/' "$prd_file"
+
+    # Pre-implement should accept any platform string
+    run bash -c "echo 'y' | bash $REPO_ROOT/hooks/prdx/pre-implement.sh workflow-go"
+    [ "$status" -eq 0 ]
+
+    # Should mention validation passed
+    echo "$output" | grep -q "PRD validation passed"
+    [ "$?" -eq 0 ]
+}
+
+@test "status workflow planning to review works with free-form platform" {
+    # Copy fixture with python platform value
+    copy_fixture_to_plans "platform-python" "prdx-workflow-python-status"
+
+    HOME="$TEST_TEMP_DIR"
+
+    local prd_file="$TEST_PLANS_DIR/prdx-workflow-python-status.md"
+
+    # Initial status should be planning
+    local initial_status=$(get_prd_status "$prd_file")
+    [ "$initial_status" = "planning" ]
+
+    # Run post-implement hook - status should transition to review
+    run run_hook "post-implement" "workflow-python-status"
+    [ "$status" -eq 0 ]
+
+    # Status should now be review
+    local new_status=$(get_prd_status "$prd_file")
+    [ "$new_status" = "review" ]
+}

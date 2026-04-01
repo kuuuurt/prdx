@@ -37,9 +37,7 @@
               "description": "Co-author email",
               "default": "noreply@anthropic.com"
             }
-          },
-          "required": ["enabled"],
-          "additionalProperties": false
+          }
         },
         "extendedDescription": {
           "type": "object",
@@ -55,9 +53,7 @@
               "description": "Include Claude Code generation link in commit message",
               "default": true
             }
-          },
-          "required": ["enabled"],
-          "additionalProperties": false
+          }
         },
         "format": {
           "type": "string",
@@ -65,9 +61,7 @@
           "enum": ["conventional", "simple"],
           "default": "conventional"
         }
-      },
-      "required": ["coAuthor", "extendedDescription", "format"],
-      "additionalProperties": false
+      }
     },
     "pullRequest": {
       "type": "object",
@@ -83,10 +77,8 @@
           "description": "Automatically assign PR to current user",
           "default": true
         }
-      },
-      "additionalProperties": false
+      }
     }
   },
-  "required": ["version", "commits"],
   "additionalProperties": false
 }

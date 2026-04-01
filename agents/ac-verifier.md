@@ -24,6 +24,8 @@ If a `Platform:` field is provided in the prompt, read platform-specific context
 1. Read `.claude/skills/impl-patterns.md` — focus on the section for the specified platform
 2. Read `.claude/skills/prd-review.md` — focus on the platform-specific review patterns section
 
+**Graceful handling:** Before reading each skill file, check if it exists. If a file is not found, emit: "Skills file not found: {path} — continuing without it" and proceed using built-in knowledge. Do NOT fail or halt if skill files are absent.
+
 Use these to inform what counts as adequate test coverage for the platform.
 
 ### 1. Gather Context
