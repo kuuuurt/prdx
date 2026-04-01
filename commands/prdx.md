@@ -66,7 +66,7 @@ If the file DOES exist, skip this step entirely and proceed with the gitignore c
 
 ```bash
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/' "$GITIGNORE"; then
+if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.prdx/*' "$GITIGNORE"; }; then
   echo '' >> "$GITIGNORE"
   echo '# PRDX' >> "$GITIGNORE"
   echo '.prdx/' >> "$GITIGNORE"
@@ -653,6 +653,11 @@ PR: #{PR_NUMBER}
 **Fix Iteration Path (PR already exists):**
 
 This runs when `@claude implement` is triggered and a PR already exists for the branch — the user wants to apply fixes.
+
+0. **Resolve repo:**
+   ```bash
+   REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+   ```
 
 1. **Check out the existing branch:**
    ```bash

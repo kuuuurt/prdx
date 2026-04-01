@@ -122,7 +122,7 @@ echo "local" > .prdx/plans-setup-done
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/' "$GITIGNORE"; then
+if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.prdx/*' "$GITIGNORE"; }; then
   echo '' >> "$GITIGNORE"
   echo '# PRDX' >> "$GITIGNORE"
   echo '.prdx/' >> "$GITIGNORE"

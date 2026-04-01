@@ -133,7 +133,7 @@ if [ -n "$(git status --porcelain)" ]; then
 fi
 
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/' "$GITIGNORE"; then
+if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.prdx/*' "$GITIGNORE"; }; then
   echo '' >> "$GITIGNORE"
   echo '# PRDX' >> "$GITIGNORE"
   echo '.prdx/' >> "$GITIGNORE"

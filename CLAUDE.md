@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document) workflow leveraging Claude Code's **native plan mode**. Plans are saved to `.prdx/plans/` inside the project root and serve as the single source of truth for feature development.
+PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document) workflow leveraging Claude Code's **native plan mode**. Plans are saved locally to `.prdx/plans/` as a working copy; in CI mode the authoritative PRD is stored as a GitHub issue comment.
 
 ## Core Philosophy
 
@@ -53,7 +53,7 @@ Use this pattern for `.gitignore` updates:
 
 ```bash
 GITIGNORE="$PROJECT_ROOT/.gitignore"
-if [ ! -f "$GITIGNORE" ] || ! grep -qxF '.prdx/' "$GITIGNORE"; then
+if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.prdx/*' "$GITIGNORE"; }; then
   echo '' >> "$GITIGNORE"
   echo '# PRDX' >> "$GITIGNORE"
   echo '.prdx/' >> "$GITIGNORE"
