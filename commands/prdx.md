@@ -495,9 +495,9 @@ Comment `@claude implement` when ready, or `@claude revise` with more feedback.
 
 ### Step 3-CI: Implement Path (CI Mode)
 
-**This step runs ONLY when `CI_MODE=true` and `PLAN_ONLY=false`.** It reads an existing PRD from the branch and implements it.
+**This step runs ONLY when `CI_MODE=true` and `PLAN_ONLY=false`.** It reads the PRD from an issue comment and implements it, creating a new branch and PR. If a PR already exists for the branch, it applies fixes to the existing branch instead.
 
-**3-CI.1: Derive slug and check for existing PRD:**
+**3-CI.1: Derive slug and detect platform:**
 
 Derive `{SLUG}` from `ISSUE_TITLE` by extracting the core concept (2-4 words max, same logic as 2-CI.1).
 
@@ -507,52 +507,73 @@ Determine branch name:
 BRANCH="{TYPE_PREFIX}/{SLUG}"
 ```
 
-**Check that the branch exists:**
+Detect platform from codebase (same logic as 2-CI.1).
+
+Detect project name:
 ```bash
-git fetch origin "$BRANCH" 2>/dev/null
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+PROJECT_NAME=$(echo "$REPO" | cut -d'/' -f2)
 ```
 
-If the branch does NOT exist, error:
-```
-No PRD found for issue #{ISSUE_NUMBER}.
+**3-CI.2: Find PRD from issue comment:**
 
-Branch {BRANCH} does not exist. Run with --plan-only first:
-  /prdx:prdx --ci --issue {ISSUE_NUMBER} --plan-only
-```
-
-**Check out the existing branch:**
 ```bash
-git checkout "$BRANCH"
-git pull origin "$BRANCH"
+PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
+PRD_BODY=$(echo "$PRD_COMMENT" | jq -r '.body' 2>/dev/null)
+PRD_COMMENT_ID=$(echo "$PRD_COMMENT" | jq -r '.databaseId // .id' 2>/dev/null)
 ```
 
-**Verify PRD file exists:**
+**If a PRD comment was found:** Check whether a PR already exists for this branch:
 ```bash
-ls {PLANS_DIR}/prdx-{SLUG}.md
+PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
+```
+- If `PR_NUMBER` is non-empty → this is a **fix iteration** (PR already exists). Jump to the fix iteration path below.
+- If `PR_NUMBER` is empty → this is a **fresh implementation**. Continue to 3-CI.2b.
+
+**If no PRD comment was found:** Check if this is an `@claude implement` on a PR:
+```bash
+PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
+```
+- If `PR_NUMBER` is non-empty → PR exists, find the linked issue from the PR body (`Closes #N` pattern) and fetch the PRD comment from that issue.
+- If `PR_NUMBER` is empty → error:
+  ```
+  No PRD found for issue #{ISSUE_NUMBER}.
+  Run `@claude plan` first to generate a PRD.
+  ```
+
+**3-CI.2b: Post progress comment on issue:**
+
+```bash
+RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+PROGRESS_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "> Implementing... 🔨
+>
+> [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
 ```
 
-If the PRD file does not exist, error:
+Store `PROGRESS_COMMENT_ID` for editing when done.
+
+**3-CI.3: Write PRD locally and set up branch:**
+
+Write the PRD to the local plans directory (this path is gitignored — it will NOT appear in any commit or PR diff):
+```bash
+mkdir -p "$PLANS_DIR"
+echo "$PRD_BODY" | sed 's/<!-- prdx-prd -->//' > "$PLANS_DIR/prdx-${SLUG}.md"
 ```
-Branch {BRANCH} exists but no PRD file found at .prdx/plans/prdx-{SLUG}.md.
 
-Run with --plan-only first to generate the PRD:
-  /prdx:prdx --ci --issue {ISSUE_NUMBER} --plan-only
+Create the feature branch:
+```bash
+git checkout -b "$BRANCH"
 ```
 
-**3-CI.2: Implement:**
+**3-CI.4: Run implement:**
 
-Update state file:
+Write state file and run the implementation pipeline:
 ```bash
 mkdir -p .prdx/state
-cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "implementing", "quick": false}
+cat > .prdx/state/${SLUG}.json << EOF
+{"slug": "${SLUG}", "phase": "implementing", "quick": false}
 EOF
-```
 
-Run `/prdx:implement {SLUG}` — this invokes the full implementation pipeline (dev-planner → platform agent → ac-verifier → code-reviewer) non-interactively. The `CI=true` env var must be set in the runner environment (GitHub Actions sets this automatically) so that `pre-implement.sh` auto-answers prompts.
-
-**Ensure `CI=true` is set** before invoking implement:
-```bash
 export CI=true
 ```
 
@@ -562,67 +583,123 @@ export CI=true
 
 Wait for implementation to complete.
 
-**3-CI.3: Push implementation:**
+**3-CI.5: Push and create PR:**
 
-After implementation completes, push the implementation commits:
+After implementation completes, push the branch:
 ```bash
-git push origin "$BRANCH"
+git push -u origin "$BRANCH"
 ```
 
-**3-CI.4: Update state and display completion:**
-
+Determine the default base branch:
 ```bash
-mkdir -p .prdx/state
-cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "review", "quick": false}
-EOF
-```
-
-**3-CI.4b: Update PR body with implementation:**
-
-```bash
-PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
 DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
 ```
 
-If PR exists, invoke `prdx:pr-author` agent to update:
+Invoke `prdx:pr-author` agent to create a real (non-draft) PR:
 
 ```
 subagent_type: "prdx:pr-author"
 
-prompt: "Update the PR body for a completed implementation.
+prompt: "Create a PR for a completed CI implementation.
 
 Mode: prd
 CI: true
-PR Number: {PR_NUMBER}
 PRD Slug: {SLUG}
 PRD File: {PLANS_DIR}/prdx-{SLUG}.md
 Branch: {BRANCH}
 Base Branch: {DEFAULT_BRANCH}
 Issue: {ISSUE_NUMBER}
 
-Read the PRD (now including Implementation Notes), analyze commits on this branch, and update the PR title and body with full implementation details. Use gh pr edit to update the existing PR.
+Analyze commits on this branch and create a PR with a clear title and body.
+Include 'Closes #{ISSUE_NUMBER}' in the body.
 The footer should say: 'Comment `@claude review` for code review.'
+Create a real (non-draft) PR using gh pr create.
 
-Return confirmation of the update."
+Return the PR number."
 ```
 
-Mark PR as ready and add requester as reviewer:
+After PR creation, add the requestor as reviewer:
 ```bash
-gh pr ready "$PR_NUMBER" 2>/dev/null || true
 if [ -n "$REQUESTOR" ]; then
   gh pr edit "$PR_NUMBER" --add-reviewer "$REQUESTOR" 2>/dev/null || true
 fi
+```
+
+**3-CI.6: Update progress comment and complete:**
+
+Edit the progress comment:
+```bash
+gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="Implementation complete. PR #${PR_NUMBER} created. Comment \`@claude review\` for code review."
+```
+
+Update state file:
+```bash
+cat > .prdx/state/${SLUG}.json << EOF
+{"slug": "${SLUG}", "phase": "review", "quick": false, "pr_number": ${PR_NUMBER}}
+EOF
 ```
 
 Display:
 ```
 CI Implementation Complete!
 
-PRD: {PLANS_DIR}/prdx-{SLUG}.md
-Branch: {BRANCH}
 Issue: #{ISSUE_NUMBER}
-PR: #{PR_NUMBER} (body updated with implementation details)
+Branch: {BRANCH}
+PR: #{PR_NUMBER}
+```
+
+---
+
+**Fix Iteration Path (PR already exists):**
+
+This runs when `@claude implement` is triggered and a PR already exists for the branch — the user wants to apply fixes.
+
+1. **Check out the existing branch:**
+   ```bash
+   git fetch origin "$BRANCH"
+   git checkout "$BRANCH"
+   git pull origin "$BRANCH"
+   ```
+
+2. **Read PRD from issue comment** (already fetched in 3-CI.2 — `PRD_BODY` is available). Write it locally:
+   ```bash
+   mkdir -p "$PLANS_DIR"
+   echo "$PRD_BODY" | sed 's/<!-- prdx-prd -->//' > "$PLANS_DIR/prdx-${SLUG}.md"
+   ```
+
+3. **Post progress comment on issue:**
+   ```bash
+   RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
+   PROGRESS_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "> Applying fixes... 🔨
+   >
+   > [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
+   ```
+
+4. **Run implement** to apply fixes:
+   ```bash
+   export CI=true
+   ```
+   ```
+   /prdx:implement {SLUG}
+   ```
+
+5. **Push fixes:**
+   ```bash
+   git push origin "$BRANCH"
+   ```
+
+6. **Update progress comment:**
+   ```bash
+   gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="Fixes applied to PR #${PR_NUMBER}. Comment \`@claude review\` for another code review."
+   ```
+
+Display:
+```
+CI Fix Iteration Complete!
+
+Issue: #{ISSUE_NUMBER}
+Branch: {BRANCH}
+PR: #{PR_NUMBER} (fixes pushed)
 ```
 
 ---
