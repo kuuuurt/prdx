@@ -217,60 +217,7 @@ The commit author is already the requestor via exported env vars. Override co-au
 ```
 This replaces the normal `coAuthor` config — in CI mode, the requestor is the author and Claude Code + GitHub Actions are always co-authors. The `includeClaudeCodeLink` and `extendedDescription` settings from prdx.json config are still respected.
 
-**Add an example commit** showing the exact format based on config.
-
-**Example with all options ENABLED (conventional format):**
-
-```
-   **Example commit (FOLLOW THIS FORMAT EXACTLY):**
-
-   ```bash
-   git commit -m "$(cat <<'EOF'
-   feat: add user authentication
-
-   Implement JWT-based authentication with login and refresh endpoints.
-   Includes middleware for protected routes.
-
-   🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-   Co-Authored-By: Claude <noreply@anthropic.com>
-   EOF
-   )"
-   ```
-```
-
-**Example with extendedDescription DISABLED (conventional format):**
-
-```
-   **Example commit (FOLLOW THIS FORMAT EXACTLY):**
-
-   ```bash
-   git commit -m "$(cat <<'EOF'
-   feat: add user authentication
-   EOF
-   )"
-   ```
-
-   NOTE: When extendedDescription is disabled, the commit is ONLY the subject line.
-   Do NOT add any description paragraph.
-```
-
-**Example with extendedDescription DISABLED but coAuthor ENABLED:**
-
-```
-   **Example commit (FOLLOW THIS FORMAT EXACTLY):**
-
-   ```bash
-   git commit -m "$(cat <<'EOF'
-   feat: add user authentication
-
-   Co-Authored-By: Claude <noreply@anthropic.com>
-   EOF
-   )"
-   ```
-
-   NOTE: Only trailers (Co-Authored-By) appear, NO description paragraph.
-```
+**Add ONE example commit** showing the exact format for the resolved config. Build the example dynamically — include only the lines that apply to the current config (format, extendedDescription, coAuthor, includeClaudeCodeLink). Do NOT show multiple variant examples. One example matching the actual config is clearer and saves tokens.
 
 **Store the result as `COMMIT_INSTRUCTIONS`.** This will be passed to all platform agent invocations.
 
@@ -597,9 +544,9 @@ Platform hint: {PLATFORM_FROM_PRD}
 **Acceptance Criteria:**
 {ACCEPTANCE_CRITERIA from PRD}
 
-## Full Dev Plan (for reference)
+## Dev Plan Context
 
-{FULL_DEV_PLAN from Step 5a}
+{ARCHITECTURE_AND_FILES_SECTIONS from dev plan — extract only the ### Architecture and ### Files sections, not the full plan}
 
 ## Completed Phases
 
