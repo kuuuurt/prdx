@@ -5,194 +5,84 @@ argument-hint: ""
 
 # /prdx:cleanup - Clean Up Merged PRD Plans
 
-> Scans for completed workflows (merged/closed PRs), captures lessons learned, deletes PRD plan files and state files.
-> Designed to run as a scheduled CI job but can also be run locally.
+> Scans pushed-phase state files, captures lessons from merged PRs into CLAUDE.md, deletes PRD + state files. Runs as scheduled CI job or locally.
 
 ## Workflow
 
-### Step 1: Resolve Plans Directory
+### Resolve Plans Directory
 
 ```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-CONFIG_FILE=""
-SEARCH_DIR="$PROJECT_ROOT"
-while [ "$SEARCH_DIR" != "/" ]; do
-  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
-  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
-  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
-done
-PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
-PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
 ```
 
-### Step 2: Scan for Pushed-Phase State Files
+### Scan & Filter
 
 ```bash
-if [ -d .prdx/state ]; then
-  for f in .prdx/state/*.json; do
-    [ -f "$f" ] || continue
-    # process each file in steps 3-8 below
-  done
-fi
+ls .prdx/state/*.json 2>/dev/null
 ```
 
-If no state files exist or directory is absent, display "No PRDs to clean up." and stop.
+If none exist, display `No PRDs to clean up.` and stop.
 
-### Step 3: Filter to Pushed Phase
+For each state file where `phase == "pushed"`:
 
-For each state file, read it and check if `phase` is `"pushed"`:
-```bash
-cat .prdx/state/{file}.json
-```
-If `phase` is not `"pushed"`, skip this file.
+1. Check PR status: `gh pr view {pr_number} --json state --jq '.state'`
+   - `MERGED` → capture lessons (below), then clean up
+   - `CLOSED` → skip to clean up (no lessons for unmerged PRs)
+   - Other → skip file (PR still open)
 
-### Step 4: Check PR Status
+### Capture Lessons (Merged PRs Only)
 
-```bash
-gh pr view {pr_number} --json state --jq '.state' 2>/dev/null
-```
+Display: `Capturing lessons from merged PR #{pr_number} ({slug})...`
 
-- If `"MERGED"` → proceed with lesson capture (steps 5-7), then cleanup (step 8)
-- If `"CLOSED"` → skip to cleanup (step 8) — no lessons for unmerged PRs
-- Otherwise → skip this file (PR still open, leave for next run)
+**Gather sources:**
+- PRD file: `{PLANS_DIR}/prdx-{slug}.md` (extract title, platform, `## Implementation Notes`)
+- PR body: `gh pr view {pr_number} --json body --jq '.body'`
+- Inline review comments: `gh api "repos/{OWNER}/{REPO}/pulls/{pr_number}/comments" --jq '[.[] | "[\(.path):\(.line // .position)] \(.body)"] | join("\n---\n")'`
+- PR review bodies: `gh pr view {pr_number} --json reviews --jq '[.reviews[] | .body | select(length > 0)] | join("\n---\n")'`
 
-### Step 5: Gather Lesson Sources (Merged PRs Only)
-
-Display:
-```
-Capturing lessons from merged PR #{pr_number} ({slug})...
-```
-
-a. Read the PRD file to extract title, platform, and `## Implementation Notes` section(s):
-```bash
-cat {PLANS_DIR}/prdx-{slug}.md
-```
-(For quick-mode slugs: `{PLANS_DIR}/prdx-{slug}.md` — the `quick-` prefix is part of the slug itself)
-
-b. Fetch PR body:
-```bash
-gh pr view {pr_number} --json body --jq '.body' 2>/dev/null
-```
-
-c. Fetch PR review comments (inline code review comments):
-```bash
-REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-gh api "repos/$REPO/pulls/{pr_number}/comments" --jq '[.[] | "[\(.path):\(.line // .position)] \(.body)"] | join("\n---\n")' 2>/dev/null
-```
-
-d. Fetch PR-level review bodies:
-```bash
-gh pr view {pr_number} --json reviews --jq '[.reviews[] | .body | select(length > 0)] | join("\n---\n")' 2>/dev/null
-```
-
-### Step 6: Extract Learnings (Merged PRs Only)
+**Extract via agent:**
 
 ```
 subagent_type: "general-purpose"
 
-prompt: "Extract ONLY repository-wide learnings from this completed PRD.
+prompt: "Extract repo-wide learnings from this completed PRD. Only include insights applicable to ANY future feature — skip PR-specific observations.
 
-Platform: {PLATFORM}
-Title: {TITLE}
+Platform: {PLATFORM} | Title: {TITLE}
 
-Implementation Notes:
-{IMPLEMENTATION_NOTES from PRD}
+Implementation Notes: {NOTES}
+PR Description: {PR_BODY}
+Review Comments: {COMMENTS}
 
-PR Description:
-{PR_BODY}
-
-PR Review Comments:
-{PR_REVIEW_COMMENTS}
-
-PR Review Bodies:
-{PR_REVIEW_BODIES}
-
-IMPORTANT: Only extract learnings that are broadly applicable to the ENTIRE repository — patterns, conventions, or insights that would help ANY future feature in this codebase. Do NOT include learnings that are specific to this particular PR, feature, or task. Skip observations that only matter for this one change.
-
-Extract concise learnings (1-5 bullet points total, fewer is better). Prioritize DO NOT DO entries — anti-patterns, mistakes, and things to avoid are the most valuable learnings. Use these categories:
-
-**Do NOT:** What mistakes, anti-patterns, or approaches should be avoided repo-wide? (highest priority — always check for these first)
-**Patterns:** What reusable patterns or conventions were established that apply repo-wide?
-**Challenges & Solutions:** What problems came up that could recur in unrelated features?
-
-If no learnings are broadly applicable to the repository, respond with exactly: NO_LEARNINGS
-
-Format your response as markdown bullet points, grouped by category. Only include categories that have learnings. Each bullet should be one line, starting with a dash.
-
-Keep entries specific and actionable. Skip generic observations and anything specific to this PR's feature."
+Return 1-5 flat bullet points (fewer is better). Prioritize anti-patterns and 'don't do X' entries. No category headers. If nothing is broadly applicable, respond: NO_LEARNINGS"
 ```
 
-### Step 7: Append Learnings to CLAUDE.md (Merged PRs Only)
+**Append to CLAUDE.md** (skip if `NO_LEARNINGS`):
 
-If the agent responded with `NO_LEARNINGS`, skip this step entirely and go to step 8.
+- If no `## Lessons Learned` section exists, append one
+- Add entry under it:
+  ```markdown
+  ### {TITLE} ({DATE}) - {PLATFORM}
+  - {bullet}
+  - {bullet}
+  ```
+- If section exceeds ~200 lines, trim oldest `###` subsections
 
-Read the project's `CLAUDE.md` (in the repository root).
+**Commit:** `git add CLAUDE.md && git commit -m "chore: update lessons learned from {SLUG}"`
 
-- If `CLAUDE.md` doesn't exist, create it with just the `## Lessons Learned` section
-- If `CLAUDE.md` exists but has no `## Lessons Learned` section, append the section at the end of the file
-- If the section already exists, append the new entry under it
+### Clean Up
 
-Use Edit tool to append the entry:
-
-```markdown
-### {TITLE} ({DATE}) - {PLATFORM}
-{EXTRACTED_LEARNINGS}
-```
-
-If the `## Lessons Learned` section exceeds ~200 lines, trim the oldest entries (remove earliest `###` subsections) to stay under the limit.
-
-**Commit the CLAUDE.md update:**
+Delete PRD and state file:
 ```bash
-git add CLAUDE.md
-git commit -m "chore: update lessons learned from {SLUG}"
+rm -f "{PLANS_DIR}/prdx-{slug}.md" ".prdx/state/{slug}.json"
+git add -A .prdx/ "{PLANS_DIR}/" && git commit -m "chore: clean up PRD for {SLUG}"
 ```
 
-### Step 8: Clean Up PRD and State File
+Display per PR:
+- Merged: `Cleaned up "{TITLE}" — lessons captured in CLAUDE.md`
+- Closed: `Cleaned up "{TITLE}" — PR closed without merge, no lessons captured`
 
-Delete the PRD plan file (both quick and normal mode — git history is the archive):
-```bash
-rm -f {PLANS_DIR}/prdx-{slug}.md
-```
+### Push
 
-Delete the state file:
-```bash
-rm -f .prdx/state/{slug}.json
-```
+After all files processed, push if any commits were made: `git push`
 
-**Commit the cleanup:**
-```bash
-git add -A .prdx/
-git add -A {PLANS_DIR}/
-git commit -m "chore: clean up PRD for {SLUG}"
-```
-
-### Step 9: Display Confirmation
-
-For merged PRs:
-```
-Cleaned up "{TITLE}" — lessons captured in CLAUDE.md
-```
-
-For closed PRs:
-```
-Cleaned up "{TITLE}" — PR was closed without merge, no lessons captured
-```
-
-### Step 10: Push Changes
-
-**Process all pushed-phase state files sequentially** (one at a time, not in parallel).
-
-After all files are processed, push if any commits were made:
-```bash
-git push
-```
-
-Display summary:
-```
-Cleanup complete: {N} PRD(s) processed ({M} merged with lessons, {K} closed)
-```
-
-If no PRDs were processed:
-```
-No merged or closed PRDs to clean up.
-```
+Display: `Cleanup complete: {N} PRD(s) processed ({M} merged with lessons, {K} closed)`

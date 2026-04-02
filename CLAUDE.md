@@ -94,25 +94,13 @@ Commands: thin wrappers, delegate to agents/bash, use hooks + native tools. Agen
 ## Lessons Learned
 
 ### Split Code Reviewer into AC Verifier + 2-Pass Code Review (2026-03-18) - backend
-
-**Patterns:**
-- Splitting a monolithic agent into two focused single-responsibility agents (ac-verifier + code-reviewer) improves coverage and clarity
-- Sequential phases (AC verification first, then code quality) ensure ACs are met before quality polish
-
-**Challenges & Solutions:**
-- AC fix loops needed a cap (3 attempts) to prevent infinite cycling — escalate to user after exhaustion
+- Split monolithic agents into focused single-responsibility agents (ac-verifier + code-reviewer) for better coverage
+- Run AC verification before code quality — ensure correctness first, then polish
+- Cap fix loops (3 attempts) to prevent infinite cycling — escalate to user after exhaustion
 
 ### CI Mode for PRDX (2026-03-18, updated 2026-04-01) - backend
-
-**Patterns:**
 - `--issue` + `--ci` composable flags for flexible interactive/non-interactive use
 - `prdx:code-explorer` + Write tool replaces plan mode in non-interactive CI contexts
 - `CI=true` env var (standard across providers) cleanly bypasses interactive hook prompts
-- PRDs as issue comments (with `<!-- prdx-prd -->` marker) avoids polluting git history
-- PRDX owns full CI lifecycle: plan (issue comment) → implement (branch + PR)
-- `pr-author` handles both `gh pr create` and `gh pr edit` for consistent titles/bodies
-- `--requested-by` sets git author to requestor; Claude Code + github-actions[bot] as co-authors
-- After `@claude plan`, requester added as assignee; after `@claude implement`, PR marked ready + requester added as reviewer
-
-**Deviations from Plan:**
-- CI flow needed to skip plans-directory setup prompt — solved with `.prdx/plans-setup-done` marker
+- PRDs as issue comments (`<!-- prdx-prd -->` marker) avoids polluting git history
+- CI flow needed `.prdx/plans-setup-done` marker to skip interactive plans-directory setup prompt
