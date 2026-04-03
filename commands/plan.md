@@ -20,7 +20,12 @@ git branch -a --format='%(refname:short)' 2>/dev/null | head -50
 
 # /prdx:plan - Create Product Requirements Document
 
-Uses Claude's **native plan mode** to explore the codebase and create a business-focused PRD. This command ONLY creates a PRD document — no code, branches, tests, or commits.
+Uses Claude's **native plan mode** to explore the codebase and create a business-focused PRD.
+
+**⛔ SCOPE BOUNDARY: This command ONLY creates a PRD document. It does NOT implement anything.**
+- Do NOT write application code (no Edit/Write on source files)
+- Do NOT create branches, run tests, or make commits
+- The ONLY files you create/edit are PRD files in `{PLANS_DIR}/` and state files in `.prdx/`
 
 ## Exploration Rules
 
