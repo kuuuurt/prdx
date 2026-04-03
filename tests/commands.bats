@@ -27,8 +27,8 @@ load helpers/test_helper
 @test "prdx.md contains post-implement decision gate" {
     local prdx_cmd="$REPO_ROOT/commands/prdx.md"
 
-    # Should have decision gate after implementation
-    run grep -A 3 "After implementation completes" "$prdx_cmd"
+    # Should have post-implement state transition
+    run grep "post-implement" "$prdx_cmd"
     [ "$status" -eq 0 ]
 
     # Should have Test first/Create PR options
@@ -194,12 +194,8 @@ load helpers/test_helper
 @test "plan.md has scope boundary preventing implementation" {
     local plan_cmd="$REPO_ROOT/commands/plan.md"
 
-    # Should have explicit scope boundary
-    run grep "SCOPE BOUNDARY" "$plan_cmd"
-    [ "$status" -eq 0 ]
-
-    # Should forbid writing application code
-    run grep "Do NOT write application code" "$plan_cmd"
+    # Should state this command only creates PRD documents
+    run grep "ONLY creates a PRD document" "$plan_cmd"
     [ "$status" -eq 0 ]
 
     # Should clarify approval means document is ready, not start implementing

@@ -214,7 +214,7 @@ Wait for implementation to complete, then proceed to review decision.
 
 Write state: `{"slug": "{SLUG}", "phase": "post-implement", "quick": {QUICK_MODE}}`
 
-**After implementation completes — STOP and use AskUserQuestion:**
+**STOP and use AskUserQuestion:**
 
 Do NOT proceed to create PR automatically. The user must test first.
 
