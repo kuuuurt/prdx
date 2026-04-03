@@ -3,118 +3,29 @@ description: "Create PRD using native plan mode"
 argument-hint: "[--quick] [description]"
 ---
 
+## Pre-Computed Context
+
+```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
+echo "PLANS_DIR=$PLANS_DIR"
+echo "PROJECT_ROOT=$PROJECT_ROOT"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/ensure-gitignore.sh"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/first-run-setup.sh"
+echo "FIRST_RUN=$FIRST_RUN"
+echo "Branch: $(git branch --show-current)"
+PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+echo "PROJECT_NAME=$PROJECT_NAME"
+git branch -a --format='%(refname:short)' 2>/dev/null | head -50
+```
+
 # /prdx:plan - Create Product Requirements Document
 
-Uses Claude's **native plan mode** to explore the codebase and create a business-focused PRD.
+Uses Claude's **native plan mode** to explore the codebase and create a business-focused PRD. This command ONLY creates a PRD document — no code, branches, tests, or commits.
 
-## Philosophy
+## Exploration Rules
 
-The plan phase is about **recon, planning, and feasibility**:
-- What problem are we solving?
-- Who benefits and how?
-- Is this feasible? What are the risks?
-- What's the general approach? (high-level, not detailed dev tasks)
-
-Detailed implementation planning is done in `/prdx:implement` using the dev-planner agent.
-
-**⛔ SCOPE BOUNDARY: This command ONLY creates a PRD document. It does NOT implement anything.**
-- Do NOT write application code (no Edit/Write on source files)
-- Do NOT create branches, run tests, or make commits
-- Do NOT call `/prdx:implement` or platform agents
-- The ONLY files you create/edit are PRD files in `{PLANS_DIR}/` and state files in `.prdx/`
-- When the user approves the plan, you call ExitPlanMode → verify file → show decision point → STOP
-
-## Usage
-
-```bash
-/prdx:plan "add biometric authentication to Android app"
-/prdx:plan "fix user login failures on slow networks"
-/prdx:plan "improve checkout conversion rate"
-
-# Quick mode — lightweight template, ephemeral PRD
-/prdx:plan --quick "fix login validation"
-/prdx:plan --quick "address PR review comments on auth"
-```
-
-## MANDATORY: Use Isolated Exploration Agents
-
-> **DO NOT use Glob, Grep, Read, or the built-in `Explore` subagent for codebase exploration.**
-> **DO NOT use `subagent_type: "Explore"` - this is FORBIDDEN.**
->
-> Instead, ALWAYS use these PRDX agents via the Task tool:
-> - `subagent_type: "prdx:code-explorer"` — for understanding code, patterns, architecture
-> - `subagent_type: "prdx:docs-explorer"` — for looking up library/API documentation
->
-> These run in isolated context and return concise summaries, keeping the planning context clean.
-> Launch multiple agents in parallel when possible.
-
-## How It Works
-
-This command enters **native plan mode** to:
-1. Detect platform from description/codebase
-2. Explore codebase using `prdx:code-explorer` agent (NOT `Explore`, NOT direct Glob/Grep/Read)
-3. Create PRD using the PRDX template format
-4. Iterate with user until approval
-5. Plan auto-saved to `{PLANS_DIR}/`
-
-## Workflow
-
-### Resolve Plans Directory
-
-Read the configured plans directory from `prdx.json`, falling back to `.prdx/plans` if not set:
-
-```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-CONFIG_FILE=""
-SEARCH_DIR="$PROJECT_ROOT"
-while [ "$SEARCH_DIR" != "/" ]; do
-  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
-  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
-  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
-done
-PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
-PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
-```
-
-**Use `$PLANS_DIR` throughout this command.**
-
-### Plans Directory Setup (First Run Only)
-
-Check if plans directory has been configured:
-
-```bash
-ls .prdx/plans-setup-done 2>/dev/null
-```
-
-If the file does NOT exist (first PRDX run in this project):
-
-1. Auto-configure project-local plans (no user prompt):
-   ```bash
-   PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-   mkdir -p .claude .prdx "$PLANS_DIR"
-   # Merge plansDirectory into settings.local.json (preserve existing keys)
-   if [ -f .claude/settings.local.json ]; then
-     jq --arg dir "$PLANS_SUBDIR" '. + {plansDirectory: $dir}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
-   else
-     echo "{\"plansDirectory\": \"$PLANS_SUBDIR\"}" > .claude/settings.local.json
-   fi
-   echo "local" > .prdx/plans-setup-done
-   ```
-
-If the file DOES exist, skip this step entirely.
-
-### Gitignore Check (Every Run)
-
-Ensure `.prdx/` is fully ignored:
-
-```bash
-GITIGNORE="$PROJECT_ROOT/.gitignore"
-if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.prdx/*' "$GITIGNORE"; }; then
-  echo '' >> "$GITIGNORE"
-  echo '# PRDX' >> "$GITIGNORE"
-  echo '.prdx/' >> "$GITIGNORE"
-fi
-```
+> ALWAYS use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool for exploration.
+> NEVER use Glob, Grep, Read, or `subagent_type: "Explore"` directly.
 
 ### Step 0: Parse Flags, Detect Project, and Derive Slug
 

@@ -816,22 +816,10 @@ fi
 Manage the plans directory preference for the current project.
 
 ```bash
-# Determine project root and settings file
-PROJECT_ROOT="${PRDX_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+# Source shared resolution scripts
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
+CONFIGURED_PLANS_DIR="$PLANS_DIR"
 SETTINGS_FILE="$PROJECT_ROOT/.claude/settings.local.json"
-
-# Resolve CONFIG_FILE using canonical walk-up resolution
-CONFIG_FILE=""
-SEARCH_DIR="$PROJECT_ROOT"
-while [ "$SEARCH_DIR" != "/" ]; do
-  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
-  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
-  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
-done
-
-# Read configured plansDirectory (defaults to .prdx/plans)
-PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
-CONFIGURED_PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
 
 # Ensure .claude directory exists
 mkdir -p "$PROJECT_ROOT/.claude"

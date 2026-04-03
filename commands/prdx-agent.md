@@ -6,39 +6,16 @@ argument-hint: "[--quick] [feature description or PRD slug]"
 ## Pre-Computed Context
 
 ```bash
-echo "=== Git Context ==="
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
+echo "PLANS_DIR=$PLANS_DIR"
 echo "Branch: $(git branch --show-current)"
-echo "Default: $(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-default-branch.sh"
+echo "DEFAULT_BRANCH=$DEFAULT_BRANCH"
 git status --short
-echo ""
-echo "=== Config ==="
-# Walk up to find prdx.json
-DIR="$PWD"; while [ "$DIR" != "/" ]; do
-  [ -f "$DIR/prdx.json" ] && echo "Config: $DIR/prdx.json" && break
-  [ -f "$DIR/.prdx/prdx.json" ] && echo "Config: $DIR/.prdx/prdx.json" && break
-  DIR=$(dirname "$DIR")
-done
-[ "$DIR" = "/" ] && echo "Config: (defaults)"
-echo ""
-echo "=== Plans Directory ==="
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-CONFIG_FILE=""
-SEARCH_DIR="$PROJECT_ROOT"
-while [ "$SEARCH_DIR" != "/" ]; do
-  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
-  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
-  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
-done
-PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
-PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
-echo "Plans directory: $PLANS_DIR"
-echo ""
-echo "=== Available PRDs (this project) ==="
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+echo "PROJECT_NAME=$PROJECT_NAME"
 grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
-echo ""
-echo "=== Agent Teams ==="
-echo "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-not set}"
+echo "AGENT_TEAMS=${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-not set}"
 ```
 
 # /prdx:prdx:agent - Agent Teams Workflow
