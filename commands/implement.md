@@ -6,34 +6,14 @@ argument-hint: "[slug]"
 ## Pre-Computed Context
 
 ```bash
-echo "=== Git Context ==="
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
+echo "PLANS_DIR=$PLANS_DIR"
 echo "Branch: $(git branch --show-current)"
-echo "Default: $(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-default-branch.sh"
+echo "DEFAULT_BRANCH=$DEFAULT_BRANCH"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-commit-config.sh"
+echo "COMMIT_FORMAT=$COMMIT_FORMAT COAUTHOR_ENABLED=$COAUTHOR_ENABLED COAUTHOR_NAME=$COAUTHOR_NAME COAUTHOR_EMAIL=$COAUTHOR_EMAIL EXTENDED_DESC=$EXTENDED_DESC_ENABLED CLAUDE_LINK=$CLAUDE_LINK_ENABLED"
 git status --short
-echo ""
-echo "=== Config ==="
-# Walk up to find prdx.json
-DIR="$PWD"; while [ "$DIR" != "/" ]; do
-  [ -f "$DIR/prdx.json" ] && echo "Config: $DIR/prdx.json" && break
-  [ -f "$DIR/.prdx/prdx.json" ] && echo "Config: $DIR/.prdx/prdx.json" && break
-  DIR=$(dirname "$DIR")
-done
-[ "$DIR" = "/" ] && echo "Config: (defaults)"
-echo ""
-echo "=== Plans Directory ==="
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-CONFIG_FILE=""
-SEARCH_DIR="$PROJECT_ROOT"
-while [ "$SEARCH_DIR" != "/" ]; do
-  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
-  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
-  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
-done
-PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
-PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
-echo "Plans directory: $PLANS_DIR"
-echo ""
-echo "=== Available PRDs (this project) ==="
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
 grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
 ```
@@ -93,133 +73,20 @@ This command orchestrates three agents in **isolated contexts**:
 
 ### Step 1: Load Configuration
 
-**IMPORTANT: You must read and parse the project's prdx.json configuration.**
-
-1. **Walk up the directory tree** to find the config file (supports monorepo/meta-project layouts):
-   - Starting from the current working directory, check each directory going up:
-     - `{dir}/prdx.json`
-     - `{dir}/.prdx/prdx.json`
-   - Stop at the first match or at filesystem root
-   - This ensures config is found even when working inside a sub-project of a meta-project
-
-2. If config file exists, extract these values:
-   - `commits.format` → "conventional" or "simple"
-   - `commits.coAuthor.enabled` → true/false
-   - `commits.coAuthor.name` → name string
-   - `commits.coAuthor.email` → email string
-   - `commits.extendedDescription.enabled` → true/false
-   - `commits.extendedDescription.includeClaudeCodeLink` → true/false
-
-3. If no config file exists, use these defaults:
-   - format: "conventional"
-   - coAuthor.enabled: true
-   - coAuthor.name: "Claude"
-   - coAuthor.email: "noreply@anthropic.com"
-   - extendedDescription.enabled: true
-   - includeClaudeCodeLink: true
-
-**Store these values - you will need them when invoking the platform agent.**
-
-#### Step 1a: Validate Configuration
-
-**If a config file was found, validate it:**
-
-1. **Check for malformed JSON:**
-   If the file cannot be parsed as valid JSON, display a warning and use defaults:
-   ```
-   ⚠️  prdx.json contains invalid JSON. Using default configuration.
-
-   Fix: Check prdx.json syntax (missing commas, trailing commas, etc.)
-   ```
-
-2. **Check for unrecognized values:**
-   - If `commits.format` is not "conventional" or "simple":
-     ```
-     ⚠️  Unrecognized commit format: "{value}". Expected: "conventional" or "simple". Using "conventional".
-     ```
-   - If unknown top-level keys exist, warn but continue:
-     ```
-     ⚠️  Unrecognized config key: "{key}". Ignoring.
-     ```
-
-3. **Display loaded config summary:**
-   ```
-   Config loaded:
-     Format: conventional | Co-author: Claude <noreply@anthropic.com> | Extended: yes | Claude Code link: yes
-   ```
+Commit config is pre-loaded via Pre-Computed Context (`resolve-commit-config.sh`). The following variables are available: `COMMIT_FORMAT`, `COAUTHOR_ENABLED`, `COAUTHOR_NAME`, `COAUTHOR_EMAIL`, `EXTENDED_DESC_ENABLED`, `CLAUDE_LINK_ENABLED`.
 
 #### Step 1b: Build Commit Instructions
 
-**Build commit instructions immediately after config loading.** These are purely config-derived and don't depend on the PRD or dev plan, so computing them once here avoids repeating work in the per-platform loop.
+Build `COMMIT_INSTRUCTIONS` from the pre-loaded config values. Use HEREDOC format for commits. Structure:
 
-**CRITICAL: Build these instructions based on the config values from Step 1.**
+- **Subject line:** `{type}: {description}` (conventional) or `{description}` (simple)
+- **Extended description** (only if `EXTENDED_DESC_ENABLED=true`): blank line + explanation
+- **Claude Code link** (only if `CLAUDE_LINK_ENABLED=true`): blank line + attribution
+- **Co-author** (only if `COAUTHOR_ENABLED=true`): blank line + `Co-Authored-By: {name} <{email}>`
 
-Build a commit instructions string with this structure:
+**CI mode override:** If `GIT_AUTHOR_NAME` env var is set, replace co-author with `claude[bot]` and `github-actions[bot]`.
 
-```
-6. **Commits:**
-   - Keep commits atomic and focused
-   - ALWAYS use HEREDOC format for commits:
-
-   ```bash
-   git commit -m "$(cat <<'EOF'
-   {your commit message}
-   EOF
-   )"
-   ```
-
-   **Commit Message Structure:**
-```
-
-Then add based on config:
-
-**If format is "conventional":**
-```
-   - Line 1: {type}: {short description}
-   - Types: feat, fix, refactor, test, chore, docs
-```
-
-**If format is "simple":**
-```
-   - Line 1: {short description} (no type prefix)
-```
-
-**If extendedDescription.enabled is true:**
-```
-   - Line 2: Empty line
-   - Lines 3+: Extended description explaining WHAT changed and WHY
-```
-
-**If extendedDescription.enabled is FALSE:**
-```
-   - DO NOT add any extended description
-   - The subject line is the ENTIRE commit message (except for optional trailers)
-   - There should be NO blank line followed by explanation text
-```
-
-**If includeClaudeCodeLink is true:**
-```
-   - Empty line
-   - 🤖 Generated with [Claude Code](https://claude.com/claude-code)
-```
-
-**If coAuthor.enabled is true:**
-```
-   - Empty line
-   - Co-Authored-By: {coAuthor.name} <{coAuthor.email}>
-```
-
-**If `GIT_AUTHOR_NAME` env var is set** (CI mode with `--requested-by`):
-The commit author is already the requestor via exported env vars. Override co-author config to always include both claude[bot] and github-actions[bot]:
-```
-   - Co-Authored-By: claude[bot] <209825114+claude[bot]@users.noreply.github.com>
-   - Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
-```
-This replaces the normal `coAuthor` config — in CI mode, the requestor is the author and Claude Code + GitHub Actions are always co-authors. The `includeClaudeCodeLink` and `extendedDescription` settings from prdx.json config are still respected.
-
-**Add ONE example commit** showing the exact format for the resolved config. Build the example dynamically — include only the lines that apply to the current config (format, extendedDescription, coAuthor, includeClaudeCodeLink). Do NOT show multiple variant examples. One example matching the actual config is clearer and saves tokens.
-
-**Store the result as `COMMIT_INSTRUCTIONS`.** This will be passed to all platform agent invocations.
+Build ONE example commit matching the resolved config. Store as `COMMIT_INSTRUCTIONS`.
 
 ### Step 1b.5: Parse Flags
 

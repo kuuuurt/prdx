@@ -1,79 +1,27 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[--quick] [--ci] [--issue <number>] [--plan-only] [--requested-by <user>] [feature description or PRD slug]"
+argument-hint: "[--quick] [--ci] [--issue <number>] [feature description or PRD slug]"
 ---
+
+## Pre-Computed Context
+
+```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
+echo "PLANS_DIR=$PLANS_DIR"
+echo "PROJECT_ROOT=$PROJECT_ROOT"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/ensure-gitignore.sh"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/first-run-setup.sh"
+echo "FIRST_RUN=$FIRST_RUN"
+echo "SETUP_DONE=$(ls .prdx/plans-setup-done 2>/dev/null && echo yes || echo no)"
+ls .prdx/state/*.json 2>/dev/null
+PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
+echo "PROJECT_NAME=$PROJECT_NAME"
+```
 
 # /prdx:prdx - Complete Feature Workflow
 
-> **Main entry point for PRDX.**
-> Orchestrates the complete feature development workflow with decision points.
-> Use `--quick` for ephemeral tasks that need the full pipeline but not a permanent PRD.
-
-## Workflow
-
-Execute the following phases based on the argument provided:
-
-### Resolve Plans Directory
-
-Read the configured plans directory from `prdx.json`, falling back to `.prdx/plans` if not set:
-
-```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-CONFIG_FILE=""
-SEARCH_DIR="$PROJECT_ROOT"
-while [ "$SEARCH_DIR" != "/" ]; do
-  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
-  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
-  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
-done
-PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
-PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
-```
-
-**Use `$PLANS_DIR` throughout this command.**
-
-### Step 0: Auto-Capture Lessons from Merged PRs
-
-**Before any other logic, check if this is the first PRDX run in this project (Plans Directory Setup).**
-
-Check if plans directory has been configured:
-
-```bash
-ls .prdx/plans-setup-done 2>/dev/null
-```
-
-If the file does NOT exist (first PRDX run in this project):
-
-**If `CI_MODE=true`:** Skip to Step 1 — CI mode validates plans-setup-done separately and never prompts.
-
-1. Auto-configure project-local plans (no user prompt):
-   ```bash
-   PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-   mkdir -p .claude .prdx "$PLANS_DIR"
-   if [ -f .claude/settings.local.json ]; then
-     jq --arg dir "$PLANS_SUBDIR" '. + {plansDirectory: $dir}' .claude/settings.local.json > .claude/settings.local.json.tmp && mv .claude/settings.local.json.tmp .claude/settings.local.json
-   else
-     echo "{\"plansDirectory\": \"$PLANS_SUBDIR\"}" > .claude/settings.local.json
-   fi
-   echo "local" > .prdx/plans-setup-done
-   ```
-
-2. Re-resolve PLANS_DIR after setup.
-
-If the file DOES exist, skip this step entirely and proceed with the gitignore check below.
-
-**After the setup check (or if already configured), ensure `.prdx/` is fully ignored (runs every time):**
-
-```bash
-GITIGNORE="$PROJECT_ROOT/.gitignore"
-if [ ! -f "$GITIGNORE" ] || ! { grep -qxF '.prdx/' "$GITIGNORE" || grep -qxF '.prdx/*' "$GITIGNORE"; }; then
-  echo '' >> "$GITIGNORE"
-  echo '# PRDX' >> "$GITIGNORE"
-  echo '.prdx/' >> "$GITIGNORE"
-fi
-```
-
-**Lesson capture and plan cleanup are handled by the scheduled CI workflow (`/prdx:cleanup`).** No startup scan is performed.
+> Main entry point for PRDX. Orchestrates plan → implement → push with decision points.
+> Use `--quick` for ephemeral tasks. Use `--ci --issue N` for CI mode (routes to `/prdx:ci`).
 
 ---
 
@@ -116,22 +64,11 @@ If no active state file qualifies (or no state files exist), continue with norma
   - Set `QUICK_MODE=true`, skip PRD matching, go directly to Phase 2 (planning)
 - If `--quick` is NOT present, continue with normal entry point logic below
 
-**Next, parse `--ci`, `--issue`, and `--requested-by` flags:**
-Strip `--ci`, `--issue {number}`, `--requested-by {user}`, and `--plan-only` from the argument string, capturing their values.
+**Next, parse `--ci` and `--issue` flags:**
 
-**If `--issue` present:** Set `HAS_ISSUE=true`, `ISSUE_NUMBER`. Fetch: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Error if not found. Store `ISSUE_TITLE` + `ISSUE_BODY` as feature description.
+**If `--ci` present:** Route to `/prdx:ci` with all arguments and stop. CI mode is handled entirely by the ci command.
 
-**If `--ci` present:** Set `CI_MODE=true`. Require `--issue` (error: `--ci requires --issue`). Configure git author if `--requested-by` provided:
-```bash
-REQUESTOR_NAME=$(gh api "users/${REQUESTOR}" --jq '.name // .login' 2>/dev/null || echo "$REQUESTOR")
-export GIT_AUTHOR_NAME="$REQUESTOR_NAME"
-export GIT_AUTHOR_EMAIL="${REQUESTOR}@users.noreply.github.com"
-```
-Skip state-file resume scan. Require `.prdx/plans-setup-done` (error if missing). Validate `gh auth status`. Route: `PLAN_ONLY=true` → Step 2-CI | `PLAN_ONLY=false` → Step 3-CI.
-
-**If `--plan-only` present:** Set `PLAN_ONLY=true`. Require both `--ci` and `--issue` (error: `--plan-only requires --ci and --issue`).
-
-**If `--ci` NOT present:** Continue with normal entry point logic (issue data available via `HAS_ISSUE` if `--issue` was provided).
+**If `--issue {number}` present (without `--ci`):** Set `HAS_ISSUE=true`, `ISSUE_NUMBER`. Fetch: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Store `ISSUE_TITLE` + `ISSUE_BODY` as feature description. Continue with normal entry point logic.
 
 **If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
 - Read PRD and check its `**Status:**` field
@@ -243,203 +180,6 @@ After issue is created, use AskUserQuestion:
 Route based on choice:
 - Yes → Phase 3
 - No → End workflow (keep state file for future resume)
-
----
-
-### Step 2-CI: Plan-Only Path (CI Mode)
-
-**This step runs ONLY when `CI_MODE=true` and `PLAN_ONLY=true`.** It generates a PRD and posts it as an issue comment.
-
-**CI progress comment helper** (used throughout CI steps):
-```bash
-# POST_PROGRESS: post a progress comment and store its ID
-REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
-PROGRESS_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "> {MESSAGE} 🔨
->
-> [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
-
-# UPDATE_PROGRESS: update an existing progress comment
-gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="{DONE_MESSAGE}"
-```
-
-Use this pattern wherever a progress comment is posted or updated. Substitute `{MESSAGE}` / `{DONE_MESSAGE}` with the relevant status text.
-
-**2-CI.1: Derive slug, detect platform and project:**
-
-- `{SLUG}`: Extract core concept from `ISSUE_TITLE` (2-4 words max, kebab-case). Strip filler words (add, implement, create, update, fix, refactor, improve) and prepositions — keep domain nouns and key verbs. Examples: "Read monthly report from Firestore" → `monthly-report-read`, "Add biometric authentication" → `biometric-auth`.
-- Platform: check directories, config files, issue title keywords (single-platform only — CI mode does not support multi-platform).
-- Project: `PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)`
-
-**2-CI.2: Check for existing PRD comment:**
-
-```bash
-PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
-```
-
-- **No PRD comment (fresh plan):** Post progress comment (`Planning...`), then continue to 2-CI.3.
-- **PRD comment exists (revision):** Jump to 2-CI.6.
-
-**2-CI.3: Explore codebase** via `prdx:code-explorer` agent. Pass `ISSUE_TITLE` + `ISSUE_BODY`. Ask for patterns, architecture, and conventions relevant to the issue.
-
-**2-CI.4: Generate PRD content** using the full PRD template (do NOT write a file):
-
-```markdown
-# {ISSUE_TITLE}
-
-**Type:** {auto-detected}
-**Project:** {PROJECT_NAME}
-**Platform:** {DETECTED_PLATFORM}
-**Status:** planning
-**Created:** {TODAY}
-
-## Problem
-{From ISSUE_BODY — problem statement}
-
-## Goal
-{From issue title/body — desired outcome}
-
-## Acceptance Criteria
-{From ISSUE_BODY checkboxes/lists, or derive 2-3 testable criteria}
-
-## Approach
-{From codebase exploration — high-level strategy}
-
-## Risks & Considerations
-{1-2 risks from codebase exploration}
-```
-
-**2-CI.5: Post PRD as issue comment:**
-
-```bash
-PRD_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "$(cat <<'PRDBODY'
-<!-- prdx-prd -->
-{FULL PRD CONTENT}
-PRDBODY
-)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
-```
-
-Update progress comment: `"Planning complete. PRD posted above — review it and comment \`@claude implement\` when ready, or \`@claude revise\` with feedback."`
-
-Display: `CI Planning Complete! PRD posted on issue #{ISSUE_NUMBER}. Comment \`@claude implement\` when ready.`
-
----
-
-**2-CI.6: Revision path (existing PRD comment):**
-
-Runs when `--plan-only` is used and a PRD comment already exists.
-
-1. Post progress comment: `Revising PRD...`
-2. Fetch existing PRD comment and content:
-   ```bash
-   PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
-   PRD_COMMENT_ID=$(echo "$PRD_COMMENT" | jq -r '.databaseId // .id' 2>/dev/null)
-   PRD_COMMENT_BODY=$(echo "$PRD_COMMENT" | jq -r '.body' 2>/dev/null)
-   ```
-3. Read feedback comments posted after the PRD comment:
-   ```bash
-   gh issue view "$ISSUE_NUMBER" --json comments --jq \
-     --argjson prd_id "$PRD_COMMENT_ID" \
-     '[.comments[] | select((.databaseId // .id) > $prd_id) | .body] | join("\n---\n")' 2>/dev/null
-   ```
-4. Re-explore codebase if needed (same as 2-CI.3).
-5. Generate revised PRD incorporating feedback (keep `<!-- prdx-prd -->` marker).
-6. Update PRD comment in-place:
-   ```bash
-   gh api "repos/$REPO/issues/comments/$PRD_COMMENT_ID" -X PATCH -f body="<!-- prdx-prd -->
-   {REVISED PRD CONTENT}"
-   ```
-7. Update progress comment: `"PRD revised. Review the updated comment and comment \`@claude implement\` when ready."`
-
-Display: `PRD Revised! PRD comment updated on issue #{ISSUE_NUMBER}.`
-
----
-
-### Step 3-CI: Implement Path (CI Mode)
-
-**This step runs ONLY when `CI_MODE=true` and `PLAN_ONLY=false`.** It reads the PRD from an issue comment and implements it, creating a new branch and PR. If a PR already exists for the branch, it applies fixes to the existing branch instead.
-
-**3-CI.1: Derive slug and detect platform:**
-
-Derive `{SLUG}` from `ISSUE_TITLE` by extracting the core concept (2-4 words max, same logic as 2-CI.1).
-
-Determine branch name:
-```bash
-# Auto-detect type from issue title/body
-BRANCH="{TYPE_PREFIX}/{SLUG}"
-```
-
-Detect platform same as 2-CI.1. Detect `REPO` and `PROJECT_NAME`:
-```bash
-REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-PROJECT_NAME=$(echo "$REPO" | cut -d'/' -f2)
-```
-
-**3-CI.2: Find PRD from issue comment:**
-
-```bash
-PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
-PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
-```
-
-| condition | action |
-|-----------|--------|
-| PRD found + PR exists | Fix iteration path (below) |
-| PRD found + no PR | Fresh implementation — post progress comment (`Implementing...`), continue to 3-CI.3 |
-| No PRD + PR exists | Find linked issue from PR body (`Closes #N`), fetch PRD from that issue |
-| No PRD + no PR | Error: `No PRD found for issue #{ISSUE_NUMBER}. Run \`@claude plan\` first.` |
-
-**3-CI.3: Write PRD locally and set up branch:**
-
-```bash
-PRD_BODY=$(echo "$PRD_COMMENT" | jq -r '.body' 2>/dev/null)
-mkdir -p "$PLANS_DIR"
-echo "$PRD_BODY" | sed 's/<!-- prdx-prd -->//' > "$PLANS_DIR/prdx-${SLUG}.md"
-git checkout -b "$BRANCH"
-```
-
-**3-CI.4: Run implement:**
-
-```bash
-mkdir -p .prdx/state
-cat > .prdx/state/${SLUG}.json << EOF
-{"slug": "${SLUG}", "phase": "implementing", "quick": false}
-EOF
-export CI=true
-```
-```
-/prdx:implement {SLUG}
-```
-
-**3-CI.5: Push and create PR:**
-
-```bash
-git push -u origin "$BRANCH"
-DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-```
-
-Invoke `prdx:pr-author` agent: create a real (non-draft) PR. Include `Closes #{ISSUE_NUMBER}` in body. Footer: `Comment \`@claude review\` for code review.` After creation, add `$REQUESTOR` as reviewer if set.
-
-**3-CI.6: Finalize:**
-
-Update progress comment: `"Implementation complete. PR #${PR_NUMBER} created. Comment \`@claude review\` for code review."`
-
-Write state: `{"slug": "${SLUG}", "phase": "review", "quick": false, "pr_number": ${PR_NUMBER}}`
-
-Display: `CI Implementation Complete! Issue: #{ISSUE_NUMBER} | Branch: {BRANCH} | PR: #{PR_NUMBER}`
-
----
-
-**Fix Iteration Path (PR already exists):**
-
-1. Checkout branch: `git fetch origin "$BRANCH" && git checkout "$BRANCH" && git pull origin "$BRANCH"`
-2. Write PRD locally (same as 3-CI.3 — `PRD_BODY` already fetched).
-3. Post progress comment: `Applying fixes...`
-4. Run: `export CI=true` then `/prdx:implement {SLUG}`
-5. Push: `git push origin "$BRANCH"`
-6. Update progress comment: `"Fixes applied to PR #${PR_NUMBER}. Comment \`@claude review\` for another code review."`
-
-Display: `CI Fix Iteration Complete! Issue: #{ISSUE_NUMBER} | Branch: {BRANCH} | PR: #{PR_NUMBER} (fixes pushed)`
 
 ---
 
@@ -619,42 +359,11 @@ Write state: `{"slug": "{SLUG}", "phase": "pushing", "quick": {QUICK_MODE}}`
 
 ---
 
-## Important Guidelines
+## Critical Rules
 
-**CRITICAL: Never skip user decision points. ALWAYS use AskUserQuestion.**
-- **⛔ #1 FAILURE MODE: After plan mode exits, Claude starts implementing without asking.** This is WRONG. After ExitPlanMode, you MUST show the post-planning decision point (Publish/Implement/Stop) and WAIT for the user's choice. The plan.md Step 5.5 handles this — follow it.
-- After planning completes → STOP, ask before implementing
-- After implementation completes → STOP, ask before creating PR (recommend testing first)
-- Each phase transition requires explicit user consent via AskUserQuestion
-- When in doubt, STOP and ask - never auto-proceed
-- **Never ask twice for the same decision.** If the user already chose "Create PR" in one step, do NOT ask for PR confirmation again. Respect prior choices within the same workflow run.
-
-**Use AskUserQuestion tool** at each decision point with clear options.
-
-**Always show context:**
-- Current PRD status
-- What was just completed
-- What comes next
-
-**Respect user choice:**
-- Never auto-proceed to the next phase without asking
-- "Stop here" is always a valid option
-- Always show how to resume later with `/prdx:prdx [slug]`
-
-**Status tracking:**
-- Read status from PRD file's `**Status:**` field
-- Update status by editing the PRD file directly
-- Status flow: planning → in-progress → review → implemented → completed (publish adds issue metadata but doesn't change status)
-
-**Error handling:**
-- If any phase fails, show clear error message
-- Don't auto-proceed after errors
-- Offer: retry, stop, or skip options
-
-**Workflow state (`.prdx/state/{slug}.json`):**
-- Written at phase transitions to enable resume after context clear
-- Read at Step 1 to detect interrupted workflows
-- **Never deleted when user pauses** (stop, test first, wait) — state files persist for resume and future lesson capture
-- Only deleted in two cases: (1) Step 0 lesson capture after PR merge, (2) Quick mode "Done" cleanup (no PR, nothing to capture)
-- Non-draft PR creation transitions to `"pushed"` phase to enable automatic lesson capture
-- `"pushed"` state files are processed at next `/prdx:prdx` startup: merged PRs trigger lesson capture, then state file is deleted
+1. **ALWAYS use AskUserQuestion at every phase transition.** Never auto-proceed. Never ask twice for the same decision.
+2. **After plan mode exits → STOP and ask** (Publish/Implement/Stop). Do NOT start implementing.
+3. **After implementation → STOP and ask** before creating PR. Recommend testing first.
+4. **Status tracking:** Read/update `**Status:**` field in PRD. Flow: planning → in-progress → review → implemented → completed.
+5. **State files** (`.prdx/state/{slug}.json`): written at phase transitions, read at Step 1 for resume. Never deleted when user pauses. Only deleted after PR merge (lesson capture) or Quick mode "Done" (no PR).
+6. **Errors:** Show clear message, offer retry/stop/skip. Never auto-proceed after errors.

@@ -3,56 +3,19 @@ description: "Create pull request for implemented feature"
 argument-hint: "[slug]"
 ---
 
-# /prdx:push - Create Pull Request
-
-Delegates to `prdx:pr-author` agent to create a pull request with comprehensive description.
-
-The agent runs in an **isolated context** to minimize main conversation context usage.
-
-**Supports two modes:**
-- **PRD mode** — When a matching PRD exists, creates a rich PR with acceptance criteria, scope, and approach from the PRD
-- **Standalone mode** — When no PRD exists, creates a PR purely from commits and diff analysis
-
-## Usage
-
-```
-/prdx:push                    # Auto-detect: PRD mode if matching PRD found, standalone otherwise
-/prdx:push backend-auth       # PRD mode: specify PRD slug
-/prdx:push --draft            # Standalone draft PR from current branch
-/prdx:push backend-auth --draft  # PRD mode: draft PR
-```
-
-## How It Works
-
-This command is a **thin wrapper** that:
-1. Detects mode (PRD or standalone)
-2. Validates git state (branch, commits)
-3. If PRD mode: confirms readiness, updates status
-4. Pushes branch to remote
-5. Invokes `prdx:pr-author` agent (isolated context)
-6. Agent creates PR (with or without PRD context)
-7. Returns only PR URL and number
-
-## Workflow
-
-### Resolve Plans Directory
-
-Plans are always stored in `.prdx/plans/` relative to the project root:
+## Pre-Computed Context
 
 ```bash
-PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-CONFIG_FILE=""
-SEARCH_DIR="$PROJECT_ROOT"
-while [ "$SEARCH_DIR" != "/" ]; do
-  [ -f "$SEARCH_DIR/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/prdx.json" && break
-  [ -f "$SEARCH_DIR/.prdx/prdx.json" ] && CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json" && break
-  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
-done
-PLANS_SUBDIR=$(jq -r '.plansDirectory // ".prdx/plans"' "$CONFIG_FILE" 2>/dev/null || echo '.prdx/plans')
-PLANS_DIR="$PROJECT_ROOT/$PLANS_SUBDIR"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
+echo "PLANS_DIR=$PLANS_DIR"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-default-branch.sh"
+echo "DEFAULT_BRANCH=$DEFAULT_BRANCH"
+echo "Branch: $(git branch --show-current)"
 ```
 
-**Use `$PLANS_DIR` throughout this command.**
+# /prdx:push - Create Pull Request
+
+Delegates to `prdx:pr-author` agent (isolated context). Two modes: **PRD mode** (matching PRD found) or **Standalone mode** (no PRD, PR from commits/diff).
 
 ### Step 0: Validate GitHub CLI
 
@@ -176,48 +139,22 @@ If the PRD does not have a `## Children` section, continue normally (including c
 
 ### Phase 3a: Validate Git State (PRD Mode)
 
+Use `DEFAULT_BRANCH` from Pre-Computed Context.
+
 ```bash
-# Detect default branch
-DEFAULT_BRANCH=$(cat prdx.json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('defaultBranch',''))" 2>/dev/null || true)
-if [ -z "$DEFAULT_BRANCH" ]; then
-  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-fi
-
-# Get current branch
 CURRENT_BRANCH=$(git branch --show-current)
-
-# Read expected branch from PRD
 EXPECTED_BRANCH=$(grep "^\*\*Branch:\*\*" "$PRD_FILE" | sed 's/\*\*Branch:\*\* //')
 
 # Validate branch matches PRD
 if [ "$CURRENT_BRANCH" != "$EXPECTED_BRANCH" ]; then
-  echo "⚠️  Branch mismatch"
-  echo ""
-  echo "Current branch: $CURRENT_BRANCH"
-  echo "PRD expects:    $EXPECTED_BRANCH"
-  echo ""
-  echo "Each PRD = 1 branch = 1 PR"
-  echo ""
-  echo "Options:"
-  echo "1. Switch to correct branch: git checkout $EXPECTED_BRANCH"
-  echo "2. Cancel and verify you're working on the right PRD"
+  echo "Branch mismatch: on $CURRENT_BRANCH, PRD expects $EXPECTED_BRANCH"
   exit 1
 fi
 
-# Check not on default branch
-if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ]; then
-  echo "Cannot create PR from default branch"
-  exit 1
-fi
+# Check not on default branch, has commits
+[ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ] && echo "Cannot create PR from default branch" && exit 1
+[ -z "$(git log "$DEFAULT_BRANCH"..HEAD --oneline)" ] && echo "No commits on this branch" && exit 1
 
-# Check for commits
-COMMITS=$(git log "$DEFAULT_BRANCH"..HEAD --oneline)
-if [ -z "$COMMITS" ]; then
-  echo "No commits on this branch"
-  exit 1
-fi
-
-# Push if needed
 git push -u origin "$CURRENT_BRANCH"
 ```
 
@@ -285,30 +222,12 @@ When no PRD exists, create a PR purely from branch analysis.
 
 ### Phase 2b: Validate Git State (Standalone)
 
+Use `DEFAULT_BRANCH` from Pre-Computed Context.
+
 ```bash
-# Detect default branch
-DEFAULT_BRANCH=$(cat prdx.json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('defaultBranch',''))" 2>/dev/null || true)
-if [ -z "$DEFAULT_BRANCH" ]; then
-  DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-fi
-
-# Get current branch
 CURRENT_BRANCH=$(git branch --show-current)
-
-# Check not on default branch
-if [ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ]; then
-  echo "Cannot create PR from default branch"
-  exit 1
-fi
-
-# Check for commits
-COMMITS=$(git log "$DEFAULT_BRANCH"..HEAD --oneline)
-if [ -z "$COMMITS" ]; then
-  echo "No commits on this branch"
-  exit 1
-fi
-
-# Push if needed
+[ "$CURRENT_BRANCH" = "$DEFAULT_BRANCH" ] && echo "Cannot create PR from default branch" && exit 1
+[ -z "$(git log "$DEFAULT_BRANCH"..HEAD --oneline)" ] && echo "No commits on this branch" && exit 1
 git push -u origin "$CURRENT_BRANCH"
 ```
 
@@ -416,112 +335,9 @@ Create a feature branch first:
   git checkout -b feat/my-feature
 ```
 
-## Context Efficiency
-
-The `prdx:pr-author` agent runs in an **isolated context**:
-
-| What stays in agent context | What returns to main conversation |
-|-----------------------------|-----------------------------------|
-| PRD file content (if PRD mode) | PR number |
-| Commit history analysis | PR URL |
-| File change analysis | PR title |
-
-This keeps the main conversation context minimal.
-
 ## Examples
 
-### Example 1: PRD Mode (slug provided)
-
-```
-User: /prdx:push backend-auth
-
-→ Finds PRD: {PLANS_DIR}/prdx-backend-auth.md
-→ Status is "review" → will update to "implemented" after PR creation
-→ Validates git state
-→ prdx:pr-author agent invoked (PRD mode)
-→ Agent reads PRD, analyzes commits
-→ Agent creates PR via gh CLI
-→ Agent updates PRD with PR metadata
-→ Returns PR summary
-
-Pull Request Created!
-
-PRD: {PLANS_DIR}/prdx-backend-auth.md
-PR: #42
-URL: https://github.com/user/repo/pull/42
-
-To view PR: gh pr view 42 --web
-```
-
-### Example 2: Standalone (no PRD)
-
-```
-User: /prdx:push
-
-→ No slug provided
-→ Current branch: fix/typo-in-readme
-→ No matching PRD found → standalone mode
-→ Validates git state
-→ prdx:pr-author agent invoked (standalone mode)
-→ Agent analyzes commits and changes
-→ Agent creates PR via gh CLI
-→ Returns PR summary
-
-Pull Request Created!
-
-PR: #43
-URL: https://github.com/user/repo/pull/43
-
-To view PR: gh pr view 43 --web
-```
-
-### Example 3: Auto-detect PRD
-
-```
-User: /prdx:push
-
-→ No slug provided
-→ Current branch: feat/backend-auth
-→ Found PRD with Branch: feat/backend-auth → PRD mode
-→ (continues as PRD mode workflow)
-```
-
-### Example 4: Draft PR (Standalone)
-
-```
-User: /prdx:push --draft
-
-→ Standalone mode (no PRD found)
-→ Draft: true → passes --draft to agent
-→ Agent adds "not human-reviewed" notice to PR body
-→ Creates draft PR via gh pr create --draft
-
-Draft Pull Request Created!
-
-PR: #44 (Draft)
-URL: https://github.com/user/repo/pull/44
-
-Note: PR body includes notice that it has not been human-reviewed.
-To mark ready: gh pr ready 44
-```
-
-### Example 5: Draft PR (PRD Mode)
-
-```
-User: /prdx:push backend-auth --draft
-
-→ Finds PRD: {PLANS_DIR}/prdx-backend-auth.md
-→ Status is "review" → will update to "implemented" after PR creation
-→ Draft: true → passes --draft to agent
-→ Agent adds "not human-reviewed" notice to PR body
-→ Creates draft PR via gh pr create --draft
-
-Draft Pull Request Created!
-
-PRD: {PLANS_DIR}/prdx-backend-auth.md
-PR: #45 (Draft)
-URL: https://github.com/user/repo/pull/45
-
-Note: PR body includes notice that it has not been human-reviewed.
-To mark ready: gh pr ready 45
-```
+- `/prdx:push backend-auth` → PRD mode, finds PRD, validates git, invokes pr-author, creates PR
+- `/prdx:push` → Auto-detects PRD from branch name, or falls back to standalone mode
+- `/prdx:push --draft` → Creates draft PR (adds "not human-reviewed" notice)
+- `/prdx:push backend-auth --draft` → PRD mode draft PR

@@ -29,62 +29,19 @@ This command creates commits based on `prdx.json` settings:
 
 ### Phase 1: Load Configuration
 
-Load PRDX configuration:
+Load commit config from the shared script (config variables set via Pre-Computed Context):
 
 ```bash
-# Walk up directory tree to find prdx.json (like .gitignore, .eslintrc)
-# This supports monorepo/meta-project layouts where config lives in a parent directory
-CONFIG_FILE=""
-SEARCH_DIR="$(pwd)"
-while [ "$SEARCH_DIR" != "/" ]; do
-  if [ -f "$SEARCH_DIR/prdx.json" ]; then
-    CONFIG_FILE="$SEARCH_DIR/prdx.json"
-    break
-  elif [ -f "$SEARCH_DIR/.prdx/prdx.json" ]; then
-    CONFIG_FILE="$SEARCH_DIR/.prdx/prdx.json"
-    break
-  fi
-  SEARCH_DIR="$(dirname "$SEARCH_DIR")"
-done
-
-# Parse config or use defaults
-if [ -n "$CONFIG_FILE" ]; then
-  # Read config values using jq if available, otherwise use defaults
-  if command -v jq &> /dev/null; then
-    COAUTHOR_ENABLED=$(jq -r '.commits.coAuthor.enabled // true' "$CONFIG_FILE")
-    COAUTHOR_NAME=$(jq -r '.commits.coAuthor.name // "Claude"' "$CONFIG_FILE")
-    COAUTHOR_EMAIL=$(jq -r '.commits.coAuthor.email // "noreply@anthropic.com"' "$CONFIG_FILE")
-    EXTENDED_DESC_ENABLED=$(jq -r '.commits.extendedDescription.enabled // true' "$CONFIG_FILE")
-    CLAUDE_LINK_ENABLED=$(jq -r '.commits.extendedDescription.includeClaudeCodeLink // true' "$CONFIG_FILE")
-    COMMIT_FORMAT=$(jq -r '.commits.format // "conventional"' "$CONFIG_FILE")
-  else
-    # Defaults if jq not available
-    COAUTHOR_ENABLED=true
-    COAUTHOR_NAME="Claude"
-    COAUTHOR_EMAIL="noreply@anthropic.com"
-    EXTENDED_DESC_ENABLED=true
-    CLAUDE_LINK_ENABLED=true
-    COMMIT_FORMAT="conventional"
-  fi
-else
-  # Use defaults if no config file
-  COAUTHOR_ENABLED=true
-  COAUTHOR_NAME="Claude"
-  COAUTHOR_EMAIL="noreply@anthropic.com"
-  EXTENDED_DESC_ENABLED=true
-  CLAUDE_LINK_ENABLED=true
-  COMMIT_FORMAT="conventional"
-fi
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-commit-config.sh"
 ```
+
+This sets: `COMMIT_FORMAT`, `COAUTHOR_ENABLED`, `COAUTHOR_NAME`, `COAUTHOR_EMAIL`, `EXTENDED_DESC_ENABLED`, `CLAUDE_LINK_ENABLED`.
 
 Display loaded configuration:
 
 ```
-📋 Commit Configuration
-Format: {COMMIT_FORMAT}
-Co-Author: {COAUTHOR_ENABLED} ({COAUTHOR_NAME} <{COAUTHOR_EMAIL}>)
-Extended Description: {EXTENDED_DESC_ENABLED}
-Claude Code Link: {CLAUDE_LINK_ENABLED}
+Commit Configuration
+Format: {COMMIT_FORMAT} | Co-Author: {COAUTHOR_ENABLED} ({COAUTHOR_NAME} <{COAUTHOR_EMAIL}>) | Extended: {EXTENDED_DESC_ENABLED} | Link: {CLAUDE_LINK_ENABLED}
 ```
 
 ### Phase 2: Check Git State
@@ -370,211 +327,9 @@ Amending commit to include hook changes...
 
 If safe to amend (authorship matches, not pushed), automatically amend.
 
-## Configuration Examples
+## Notes
 
-### Full Attribution (Default)
-
-`prdx.json`:
-```json
-{
-  "commits": {
-    "format": "conventional",
-    "coAuthor": {
-      "enabled": true,
-      "name": "Claude",
-      "email": "noreply@anthropic.com"
-    },
-    "extendedDescription": {
-      "enabled": true,
-      "includeClaudeCodeLink": true
-    }
-  }
-}
-```
-
-Produces:
-```
-feat: add authentication
-
-Implement JWT-based authentication with refresh tokens
-and secure password hashing.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
-
-### Minimal Commits
-
-`prdx.json`:
-```json
-{
-  "commits": {
-    "format": "simple",
-    "coAuthor": {
-      "enabled": false
-    },
-    "extendedDescription": {
-      "enabled": false,
-      "includeClaudeCodeLink": false
-    }
-  }
-}
-```
-
-Produces:
-```
-add authentication
-```
-
-### Conventional Without Attribution
-
-`prdx.json`:
-```json
-{
-  "commits": {
-    "format": "conventional",
-    "coAuthor": {
-      "enabled": false
-    },
-    "extendedDescription": {
-      "enabled": true,
-      "includeClaudeCodeLink": false
-    }
-  }
-}
-```
-
-Produces:
-```
-feat: add authentication
-
-Implement JWT-based authentication with refresh tokens
-and secure password hashing.
-```
-
-## Examples
-
-### Basic Commit with Message
-
-```
-User: /prdx:commit "add login endpoint"
-
-→ Loads prdx.json config
-→ Checks staged changes exist
-→ Creates commit with configured format
-
-✅ Commit created!
-
-a1b2c3d feat: add login endpoint
-
-Files changed: 3
-Insertions: +45
-Deletions: -0
-```
-
-### Auto-Generated Message (with extendedDescription ENABLED)
-
-```
-User: /prdx:commit
-
-→ Loads prdx.json: extendedDescription.enabled = true
-→ Analyzes staged changes
-→ Determines: new auth module files
-→ Proposes: "feat: add authentication module"
-
-📝 Proposed commit:
-
-feat: add authentication module
-
-Add JWT-based authentication with login and refresh endpoints.
-Includes middleware for protected routes.
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-
-Proceed? (y/n/edit)
-
-User: y
-
-✅ Commit created!
-```
-
-### Auto-Generated Message (with extendedDescription DISABLED)
-
-```
-User: /prdx:commit
-
-→ Loads prdx.json: extendedDescription.enabled = false
-→ Analyzes staged changes
-→ Determines: new auth module files
-→ Proposes: "feat: add authentication module"
-
-📝 Proposed commit:
-
-feat: add authentication module
-
-Proceed? (y/n/edit)
-
-User: y
-
-✅ Commit created!
-```
-
-**Note:** When extendedDescription is disabled, the commit is just the subject line. NO extended description is added.
-
-### Commit All Changes
-
-```
-User: /prdx:commit --all "fix validation bug"
-
-→ Stages all changes
-→ Creates commit
-
-✅ Commit created!
-
-d4e5f6g fix: fix validation bug
-
-Files changed: 2
-Insertions: +12
-Deletions: -5
-```
-
-## Implementation Notes
-
-### Why HEREDOC Format?
-
-HEREDOC ensures:
-- Multi-line messages work correctly
-- Special characters are preserved
-- Consistent formatting across shells
-
-**Always use:**
-```bash
-git commit -m "$(cat <<'EOF'
-message here
-EOF
-)"
-```
-
-**Never use simple quotes for multi-line commits.**
-
-### Conventional Commit Types
-
-| Type | When to Use |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `refactor` | Code change without feature/fix |
-| `docs` | Documentation only |
-| `test` | Adding/updating tests |
-| `chore` | Maintenance tasks |
-| `style` | Formatting changes |
-| `perf` | Performance improvements |
-
-### Co-Author Best Practices
-
-- Only attribute when Claude contributed meaningfully
-- Use consistent email format
-- Keep attribution honest and accurate
+- Always use HEREDOC format for commits: `git commit -m "$(cat <<'EOF' ... EOF)"`
+- Conventional types: feat, fix, refactor, docs, test, chore, style, perf
+- When `extendedDescription.enabled` is false, the subject line IS the entire commit (no description body)
+- See `/prdx:config` for all configuration options and examples
