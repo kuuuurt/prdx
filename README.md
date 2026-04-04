@@ -191,10 +191,10 @@ Run PRDX from GitHub Actions or any CI environment. PRDs are stored as GitHub is
 
 ```bash
 # Plan only — generates PRD, posts as issue comment
-/prdx:prdx --ci --issue 42 --plan-only --requested-by username
+/prdx:ci --issue 42 --plan-only --requested-by username
 
 # Implement — reads PRD from issue comment, implements, creates PR
-/prdx:prdx --ci --issue 42 --requested-by username
+/prdx:ci --issue 42 --requested-by username
 ```
 
 ### Responsibility Boundaries
