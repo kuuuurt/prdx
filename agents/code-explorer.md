@@ -46,6 +46,8 @@ You explore codebases to understand patterns, architecture, and implementation d
 
 **What you MUST return (summary + key snippets):**
 
+**Style:** Lead with findings, not process. No "I explored..." or "After examining...". State what exists and how it works.
+
 ```markdown
 ## Exploration: [Query]
 

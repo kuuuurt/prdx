@@ -68,7 +68,9 @@ PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] |
 
 **1.3: Explore codebase** via `prdx:code-explorer` agent. Pass `ISSUE_TITLE` + `ISSUE_BODY`.
 
-**1.4: Generate PRD content** using the full PRD template (do NOT write a file):
+**1.4: Generate PRD content** using the full PRD template (do NOT write a file).
+
+**Writing style:** Lead with the point. Problem: 1-3 sentences. Goal: 1 sentence. ACs: start with verb, testable, no explanations. Approach: 1-3 sentences. Risks: bullet list, max 3. No throat-clearing, hedging, or preambles.
 
 ```markdown
 # {ISSUE_TITLE}
@@ -80,19 +82,19 @@ PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] |
 **Created:** {TODAY}
 
 ## Problem
-{From ISSUE_BODY}
+{1-3 sentences: what is broken/missing and why it matters}
 
 ## Goal
-{From issue title/body}
+{1 sentence: desired end state in user/business terms}
 
 ## Acceptance Criteria
 {From ISSUE_BODY checkboxes/lists, or derive 2-3 testable criteria}
 
 ## Approach
-{From codebase exploration}
+{1-3 sentences or numbered steps. Direction only}
 
 ## Risks & Considerations
-{1-2 risks from codebase exploration}
+{Bullet list. Risk → consequence. Max 2}
 ```
 
 **1.5: Post PRD as issue comment:**

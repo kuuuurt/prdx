@@ -256,6 +256,35 @@ Task tool: subagent_type="prdx:docs-explorer", prompt="[your docs question]"
 
 **NEVER use:** `subagent_type: "Explore"`, Glob, Grep, or Read for exploration. These pollute the main context.
 
+### PRD Writing Style
+
+Every PRD section follows these rules. The goal is readable but tight — no caveman-speak, just zero filler.
+
+**Lead with the point.** State what's broken, what's needed, or what to do. Justify after if needed — never before.
+
+**Section constraints:**
+- **Problem:** 1-3 sentences. What is broken/missing + why it matters.
+- **Goal:** 1 sentence. Desired end state in user/business terms.
+- **User Stories:** Max 3. Omit if the user is obvious from context.
+- **Acceptance Criteria:** Start with a verb. Testable. No inline explanations.
+- **Approach:** 1-3 sentences or a numbered list. Direction only — no implementation details (that's the dev plan's job).
+- **Scope:** Bullets only. No prose introductions.
+- **Risks:** Bullet list, "risk → consequence" format. Max 3 unless genuinely more.
+
+**Cut these patterns:**
+- Throat-clearing: "In order to", "The purpose of this is to", "It should be noted that"
+- Hedging: "might", "possibly", "it seems like", "could potentially"
+- Preambles: "This section describes...", "Below we outline..."
+- Padding: "As mentioned above", "To summarize", "Additionally"
+- Restating the title or type in the Problem statement
+
+**Keep these — they are substance, not fluff:**
+- Tables for comparisons (high signal density)
+- Code snippets and file paths
+- Concrete numbers and evidence
+- Active voice, present tense
+- Fragments in bullet items
+
 **If QUICK_MODE — use this lightweight template:**
 
 Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined template:
@@ -308,11 +337,11 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 ## Problem
 
-[What pain point or opportunity exists? Why does this matter?]
+[1-3 sentences: what is broken/missing and why it matters]
 
 ## Goal
 
-[What outcome do we want? Express in terms of user/business benefit.]
+[1 sentence: desired end state in user/business terms]
 
 ## User Stories   ← include only when the feature has identifiable end users (omit for infra, data pipelines, CLI tools, libraries)
 
@@ -333,11 +362,11 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 ## Approach
 
-[High-level strategy - general direction, NOT detailed dev tasks]
+[1-3 sentences or numbered steps. Direction only — no implementation details]
 
 ## Risks & Considerations   ← include only when non-trivial risks or constraints exist (omit for straightforward changes)
 
-- [Technical/business risks and constraints]
+- [Risk → consequence. Max 3 unless genuinely more]
 ```
 
 **Conditional section guidance:**
