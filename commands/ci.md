@@ -42,21 +42,6 @@ Route: `--plan-only` → Step 1 | otherwise → Step 2.
 
 ---
 
-## CI Progress Comment Helper
-
-```bash
-REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-RUN_URL="${GITHUB_SERVER_URL}/${REPO}/actions/runs/${GITHUB_RUN_ID}"
-PROGRESS_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "> {MESSAGE} 🔨
->
-> [View job run]($RUN_URL)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
-
-# To update:
-gh api "repos/$REPO/issues/comments/$PROGRESS_COMMENT_ID" -X PATCH -f body="{DONE_MESSAGE}"
-```
-
----
-
 ## Step 1: Plan-Only Path
 
 Generates a PRD and posts it as an issue comment.
@@ -73,7 +58,12 @@ Generates a PRD and posts it as an issue comment.
 PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
 ```
 
-- **No PRD comment (fresh plan):** Post progress comment (`Planning...`), continue to 1.3.
+- **No PRD comment (fresh plan):** React `eyes` on the issue to signal planning has started:
+  ```bash
+  REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+  gh api "repos/$REPO/issues/$ISSUE_NUMBER/reactions" -X POST -f content="eyes"
+  ```
+  Continue to 1.3.
 - **PRD comment exists (revision):** Jump to 1.6.
 
 **1.3: Explore codebase** via `prdx:code-explorer` agent. Pass `ISSUE_TITLE` + `ISSUE_BODY`.
@@ -115,13 +105,25 @@ PRDBODY
 )" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
 ```
 
-Update progress comment: `"Planning complete. PRD posted above — comment \`@claude implement\` when ready, or \`@claude revise\` with feedback."`
+React `rocket` on the issue to signal the PRD is ready:
+```bash
+gh api "repos/$REPO/issues/$ISSUE_NUMBER/reactions" -X POST -f content="rocket"
+```
 
 ---
 
 **1.6: Revision path (existing PRD comment):**
 
-1. Post progress comment: `Revising PRD...`
+1. Identify the feedback comment that triggered this revision (the most recent non-PRD user comment):
+   ```bash
+   REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+   TRIGGER_COMMENT_ID=$(gh issue view "$ISSUE_NUMBER" --json comments --jq \
+     '[.comments[] | select(.body | contains("<!-- prdx-prd -->") | not)] | last | .databaseId // .id' 2>/dev/null)
+   ```
+   React `eyes` on the feedback comment to signal revision has started:
+   ```bash
+   gh api "repos/$REPO/issues/comments/$TRIGGER_COMMENT_ID/reactions" -X POST -f content="eyes"
+   ```
 2. Fetch existing PRD comment:
    ```bash
    PRD_COMMENT_ID=$(echo "$PRD_COMMENT" | jq -r '.databaseId // .id' 2>/dev/null)
@@ -140,7 +142,10 @@ Update progress comment: `"Planning complete. PRD posted above — comment \`@cl
    gh api "repos/$REPO/issues/comments/$PRD_COMMENT_ID" -X PATCH -f body="<!-- prdx-prd -->
    {REVISED PRD CONTENT}"
    ```
-7. Update progress comment: `"PRD revised. Comment \`@claude implement\` when ready."`
+7. React `rocket` on the feedback comment to signal revision is complete:
+   ```bash
+   gh api "repos/$REPO/issues/comments/$TRIGGER_COMMENT_ID/reactions" -X POST -f content="rocket"
+   ```
 
 ---
 
@@ -167,9 +172,14 @@ PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/
 | condition | action |
 |-----------|--------|
 | PRD found + PR exists | Fix iteration path (below) |
-| PRD found + no PR | Fresh implementation — post progress (`Implementing...`), continue to 2.3 |
+| PRD found + no PR | Fresh implementation — react `eyes` on the issue, continue to 2.3 |
 | No PRD + PR exists | Find linked issue from PR body (`Closes #N`), fetch PRD from that issue |
 | No PRD + no PR | Error: `No PRD found for issue #{ISSUE_NUMBER}. Run \`@claude plan\` first.` |
+
+For the fresh implementation case (PRD found + no PR), react `eyes` on the issue:
+```bash
+gh api "repos/$REPO/issues/$ISSUE_NUMBER/reactions" -X POST -f content="eyes"
+```
 
 **2.3: Write PRD locally and set up branch:**
 
@@ -203,7 +213,10 @@ Invoke `prdx:pr-author` agent: create a real (non-draft) PR. Include `Closes #{I
 
 **2.6: Finalize:**
 
-Update progress comment: `"Implementation complete. PR #${PR_NUMBER} created. Comment \`@claude review\` for code review."`
+Post a single short comment on the issue with the PR link:
+```bash
+gh issue comment "$ISSUE_NUMBER" --body "Created PR #${PR_NUMBER}."
+```
 
 Write state: `{"slug": "${SLUG}", "phase": "review", "quick": false, "pr_number": ${PR_NUMBER}}`
 
@@ -213,7 +226,14 @@ Write state: `{"slug": "${SLUG}", "phase": "review", "quick": false, "pr_number"
 
 1. Checkout branch: `git fetch origin "$BRANCH" && git checkout "$BRANCH" && git pull origin "$BRANCH"`
 2. Write PRD locally (same as 2.3).
-3. Post progress comment: `Applying fixes...`
+3. Identify the review comment that triggered this fix iteration and react `eyes` on it:
+   ```bash
+   REVIEW_COMMENT_ID=$(gh api "repos/$REPO/pulls/$PR_NUMBER/comments" --jq '[.[] | select(.position != null)] | last | .id' 2>/dev/null)
+   gh api "repos/$REPO/issues/comments/$REVIEW_COMMENT_ID/reactions" -X POST -f content="eyes"
+   ```
 4. Run: `export CI=true` then `/prdx:implement {SLUG}`
 5. Push: `git push origin "$BRANCH"`
-6. Update progress comment: `"Fixes applied to PR #${PR_NUMBER}. Comment \`@claude review\` for another code review."`
+6. React `rocket` on the review comment to signal fixes are applied:
+   ```bash
+   gh api "repos/$REPO/issues/comments/$REVIEW_COMMENT_ID/reactions" -X POST -f content="rocket"
+   ```
