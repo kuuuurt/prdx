@@ -113,6 +113,8 @@ Produce a detailed implementation plan with:
 
 ## Dev Plan Format
 
+**Writing style:** Architecture section: 2-4 sentences total — integration approach, key decisions, connection points. No justifications or alternatives unless a risk demands it. Task descriptions: start with a verb, one line each. Risk descriptions: 1 sentence each, max 3.
+
 Return the dev plan in this exact format:
 
 ```markdown
@@ -120,9 +122,7 @@ Return the dev plan in this exact format:
 
 ### Architecture
 
-[How this integrates with existing codebase]
-[Key architectural decisions]
-[Integration points with existing code]
+[2-4 sentences: integration approach, key decisions, and connection points]
 
 ### Files
 
@@ -180,8 +180,9 @@ Group tasks into phases. Phases execute in order; tasks within a parallel phase 
 
 ### Technical Risks
 
-- **Risk:** [description]
-  **Mitigation:** [approach]
+- **Risk:** [1 sentence]
+  **Mitigation:** [1 sentence]
+<!-- max 3 risks -->
 
 ### Dependencies
 

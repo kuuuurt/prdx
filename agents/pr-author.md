@@ -95,6 +95,8 @@ Add PR metadata to the PRD file. **Skip this step in standalone mode.**
 
 ## PR Format — PRD Mode
 
+**Writing style:** Lead with the point. Summary: 1-2 sentences, state the value delivered. Architecture: 2-3 sentences, state the structural approach. No throat-clearing, hedging, or "this PR does X" preambles — the title already says what it does.
+
 Generate PR with this structure:
 
 **Title:** `{prefix}: {concise description}`
@@ -120,7 +122,7 @@ Closes #{ISSUE_NUMBER}  <!-- REQUIRED if PRD has **Issue:** field -->
 ## Changes
 
 ### Architecture
-{High-level architectural approach}
+{2-3 sentences: structural approach and key decisions}
 
 ### Key Changes
 - {Change 1}
@@ -135,7 +137,7 @@ Closes #{ISSUE_NUMBER}  <!-- REQUIRED if PRD has **Issue:** field -->
 
 ## Testing
 
-{Summary of test coverage}
+{1 sentence: what's tested}
 - Unit tests: {count} tests
 - Integration tests: {count} tests
 
