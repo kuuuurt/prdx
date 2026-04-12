@@ -50,9 +50,9 @@ Scan `.prdx/state/` for state files with `"phase": "pushed"`, check if PRs are m
 
 ### Step 1: Determine Entry Point
 
-**Identical to `/prdx:prdx` Step 1.** Same state file checking, argument parsing, `--quick` flag handling, PRD matching, and resume logic.
+Same logic as `/prdx:prdx` Step 1. See [skills/prdx-workflow.md#entry-point-routing](../skills/prdx-workflow.md#entry-point-routing) for the full routing specification.
 
-The only difference: when resuming from `"implementing"` phase, jump to Step 4 (team implementation) instead of calling `/prdx:implement`.
+The only difference from `/prdx:prdx`: when resuming from `"implementing"` phase, jump to Step 4 (team implementation) instead of calling `/prdx:implement`.
 
 ---
 
@@ -245,24 +245,11 @@ EOF
 
 #### Step 3c: Post-Planning Decision Point
 
-**Same decision point as `/prdx:prdx` Step 2:**
-
-**Normal mode:**
-- Option 1: "Publish to GitHub" — Create issue for team visibility
-- Option 2: "Implement now" — Start coding
-- Option 3: "Stop here" — Review PRD later
-
-**Quick mode:**
-- Option 1: "Implement now" (Recommended)
-- Option 2: "Stop here"
-
-Route: Publish → Step 3d, Implement → Step 4, Stop → shut down team, delete state, end workflow.
+Same options as `/prdx:prdx` Step 2 (normal: Publish / Implement / Stop; quick: Implement / Stop). Route: Publish → Step 3d, Implement → Step 4, Stop → shut down team + delete state.
 
 #### Step 3d: Publish (Optional)
 
-If user chose to publish, run `/prdx:publish {slug}` (same as `/prdx:prdx` Step 2a).
-
-After issue is created, ask: Implement now? / Stop here?
+Run `/prdx:publish {slug}` (same as `/prdx:prdx` Step 2a). After issue is created, ask: Implement now? / Stop here?
 
 ---
 
@@ -502,7 +489,9 @@ Wait for auditor's AC verification message.
 
 **If all ACs verified:** Proceed to Step 4.7b.
 
-**If ACs unmet (AC fix loop — max 3 attempts):**
+**AC fix loop — max 3 attempts.** On exhaustion → AskUserQuestion (Proceed to code review / Fix manually / Stop). See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification including the stale-reviewer-output rule.
+
+**If ACs unmet:**
 
 1. Display AC verification summary to user
 2. Relay unmet ACs to platform dev:
@@ -529,10 +518,7 @@ Wait for auditor's AC verification message.
    ```
 5. Wait for auditor's re-verification
 6. If ACs still unmet and attempts < 3, loop back to step 2
-7. **If ACs still unmet after 3 attempts:** Offer user choice via AskUserQuestion:
-   - Option 1: "Proceed to code review" (Recommended) — Continue with noted AC gaps
-   - Option 2: "Fix manually" — Stop, user fixes AC issues
-   - Option 3: "Stop" — End workflow
+7. **If ACs still unmet after 3 attempts:** Escalate per `skills/fix-loop.md` (AskUserQuestion).
 
 #### Step 4.7b: Code Review (Reviewer)
 
@@ -556,6 +542,8 @@ SendMessage:
 Wait for reviewer's review message.
 
 **If no issues found:** Proceed to Step 4.8.
+
+**Code review fix loop — max 2 cycles.** On exhaustion → AskUserQuestion (Proceed anyway / Fix manually / Stop). See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification.
 
 **If issues found (review cycle 1):**
 
@@ -582,10 +570,7 @@ Wait for reviewer's review message.
      Send me your updated review."
    ```
 5. Wait for reviewer's second review
-6. **If issues remain after cycle 2:** Note remaining issues, offer user choice via AskUserQuestion:
-   - Option 1: "Proceed anyway" (Recommended) — Continue with noted issues
-   - Option 2: "Fix manually" — Stop, user fixes remaining issues
-   - Option 3: "Stop" — End workflow
+6. **If issues remain after cycle 2:** Escalate per `skills/fix-loop.md` (AskUserQuestion).
 
 **If no issues after fixes:** Proceed to Step 4.8.
 
@@ -629,48 +614,31 @@ After review completes:
 
 ### Step 5: Post-Implementation Decision Point
 
-**Identical to `/prdx:prdx` Step 3 (after implementation).**
-
-**If QUICK_MODE:**
-- Option 1: "Create PR" (Recommended)
-- Option 2: "Create Draft PR"
-- Option 3: "Done" — Commit only, no PR
-- Option 4: "Test first"
-
-**If NOT QUICK_MODE:**
-- Option 1: "Test first" (Recommended)
-- Option 2: "Create PR now"
-- Option 3: "Create Draft PR"
-
-Route: same as `/prdx:prdx`. PR creation uses `/prdx:push {slug}`.
+**Identical to `/prdx:prdx` Step 3 (after implementation).** Same AskUserQuestion options (quick: Create PR / Draft PR / Done / Test first; normal: Test first / Create PR now / Draft PR). PR creation uses `/prdx:push {slug}`.
 
 ---
 
 ### Step 5a: Review Status Decision
 
-**Identical to `/prdx:prdx` Step 3a.** When PRD status is `review`, offer Create PR / Draft PR / Fix issues / View summary.
-
-When "Fix issues" is chosen: fix directly in conversation (no team needed), commit, ask again.
+**Identical to `/prdx:prdx` Step 3a.** Create PR / Draft PR / Fix issues / View summary. Fix issues in conversation (no team), commit, ask again.
 
 ---
 
 ### Step 5b: Reviewing Loop (Draft PR)
 
-**Identical to `/prdx:prdx` Step 3b.** Fetch PR comments, offer fix/push/mark-ready options. Fixes happen in the main session (no team).
+Same logic as `/prdx:prdx` Step 3b. See [skills/prdx-workflow.md#reviewing-loop](../skills/prdx-workflow.md#reviewing-loop) for the full decision-point specification. Fixes happen in the main session (no team).
 
 ---
 
 ### Step 6: Create Pull Request
 
-**Identical to `/prdx:prdx` Step 4.** Uses `/prdx:push {slug}` (with `--draft` if applicable).
-
-State transitions: `pushing` → `pushed` (for non-draft) or `reviewing` (for draft).
+**Identical to `/prdx:prdx` Step 4.** Uses `/prdx:push {slug}` (with `--draft` if applicable). State: `pushing` → `pushed` (non-draft) or `reviewing` (draft).
 
 ---
 
 ### Step 7: Cleanup (Quick Mode Only)
 
-**Identical to `/prdx:prdx` Step 5.** Delete temporary PRD and state files when user chose "Done" (no PR). For PRs, cleanup happens after lesson capture on next startup.
+**Identical to `/prdx:prdx` Step 5.** Delete temporary PRD and state files on "Done" (no PR). PRs: cleanup after lesson capture on next startup.
 
 ---
 

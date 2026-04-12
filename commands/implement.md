@@ -536,6 +536,10 @@ Perform the three-point check: code exists, test exists, coverage (happy + error
 Return only the AC verification summary."
 ```
 
+**AC fix loop:** up to 3 attempts — invoke platform developer with unmet ACs, re-run ac-verifier after each fix. On exhaustion → AskUserQuestion (Proceed to code review / Fix manually / Stop).
+
+See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification.
+
 **If any AC is NOT MET or Partial:**
 1. Display the AC verification summary to the conversation
 2. Feed the unmet/partial ACs back to the platform agent for fixing:
@@ -572,24 +576,7 @@ prompt: "Fix the following unmet acceptance criteria.
 Return only a summary of fixes applied."
 ```
 
-3. After fixes, re-run the ac-verifier to confirm
-4. If ACs still unmet, loop back: platform agent fixes → ac-verifier re-checks
-5. Continue looping until all ACs are verified or 3 attempts are exhausted
-
-**If all ACs verified (at any attempt):**
-- Continue to Step 5f
-
-**If ACs still unmet after 3 fix attempts:**
-
-Use AskUserQuestion to offer options:
-- Option 1: "Proceed to code review" (Recommended) — Continue with remaining AC gaps noted
-- Option 2: "Fix manually" — Stop here, let user fix AC issues (status stays `in-progress`)
-- Option 3: "Stop implementation" — Halt workflow entirely
-
-Route based on choice:
-- Proceed → Continue to Step 5f, include unmet ACs in completion summary
-- Fix manually → Display unmet ACs, end workflow
-- Stop → End workflow, show how to resume with `/prdx:prdx {slug}`
+Follow the AC fix loop from `skills/fix-loop.md`: re-run ac-verifier after each fix, loop until verified or 3 attempts exhausted.
 
 ---
 
@@ -618,6 +605,10 @@ Only report high-confidence issues (>80%).
 
 Return only the review summary."
 ```
+
+**Code review fix loop:** up to 2 cycles — invoke platform developer with review issues, re-run code-reviewer after each fix. On exhaustion → AskUserQuestion (Proceed anyway / Fix manually / Stop).
+
+See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification.
 
 **If issues found:**
 1. Display the review summary to the conversation
@@ -651,19 +642,7 @@ prompt: "Fix the following code review issues.
 Return only a summary of fixes applied."
 ```
 
-3. After fixes, re-run the code reviewer to verify (max 2 review cycles to avoid loops)
-
-**If 2 review cycles exhausted and issues remain:**
-
-Use AskUserQuestion to offer options:
-- Option 1: "Proceed anyway" (Recommended) — Continue to Step 6 with remaining issues noted
-- Option 2: "Fix manually" — Stop here, let user fix remaining issues (status stays `in-progress`)
-- Option 3: "Stop implementation" — Halt workflow entirely
-
-Route based on choice:
-- Proceed → Continue to Step 6, include remaining issues in completion summary
-- Fix manually → Display remaining issues, end workflow
-- Stop → End workflow, show how to resume with `/prdx:prdx {slug}`
+Follow the code review fix loop from `skills/fix-loop.md`: re-run code-reviewer after each fix, max 2 cycles.
 
 **If no issues found (or after fixes verified):**
 - Continue to Step 6
