@@ -108,7 +108,7 @@ _WORDS=$(echo "$_SLUG" | tr '-' '\n' | grep -v '^$')
 if [ -n "$_WORDS" ]; then
   _WB_MATCHES=$(ls "$PLANS_DIR"/prdx-*.md 2>/dev/null)
   for _WORD in $_WORDS; do
-    _WB_MATCHES=$(echo "$_WB_MATCHES" | xargs -I{} bash -c 'basename "$1" .md | grep -qi "$2" && echo "$1"' _ {} "$_WORD" 2>/dev/null)
+    _WB_MATCHES=$(echo "$_WB_MATCHES" | xargs -I{} bash -c 'basename "$1" .md | grep -qi -- "$2" && echo "$1"' _ {} "$_WORD" 2>/dev/null)
     [ -z "$_WB_MATCHES" ] && break
   done
 
