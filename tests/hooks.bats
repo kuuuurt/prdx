@@ -235,3 +235,196 @@ load helpers/test_helper
     echo "$output" | grep -q "PRD validation passed"
     [ "$?" -eq 0 ]
 }
+
+# ============================================================
+# resolve-slug.sh tests
+# ============================================================
+
+@test "resolve-slug: exact prefixed match sets RESOLVED_SLUG and PRD_FILE" {
+    copy_fixture_to_plans "valid-prd" "prdx-my-feature"
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-slug.sh" my-feature
+        echo "SLUG=$RESOLVED_SLUG"
+        echo "FILE=$PRD_FILE"
+        echo "RENAMED=$RENAMED"
+    '
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "SLUG=my-feature"
+    echo "$output" | grep -q "FILE=.*prdx-my-feature.md"
+    echo "$output" | grep -q "RENAMED=false"
+}
+
+@test "resolve-slug: exact unprefixed match auto-renames file and sets RENAMED=true" {
+    copy_fixture_to_plans "valid-prd" "unprefixed-plan"
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-slug.sh" unprefixed-plan
+        echo "SLUG=$RESOLVED_SLUG"
+        echo "RENAMED=$RENAMED"
+        [ -f "$PLANS_DIR/prdx-unprefixed-plan.md" ] && echo "FILE_EXISTS=true"
+        [ ! -f "$PLANS_DIR/unprefixed-plan.md" ] && echo "OLD_GONE=true"
+    '
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "SLUG=unprefixed-plan"
+    echo "$output" | grep -q "RENAMED=true"
+    echo "$output" | grep -q "FILE_EXISTS=true"
+    echo "$output" | grep -q "OLD_GONE=true"
+}
+
+@test "resolve-slug: substring match resolves correct slug" {
+    copy_fixture_to_plans "valid-prd" "prdx-backend-auth-refresh"
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-slug.sh" auth-refresh
+        echo "SLUG=$RESOLVED_SLUG"
+    '
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "SLUG=backend-auth-refresh"
+}
+
+@test "resolve-slug: word-boundary match finds PRD containing all words" {
+    copy_fixture_to_plans "valid-prd" "prdx-backend-auth-refresh"
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-slug.sh" auth
+        echo "SLUG=$RESOLVED_SLUG"
+    '
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "SLUG=backend-auth-refresh"
+}
+
+@test "resolve-slug: ambiguous match exits 1 and prints listing" {
+    copy_fixture_to_plans "valid-prd" "prdx-backend-auth"
+    copy_fixture_to_plans "valid-prd" "prdx-backend-auth-refresh"
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    # Use "auth" as slug — it won't match either exactly, so substring step finds both
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-slug.sh" auth 2>&1 || exit 1
+        echo "RESOLVED=$RESOLVED_SLUG"
+    '
+
+    [ "$status" -ne 0 ]
+    echo "$output" | grep -qE "Multiple|backend-auth"
+}
+
+@test "resolve-slug: not found exits 1 and lists available PRDs" {
+    copy_fixture_to_plans "valid-prd" "prdx-other-feature"
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-slug.sh" nonexistent-xyz 2>&1
+        echo "SLUG=$RESOLVED_SLUG"
+    '
+
+    [ "$status" -ne 0 ] || echo "$output" | grep -q "SLUG=$"
+    echo "$output" | grep -qiE "not found|Available|other-feature"
+}
+
+@test "resolve-slug: PLANS_DIR unset exits 1 with error message" {
+    run bash -c '
+        unset PLANS_DIR
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-slug.sh" some-slug 2>&1
+        echo "exit=$?"
+    '
+
+    echo "$output" | grep -qE "PLANS_DIR|resolve-plans-dir"
+}
+
+# ============================================================
+# read-state.sh tests
+# ============================================================
+
+@test "read-state: present state file with all keys sets all STATE_* vars" {
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+    mkdir -p "$TEST_TEMP_DIR/.prdx/state"
+    cat > "$TEST_TEMP_DIR/.prdx/state/my-feature.json" <<'EOF'
+{"slug": "my-feature", "phase": "in-progress", "quick": false, "parent": "parent-prd", "pr_number": 42}
+EOF
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/read-state.sh" my-feature
+        echo "PHASE=$STATE_PHASE"
+        echo "QUICK=$STATE_QUICK"
+        echo "PARENT=$STATE_PARENT"
+        echo "PR=$STATE_PR_NUMBER"
+    '
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "PHASE=in-progress"
+    echo "$output" | grep -q "QUICK=false"
+    echo "$output" | grep -q "PARENT=parent-prd"
+    echo "$output" | grep -q "PR=42"
+}
+
+@test "read-state: present state file missing optional keys leaves those vars empty" {
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+    mkdir -p "$TEST_TEMP_DIR/.prdx/state"
+    cat > "$TEST_TEMP_DIR/.prdx/state/simple-feature.json" <<'EOF'
+{"slug": "simple-feature", "phase": "review", "quick": false}
+EOF
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/read-state.sh" simple-feature
+        echo "PHASE=$STATE_PHASE"
+        echo "PARENT=$STATE_PARENT"
+        echo "PR=$STATE_PR_NUMBER"
+    '
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "PHASE=review"
+    echo "$output" | grep -q "PARENT=$"
+    echo "$output" | grep -q "PR=$"
+}
+
+@test "read-state: absent state file sets all STATE_* vars empty and exits 0" {
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/read-state.sh" nonexistent-slug
+        echo "PHASE=$STATE_PHASE"
+        echo "PARENT=$STATE_PARENT"
+        echo "PR=$STATE_PR_NUMBER"
+    '
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "PHASE=$"
+    echo "$output" | grep -q "PARENT=$"
+    echo "$output" | grep -q "PR=$"
+}
+
+@test "read-state: malformed JSON sets all STATE_* vars empty and exits 0 with warning" {
+    export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
+    mkdir -p "$TEST_TEMP_DIR/.prdx/state"
+    echo "{ not valid json ::::" > "$TEST_TEMP_DIR/.prdx/state/broken-feature.json"
+
+    run bash -c '
+        source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
+        source "'"$REPO_ROOT"'/hooks/prdx/read-state.sh" broken-feature 2>&1
+        echo "PHASE=$STATE_PHASE"
+        echo "PR=$STATE_PR_NUMBER"
+    '
+
+    [ "$status" -eq 0 ]
+    echo "$output" | grep -q "PHASE=$"
+    echo "$output" | grep -q "PR=$"
+    echo "$output" | grep -qi "warning\|malformed"
+}

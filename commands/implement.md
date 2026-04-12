@@ -107,29 +107,15 @@ Store `NO_CACHE` — it will be passed to the dev-planner agent in Step 5a.
 
 ### Step 2: Load PRD
 
-**Resolve slug to PRD file using enhanced matching:**
+**Resolve slug to PRD file:**
 
-1. **Exact match (prefixed):** `{PLANS_DIR}/prdx-{slug}.md`
-2. **Exact match (unprefixed fallback):** `{PLANS_DIR}/{slug}.md` — for plans created without the `prdx-` prefix
-3. **Substring match:** `ls {PLANS_DIR}/prdx-*{slug}*.md` — slug appears anywhere in prefixed filenames
-4. **Substring match (unprefixed fallback):** `ls {PLANS_DIR}/*{slug}*.md` — search all plans if no prefixed match
-5. **Word-boundary match:** Split slug into words, find PRDs containing all words (in any order)
-6. **Disambiguation:** If multiple matches at any step, use AskUserQuestion to let user select:
-   ```
-   Multiple PRDs match "{slug}":
-     1. backend-auth
-     2. backend-auth-refresh
-   Which one?
-   ```
-   If exactly one match at any step, use it.
-
-7. If no match found at any step, show error and list available PRDs
-
-**Auto-rename unprefixed plans:** If a match is found without the `prdx-` prefix, rename it to add the prefix before proceeding:
 ```bash
-mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-{slug}.md
+source "$PROJECT_ROOT/hooks/prdx/resolve-slug.sh" "$SLUG_INPUT"
+# → sets: RESOLVED_SLUG, PRD_FILE, RENAMED
+# → on ambiguity or not-found: writes to stderr and returns 1 — use AskUserQuestion to disambiguate
 ```
-Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
+
+If `RENAMED=true`, inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 
 3. Read the PRD file and extract:
    - **Platform** (single-platform PRDs: free-form string, e.g., backend, frontend, android, ios, python, go, etc.)

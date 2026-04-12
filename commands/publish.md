@@ -57,12 +57,11 @@ echo "PLANS_DIR=$PLANS_DIR"
 
 **Find the PRD:**
 
-1. If slug provided, resolve using enhanced matching (exact → substring → word-boundary → disambiguation):
+1. If slug provided:
    ```bash
-   # 1. Exact: {PLANS_DIR}/prdx-{slug}.md
-   # 2. Substring: ls {PLANS_DIR}/prdx-*{slug}*.md
-   # 3. Word-boundary: split slug into words, find PRDs containing all words
-   # 4. Multiple matches → ask user to select
+   source "$PROJECT_ROOT/hooks/prdx/resolve-slug.sh" "$SLUG_INPUT"
+   # → sets: RESOLVED_SLUG, PRD_FILE, RENAMED
+   # → on ambiguity or not-found: writes to stderr and returns 1 — use AskUserQuestion to disambiguate
    ```
 2. If not: list all PRDs and ask user to select
 3. **DO NOT PROCEED** without valid PRD

@@ -63,15 +63,12 @@ Delegates to `prdx:pr-author` agent (isolated context). Two modes: **PRD mode** 
 
 **If slug provided:**
 
-Resolve slug using enhanced matching (exact → substring → word-boundary → disambiguation):
 ```bash
-# 1. Exact (prefixed): {PLANS_DIR}/prdx-{slug}.md
-# 2. Exact (unprefixed fallback): {PLANS_DIR}/{slug}.md
-# 3. Substring: ls {PLANS_DIR}/*{slug}*.md
-# 4. Word-boundary: split slug into words, find PRDs containing all words
-# 5. Multiple matches → ask user to select
+source "$PROJECT_ROOT/hooks/prdx/resolve-slug.sh" "$SLUG_INPUT"
+# → sets: RESOLVED_SLUG, PRD_FILE, RENAMED
+# → on ambiguity or not-found: writes to stderr and returns 1 — use AskUserQuestion to disambiguate
 ```
-**Auto-rename unprefixed plans:** If matched without `prdx-` prefix, rename to `prdx-{slug}.md` and inform user.
+If `RENAMED=true`, inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 - Found → **PRD mode**
 - Not found → Error: "PRD not found: {slug}. Did you mean to run without a PRD? Use `/prdx:push` with no arguments from your feature branch."
 
