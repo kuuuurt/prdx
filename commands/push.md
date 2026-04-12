@@ -7,10 +7,7 @@ argument-hint: "[slug]"
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-default-branch.sh"
-echo "DEFAULT_BRANCH=$DEFAULT_BRANCH"
-echo "Branch: $(git branch --show-current)"
 ```
 
 # /prdx:push - Create Pull Request

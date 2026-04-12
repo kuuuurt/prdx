@@ -7,15 +7,10 @@ argument-hint: "[slug]"
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
-echo "Branch: $(git branch --show-current)"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-default-branch.sh"
-echo "DEFAULT_BRANCH=$DEFAULT_BRANCH"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-commit-config.sh"
-echo "COMMIT_FORMAT=$COMMIT_FORMAT COAUTHOR_ENABLED=$COAUTHOR_ENABLED COAUTHOR_NAME=$COAUTHOR_NAME COAUTHOR_EMAIL=$COAUTHOR_EMAIL EXTENDED_DESC=$EXTENDED_DESC_ENABLED CLAUDE_LINK=$CLAUDE_LINK_ENABLED"
-git status --short
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+AVAILABLE_PRDS=$(grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || true)
 ```
 
 # /prdx:implement - Implement Feature

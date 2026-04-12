@@ -7,15 +7,11 @@ argument-hint: "[--quick] [description]"
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
-echo "PROJECT_ROOT=$PROJECT_ROOT"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/ensure-gitignore.sh"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/first-run-setup.sh"
-echo "FIRST_RUN=$FIRST_RUN"
-echo "Branch: $(git branch --show-current)"
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-echo "PROJECT_NAME=$PROJECT_NAME"
-git branch -a --format='%(refname:short)' 2>/dev/null | head -50
+BRANCH_LIST=$(git branch -a --format='%(refname:short)' 2>/dev/null | head -50)
+[ "$FIRST_RUN" = "true" ] && echo "PRDX initialized. Plans: $PLANS_DIR"
 ```
 
 # /prdx:plan - Create Product Requirements Document

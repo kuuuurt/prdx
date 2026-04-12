@@ -14,7 +14,6 @@ argument-hint: "[slug] [--issue #123]"
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
 ```
 
 ## Step 0: Validate GitHub CLI

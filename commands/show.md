@@ -46,7 +46,6 @@
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
 ```
 
 ## Phase 1: Determine Mode

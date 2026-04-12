@@ -7,15 +7,11 @@ argument-hint: "[--quick] [--ci] [--issue <number>] [feature description or PRD 
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
-echo "PROJECT_ROOT=$PROJECT_ROOT"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/ensure-gitignore.sh"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/first-run-setup.sh"
-echo "FIRST_RUN=$FIRST_RUN"
-echo "SETUP_DONE=$(ls .prdx/plans-setup-done 2>/dev/null && echo yes || echo no)"
-ls .prdx/state/*.json 2>/dev/null
+ACTIVE_STATES=$(ls .prdx/state/*.json 2>/dev/null)
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-echo "PROJECT_NAME=$PROJECT_NAME"
+[ "$FIRST_RUN" = "true" ] && echo "PRDX initialized. Plans: $PLANS_DIR"
 ```
 
 # /prdx:prdx - Complete Feature Workflow
