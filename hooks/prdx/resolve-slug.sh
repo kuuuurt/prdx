@@ -17,8 +17,10 @@
 #   0 on success (exactly one match found)
 #   1 on failure (no match or ambiguous match)
 
-# Guard: skip if already resolved
-[ -n "$RESOLVED_SLUG" ] && return 0
+# Guard: skip if already resolved for this exact slug
+if [ -n "$_RESOLVE_SLUG_LAST" ] && [ "$_RESOLVE_SLUG_LAST" = "$1" ]; then
+  return 0
+fi
 
 _INPUT_SLUG="$1"
 
@@ -32,9 +34,13 @@ if [ -z "$_INPUT_SLUG" ]; then
   return 1
 fi
 
+# Record which slug we are resolving (set after arg validation so invalid calls don't poison it)
+_RESOLVE_SLUG_LAST="$_INPUT_SLUG"
+
 # Strip prdx- prefix from input if present (normalize for matching)
 _SLUG="${_INPUT_SLUG#prdx-}"
 
+# Reset outputs so stale values from a prior call don't leak through
 RESOLVED_SLUG=""
 PRD_FILE=""
 RENAMED="false"
@@ -102,10 +108,7 @@ _WORDS=$(echo "$_SLUG" | tr '-' '\n' | grep -v '^$')
 if [ -n "$_WORDS" ]; then
   _WB_MATCHES=$(ls "$PLANS_DIR"/prdx-*.md 2>/dev/null)
   for _WORD in $_WORDS; do
-    _WB_MATCHES=$(echo "$_WB_MATCHES" | xargs -I{} bash -c '
-      f="{}"; w="'"$_WORD"'"
-      basename "$f" .md | grep -qi "$w" && echo "$f"
-    ' 2>/dev/null)
+    _WB_MATCHES=$(echo "$_WB_MATCHES" | xargs -I{} bash -c 'basename "$1" .md | grep -qi "$2" && echo "$1"' _ {} "$_WORD" 2>/dev/null)
     [ -z "$_WB_MATCHES" ] && break
   done
 

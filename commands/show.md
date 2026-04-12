@@ -54,7 +54,7 @@ source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
 
 1. **Resolve slug:**
    ```bash
-   source "$PROJECT_ROOT/hooks/prdx/resolve-slug.sh" "$INPUT"
+   source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-slug.sh" "$INPUT"
    # → sets: RESOLVED_SLUG, PRD_FILE, RENAMED
    # → on ambiguity: writes to stderr and returns 1 — use AskUserQuestion to disambiguate
    # → on no match: returns 1 → fall through to SEARCH mode

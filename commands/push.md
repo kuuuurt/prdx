@@ -61,7 +61,7 @@ Delegates to `prdx:pr-author` agent (isolated context). Two modes: **PRD mode** 
 **If slug provided:**
 
 ```bash
-source "$PROJECT_ROOT/hooks/prdx/resolve-slug.sh" "$SLUG_INPUT"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-slug.sh" "$SLUG_INPUT"
 # → sets: RESOLVED_SLUG, PRD_FILE, RENAMED
 # → on ambiguity or not-found: writes to stderr and returns 1 — use AskUserQuestion to disambiguate
 ```

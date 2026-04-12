@@ -574,10 +574,12 @@ echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, 
 [optional — short quotes from the code, only when load-bearing]
 ```
 
-**Append to PRD file — this section MUST be the last section in the file:**
+**Append to PRD file — this section MUST be the last section in the file.**
+
+**This is a write-once step.** If plan mode is resumed (user exits and re-enters), do NOT re-run this append — the section already exists. Check first:
 
 ```bash
-cat >> "{PLANS_DIR}/prdx-{slug}.md" << 'EOF'
+grep -q '^## Codebase Context' "{PLANS_DIR}/prdx-{slug}.md" || cat >> "{PLANS_DIR}/prdx-{slug}.md" << 'EOF'
 
 ## Codebase Context
 

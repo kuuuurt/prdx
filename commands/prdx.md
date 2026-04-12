@@ -23,14 +23,26 @@ PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(
 
 ### Step 1: Determine Entry Point
 
-| phase (from state file) | action |
-|-------------------------|--------|
+When exactly one active state file is identified (see skill for active detection logic), read that slug's state using the shared hook:
+
+```bash
+# SLUG = slug extracted from the identified state file name (strip .prdx/state/ prefix and .json suffix)
+source "$(git rev-parse --show-toplevel)/hooks/prdx/read-state.sh" "$SLUG"
+# → sets: STATE_PHASE, STATE_QUICK, STATE_PARENT, STATE_PR_NUMBER
+```
+
+Route by `STATE_PHASE`:
+
+| phase (`STATE_PHASE`) | action |
+|-----------------------|--------|
 | `"planning"` | Fall through to normal logic below |
 | `"post-planning"` | Show post-planning decision (AskUserQuestion) |
 | `"implementing"` | Jump to Step 3 |
 | `"post-implement"` | Jump to Step 3a |
 | `"reviewing"` | Jump to Step 3b |
 | `"pushing"` / `"pushed"` / `"completed"` | See routing rules in skill |
+
+> When scanning `.prdx/state/*.json` for multiple active sessions (no single slug identified yet), leave the directory scan loop in place — `read-state.sh` is for single-slug reads and is not a good fit for directory scanning. The loop body could be refactored to call `read-state.sh` per iteration in the future.
 
 See [skills/prdx-workflow.md#entry-point-routing](../skills/prdx-workflow.md#entry-point-routing) for the full routing logic (active state detection, quick-flag parsing, CI/issue flags, slug-vs-description resolution, and no-argument handling).
 
