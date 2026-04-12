@@ -283,6 +283,24 @@ Multi-platform features are handled via parent-child PRDs: each child is a singl
 
 #### Step 5a: Dev Planning (prdx:dev-planner)
 
+**Quick-mode shortcut — check this FIRST:**
+
+If the PRD has `**Quick:** true`, skip this step entirely.
+
+Quick-mode PRDs are small and ephemeral — the dev-planner round-trip is wasted context.
+Instead, jump directly to Step 5c (Phased Execution Loop) with a synthesized single-phase plan:
+
+```
+PHASES = [{"phase": 1, "name": "Implementation", "mode": "sequential", "tasks": ["Execute PRD"]}]
+PHASE_CONTENTS = {1: "<entire PRD Approach section>"}
+```
+
+Treat the PRD's `## Approach` section as the full phase content. If `## Approach` is absent, use the entire PRD body. Then proceed to Step 5c.
+
+---
+
+**Non-quick path (normal PRDs):**
+
 **Display progress:**
 ```
 Phase 1/4: Dev Planning — Creating implementation plan...
@@ -493,16 +511,16 @@ After all phases complete:
 
 ---
 
-#### Step 5e: AC Verification (prdx:ac-verifier)
+#### Step 5e: AC Verification + Code Review — Parallel First Pass
 
 **Display progress:**
 ```
-Phase 3/3: AC Verification — Checking acceptance criteria...
+Phase 3/3: AC Verification + Code Review — Running in parallel...
 ```
 
-After all platform implementations are complete, verify that acceptance criteria are met before code review.
+After all platform implementations are complete, launch `prdx:ac-verifier` and `prdx:code-reviewer` **simultaneously** as a read-only first pass. Both agents read the same diff (`git diff {DEFAULT_BRANCH}..HEAD`) — there is no conflict.
 
-Invoke the ac-verifier agent using the Task tool:
+**IMPORTANT: Make both Task tool calls in a single message (parallel execution):**
 
 ```
 subagent_type: "prdx:ac-verifier"
@@ -522,13 +540,42 @@ Perform the three-point check: code exists, test exists, coverage (happy + error
 Return only the AC verification summary."
 ```
 
-**AC fix loop:** up to 3 attempts — invoke platform developer with unmet ACs, re-run ac-verifier after each fix. On exhaustion → AskUserQuestion (Proceed to code review / Fix manually / Stop).
+```
+subagent_type: "prdx:code-reviewer"
+
+prompt: "Review the implementation for this PRD.
+
+PRD Slug: {SLUG}
+Base Branch: {DEFAULT_BRANCH}
+Platform: {PLATFORM}
+
+Review the diff (git diff {DEFAULT_BRANCH}..HEAD) for bugs, security issues, quality problems, and convention adherence.
+Only report high-confidence issues (>80%).
+
+Return only the review summary."
+```
+
+Wait for both agents to complete, then route based on the combined result:
+
+**Routing logic (four branches):**
+
+1. **Both clean** → Skip directly to Step 6 (post-implement hook). This is the happy path — saves one full agent round-trip compared to the old sequential flow.
+
+2. **AC fails, review clean** → Discard the reviewer's first-pass output (it may assume ACs are met — that assumption is now invalid). Run the AC fix loop (Step 5e-fix below — up to 3 attempts). After AC converges, re-run `prdx:code-reviewer` on the new diff. If review now fails, run the review fix loop (Step 5f-fix). If review clean, proceed to Step 6.
+
+3. **AC clean, review fails** → Run the review fix loop directly (Step 5f-fix — up to 2 cycles). AC is already verified so do not re-run it. After fix loop, proceed to Step 6.
+
+4. **Both fail** → Run AC fix loop first (correctness-first invariant — see `skills/fix-loop.md`). Discard the stale reviewer output. After AC converges, re-run `prdx:code-reviewer` on the new diff. If review then fails, run the review fix loop. Proceed to Step 6 when both are clean.
+
+---
+
+#### Step 5e-fix: AC Fix Loop (subroutine)
+
+Invoked when ac-verifier reports one or more ACs NOT MET or Partial. Maximum 3 attempts. On exhaustion → AskUserQuestion (Proceed to code review / Fix manually / Stop).
 
 See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification.
 
-**If any AC is NOT MET or Partial:**
-1. Display the AC verification summary to the conversation
-2. Feed the unmet/partial ACs back to the platform agent for fixing:
+Feed unmet/partial ACs back to the platform agent:
 
 ```
 subagent_type: "prdx:developer"
@@ -562,43 +609,17 @@ prompt: "Fix the following unmet acceptance criteria.
 Return only a summary of fixes applied."
 ```
 
-Follow the AC fix loop from `skills/fix-loop.md`: re-run ac-verifier after each fix, loop until verified or 3 attempts exhausted.
+Re-run `prdx:ac-verifier` after each fix. Loop until all ACs are met or 3 attempts are exhausted.
 
 ---
 
-#### Step 5f: Code Review (prdx:code-reviewer)
+#### Step 5f-fix: Code Review Fix Loop (subroutine)
 
-**Display progress:**
-```
-Code Review — Reviewing for bugs, security, and quality...
-```
-
-Run code review focused on bugs, security, quality, and conventions (AC verification already done in Step 5e).
-
-Invoke the code-reviewer agent using the Task tool:
-
-```
-subagent_type: "prdx:code-reviewer"
-
-prompt: "Review the implementation for this PRD.
-
-PRD Slug: {SLUG}
-Base Branch: {DEFAULT_BRANCH}
-Platform: {PLATFORM}
-
-Review the diff (git diff {DEFAULT_BRANCH}..HEAD) for bugs, security issues, quality problems, and convention adherence.
-Only report high-confidence issues (>80%).
-
-Return only the review summary."
-```
-
-**Code review fix loop:** up to 2 cycles — invoke platform developer with review issues, re-run code-reviewer after each fix. On exhaustion → AskUserQuestion (Proceed anyway / Fix manually / Stop).
+Invoked when code-reviewer reports issues. Maximum 2 cycles. On exhaustion → AskUserQuestion (Proceed anyway / Fix manually / Stop).
 
 See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification.
 
-**If issues found:**
-1. Display the review summary to the conversation
-2. Feed each issue back to the platform agent for fixing:
+Feed review issues back to the platform agent:
 
 ```
 subagent_type: "prdx:developer"
@@ -628,9 +649,9 @@ prompt: "Fix the following code review issues.
 Return only a summary of fixes applied."
 ```
 
-Follow the code review fix loop from `skills/fix-loop.md`: re-run code-reviewer after each fix, max 2 cycles.
+Re-run `prdx:code-reviewer` after each fix. Loop until clean or 2 cycles exhausted.
 
-**If no issues found (or after fixes verified):**
+**After fix loop completes (or if review was already clean):**
 - Continue to Step 6
 
 ---
