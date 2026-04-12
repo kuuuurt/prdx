@@ -157,16 +157,6 @@ EOF
 4. **Update status to `in-progress`:**
    Edit the PRD file to change `**Status:** planning` to `**Status:** in-progress`
 
-5. **React on issue (CI mode only):**
-
-   If `CI=true` environment variable is set and `ISSUE_NUMBER` is available, react `eyes` on the issue to signal implementation has started:
-   ```bash
-   if [ -n "$ISSUE_NUMBER" ]; then
-     REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-     gh api "repos/$REPO/issues/$ISSUE_NUMBER/reactions" -X POST -f content="eyes"
-   fi
-   ```
-
 ### Step 2b: Parent PRD Handling
 
 **This step runs only when the loaded PRD is a parent PRD (contains `## Children` section).**
@@ -712,16 +702,6 @@ Route based on choice:
    ```
 
 ### Step 7: Display Completion
-
-**React on issue (CI mode only):**
-
-If `CI=true` environment variable is set and `ISSUE_NUMBER` is available, react `rocket` on the issue to signal implementation is complete:
-```bash
-if [ -n "$ISSUE_NUMBER" ]; then
-  REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-  gh api "repos/$REPO/issues/$ISSUE_NUMBER/reactions" -X POST -f content="rocket"
-fi
-```
 
 **For single-platform PRDs:**
 ```

@@ -28,6 +28,11 @@ jobs:
 
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_COMMENT_ID: ${{ github.event.comment.id }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          CI: "true"
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: "https://github.com/kuuuurt/prdx.git"
@@ -60,6 +65,11 @@ jobs:
 
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_COMMENT_ID: ${{ github.event.comment.id }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          CI: "true"
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: "https://github.com/kuuuurt/prdx.git"
@@ -133,6 +143,9 @@ jobs:
             Implement the PRD for issue #${{ steps.resolve.outputs.issue }}:
             /prdx:ci --issue ${{ steps.resolve.outputs.issue }} --requested-by ${{ github.actor }}
         env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_COMMENT_ID: ${{ github.event.comment.id }}
+          ISSUE_NUMBER: ${{ steps.resolve.outputs.issue }}
           GIT_AUTHOR_NAME: ${{ github.actor }}
           GIT_AUTHOR_EMAIL: ${{ github.actor }}@users.noreply.github.com
           CI: "true"
@@ -146,7 +159,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: read
+      issues: write
       id-token: write
       actions: read
     steps:
@@ -162,6 +175,11 @@ jobs:
 
       - name: Run Claude Code
         uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_COMMENT_ID: ${{ github.event.comment.id }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          CI: "true"
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |

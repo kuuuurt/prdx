@@ -42,6 +42,24 @@ Route: `--plan-only` → Step 1 | otherwise → Step 2.
 
 ---
 
+## Reactions
+
+The workflow's `Acknowledge comment` step already reacts `eyes` on the triggering comment before Claude Code starts, so `ci.md` only needs to post the `rocket` reaction when work completes. All reactions target the triggering comment (not the issue) so the user sees the emoji on the exact comment they typed.
+
+The trigger comment is passed via the `TRIGGER_COMMENT_ID` env var. If it is unset (e.g., running outside the workflow), skip reactions silently.
+
+```bash
+react_rocket() {
+  [ -z "$TRIGGER_COMMENT_ID" ] && return 0
+  REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+  gh api "repos/$REPO/issues/comments/$TRIGGER_COMMENT_ID/reactions" -X POST -f content="rocket" >/dev/null 2>&1 || true
+}
+```
+
+Call `react_rocket` at the end of each successful flow below.
+
+---
+
 ## Step 1: Plan-Only Path
 
 Generates a PRD and posts it as an issue comment.
@@ -58,12 +76,7 @@ Generates a PRD and posts it as an issue comment.
 PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
 ```
 
-- **No PRD comment (fresh plan):** React `eyes` on the issue to signal planning has started:
-  ```bash
-  REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-  gh api "repos/$REPO/issues/$ISSUE_NUMBER/reactions" -X POST -f content="eyes"
-  ```
-  Continue to 1.3.
+- **No PRD comment (fresh plan):** Continue to 1.3. (The workflow has already reacted `eyes` on the trigger comment.)
 - **PRD comment exists (revision):** Jump to 1.6.
 
 **1.3: Explore codebase** via `prdx:code-explorer` agent. Pass `ISSUE_TITLE` + `ISSUE_BODY`.
@@ -107,47 +120,32 @@ PRDBODY
 )" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
 ```
 
-React `rocket` on the issue to signal the PRD is ready:
-```bash
-gh api "repos/$REPO/issues/$ISSUE_NUMBER/reactions" -X POST -f content="rocket"
-```
+Call `react_rocket` to signal the PRD is ready.
 
 ---
 
 **1.6: Revision path (existing PRD comment):**
 
-1. Identify the feedback comment that triggered this revision (the most recent non-PRD user comment):
+1. Fetch existing PRD comment:
    ```bash
    REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-   TRIGGER_COMMENT_ID=$(gh issue view "$ISSUE_NUMBER" --json comments --jq \
-     '[.comments[] | select(.body | contains("<!-- prdx-prd -->") | not)] | last | .databaseId // .id' 2>/dev/null)
-   ```
-   React `eyes` on the feedback comment to signal revision has started:
-   ```bash
-   gh api "repos/$REPO/issues/comments/$TRIGGER_COMMENT_ID/reactions" -X POST -f content="eyes"
-   ```
-2. Fetch existing PRD comment:
-   ```bash
    PRD_COMMENT_ID=$(echo "$PRD_COMMENT" | jq -r '.databaseId // .id' 2>/dev/null)
    PRD_COMMENT_BODY=$(echo "$PRD_COMMENT" | jq -r '.body' 2>/dev/null)
    ```
-3. Read feedback comments posted after the PRD comment:
+2. Read feedback comments posted after the PRD comment. `TRIGGER_COMMENT_ID` (from env) is the specific comment that triggered this revision; treat everything newer than the PRD comment as feedback:
    ```bash
    gh issue view "$ISSUE_NUMBER" --json comments --jq \
      --argjson prd_id "$PRD_COMMENT_ID" \
      '[.comments[] | select((.databaseId // .id) > $prd_id) | .body] | join("\n---\n")' 2>/dev/null
    ```
-4. Re-explore codebase if needed.
-5. Generate revised PRD (keep `<!-- prdx-prd -->` marker).
-6. Update in-place:
+3. Re-explore codebase if needed.
+4. Generate revised PRD (keep `<!-- prdx-prd -->` marker).
+5. Update in-place:
    ```bash
    gh api "repos/$REPO/issues/comments/$PRD_COMMENT_ID" -X PATCH -f body="<!-- prdx-prd -->
    {REVISED PRD CONTENT}"
    ```
-7. React `rocket` on the feedback comment to signal revision is complete:
-   ```bash
-   gh api "repos/$REPO/issues/comments/$TRIGGER_COMMENT_ID/reactions" -X POST -f content="rocket"
-   ```
+6. Call `react_rocket` to signal revision is complete.
 
 ---
 
@@ -174,14 +172,11 @@ PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/
 | condition | action |
 |-----------|--------|
 | PRD found + PR exists | Fix iteration path (below) |
-| PRD found + no PR | Fresh implementation — react `eyes` on the issue, continue to 2.3 |
+| PRD found + no PR | Fresh implementation — continue to 2.3 |
 | No PRD + PR exists | Find linked issue from PR body (`Closes #N`), fetch PRD from that issue |
 | No PRD + no PR | Error: `No PRD found for issue #{ISSUE_NUMBER}. Run \`@claude plan\` first.` |
 
-For the fresh implementation case (PRD found + no PR), react `eyes` on the issue:
-```bash
-gh api "repos/$REPO/issues/$ISSUE_NUMBER/reactions" -X POST -f content="eyes"
-```
+(The workflow has already reacted `eyes` on the trigger comment.)
 
 **2.3: Write PRD locally and set up branch:**
 
@@ -222,20 +217,14 @@ gh issue comment "$ISSUE_NUMBER" --body "Created PR #${PR_NUMBER}."
 
 Write state: `{"slug": "${SLUG}", "phase": "review", "quick": false, "pr_number": ${PR_NUMBER}}`
 
+Call `react_rocket` to signal implementation is complete.
+
 ---
 
 **Fix Iteration Path (PR already exists):**
 
 1. Checkout branch: `git fetch origin "$BRANCH" && git checkout "$BRANCH" && git pull origin "$BRANCH"`
 2. Write PRD locally (same as 2.3).
-3. Identify the review comment that triggered this fix iteration and react `eyes` on it:
-   ```bash
-   REVIEW_COMMENT_ID=$(gh api "repos/$REPO/pulls/$PR_NUMBER/comments" --jq '[.[] | select(.position != null)] | last | .id' 2>/dev/null)
-   gh api "repos/$REPO/issues/comments/$REVIEW_COMMENT_ID/reactions" -X POST -f content="eyes"
-   ```
-4. Run: `export CI=true` then `/prdx:implement {SLUG}`
-5. Push: `git push origin "$BRANCH"`
-6. React `rocket` on the review comment to signal fixes are applied:
-   ```bash
-   gh api "repos/$REPO/issues/comments/$REVIEW_COMMENT_ID/reactions" -X POST -f content="rocket"
-   ```
+3. Run: `export CI=true` then `/prdx:implement {SLUG}`
+4. Push: `git push origin "$BRANCH"`
+5. Call `react_rocket` to signal fixes are applied. (The workflow already reacted `eyes` on the trigger comment.)
