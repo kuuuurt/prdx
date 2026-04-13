@@ -7,15 +7,11 @@ argument-hint: "[--quick] [--ci] [--issue <number>] [feature description or PRD 
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
-echo "PROJECT_ROOT=$PROJECT_ROOT"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/ensure-gitignore.sh"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/first-run-setup.sh"
-echo "FIRST_RUN=$FIRST_RUN"
-echo "SETUP_DONE=$(ls .prdx/plans-setup-done 2>/dev/null && echo yes || echo no)"
-ls .prdx/state/*.json 2>/dev/null
+ACTIVE_STATES=$(ls .prdx/state/*.json 2>/dev/null)
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-echo "PROJECT_NAME=$PROJECT_NAME"
+[ "$FIRST_RUN" = "true" ] && echo "PRDX initialized. Plans: $PLANS_DIR"
 ```
 
 # /prdx:prdx - Complete Feature Workflow
@@ -27,69 +23,28 @@ echo "PROJECT_NAME=$PROJECT_NAME"
 
 ### Step 1: Determine Entry Point
 
-**First, check for active workflow state:**
+When exactly one active state file is identified (see skill for active detection logic), read that slug's state using the shared hook:
 
 ```bash
-ls .prdx/state/*.json 2>/dev/null
+# SLUG = slug extracted from the identified state file name (strip .prdx/state/ prefix and .json suffix)
+source "$(git rev-parse --show-toplevel)/hooks/prdx/read-state.sh" "$SLUG"
+# → sets: STATE_PHASE, STATE_QUICK, STATE_PARENT, STATE_PR_NUMBER
 ```
 
-If state files exist and **no argument was provided**, auto-resume if exactly one active (non-pushed, non-completed) state file exists; otherwise list and let user pick.
+Route by `STATE_PHASE`:
 
-If exactly one active state file exists, route by `phase`:
+| phase (`STATE_PHASE`) | action |
+|-----------------------|--------|
+| `"planning"` | Fall through to normal logic below |
+| `"post-planning"` | Show post-planning decision (AskUserQuestion) |
+| `"implementing"` | Jump to Step 3 |
+| `"post-implement"` | Jump to Step 3a |
+| `"reviewing"` | Jump to Step 3b |
+| `"pushing"` / `"pushed"` / `"completed"` | See routing rules in skill |
 
-| phase | action |
-|-------|--------|
-| `"planning"` | Fall through to normal Step 1 logic below |
-| `"post-planning"` | Show post-planning decision via AskUserQuestion (see options below) |
-| `"implementing"` | Jump to Phase 3, using slug from state file |
-| `"post-implement"` | Jump to Phase 3a (review decision), using slug from state file |
-| `"reviewing"` | Jump to Step 3b (reviewing loop), using slug + pr_number |
-| `"pushing"` | Check if PR was actually created: `gh pr list --head {BRANCH} --json number --jq '.[0].number'`. If PR exists → transition to `"pushed"` + inform user. If no PR → transition to `"post-implement"` + offer to retry with `/prdx:push {slug}` |
-| `"pushed"` | Inform user PR isn't merged yet. Ignore this state file and continue with normal Step 1 logic. |
-| `"completed"` | Delete stale state file and continue with normal Step 1 logic |
+> When scanning `.prdx/state/*.json` for multiple active sessions (no single slug identified yet), leave the directory scan loop in place — `read-state.sh` is for single-slug reads and is not a good fit for directory scanning. The loop body could be refactored to call `read-state.sh` per iteration in the future.
 
-**Post-planning decision point** (AskUserQuestion):
-- **Normal mode**: Option 1: "Publish to GitHub" → Phase 2a | Option 2: "Implement now" → Phase 3 | Option 3: "Stop here"
-- **Quick mode**: Option 1: "Implement now" (Recommended) | Option 2: "Stop here"
-
-If no active state file qualifies (or no state files exist), continue with normal logic below.
-
----
-
-**Next, parse `--quick` flag:**
-- Strip `--quick` from arguments if present (can appear anywhere in the argument string)
-- If `--quick` is present:
-  - Remaining text MUST be a description (not a slug) — error if empty
-  - Error: `--quick requires a description. Usage: /prdx:prdx --quick "fix login validation"`
-  - Set `QUICK_MODE=true`, skip PRD matching, go directly to Phase 2 (planning)
-- If `--quick` is NOT present, continue with normal entry point logic below
-
-**Next, parse `--ci` and `--issue` flags:**
-
-**If `--ci` present:** Route to `/prdx:ci` with all arguments and stop. CI mode is handled entirely by the ci command.
-
-**If `--issue {number}` present (without `--ci`):** Set `HAS_ISSUE=true`, `ISSUE_NUMBER`. Fetch: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Store `ISSUE_TITLE` + `ISSUE_BODY` as feature description. Continue with normal entry point logic.
-
-**If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for full algorithm):
-- Read PRD and check its `**Status:**` field
-- **Detect quick mode from PRD:** If the PRD contains `**Quick:** true`, set `QUICK_MODE=true` internally
-- **For parent PRDs** (has `## Children` section): Read child state files from `.prdx/state/` to determine progress. Display the child progress table (same as implement.md Step 2b). If all children are at `review` or beyond, ask if user wants to push each child. Otherwise, show which children still need work and display session instructions.
-- **For single-platform and child PRDs**, resume from the appropriate phase:
-  - `planning` → Continue planning (Phase 2)
-  - `in-progress` → Continue implementation (Phase 3)
-  - `review` → Ask user: Fix issues OR Create PR? (Phase 3a)
-  - `implemented` → Check PRD for `## Pull Request` section with PR metadata. If PR exists, enter reviewing loop (Step 3b) with PR number from PRD. If no PR, inform user and suggest `/prdx:push`
-  - `completed` → Inform user the PRD is done
-
-**If the argument is a feature description** (not an existing PRD):
-- Proceed to Phase 2 (planning)
-
-**If no argument provided**:
-
-Scan `.prdx/state/*.json` for active state files (phase NOT `"pushed"` or `"completed"`). Present via AskUserQuestion:
-- One active state file: "Continue {slug}" (Recommended) | "Choose a different PRD" | "Start a new feature"
-- Multiple active: list all (slug, phase, quick) + "Start a new feature"
-- None: list existing project PRDs (`grep -rl "^\*\*Project:\*\* $PROJECT_NAME" {PLANS_DIR}/*.md`) and ask: "Start a new feature or continue an existing PRD?"
+See [skills/prdx-workflow.md#entry-point-routing](../skills/prdx-workflow.md#entry-point-routing) for the full routing logic (active state detection, quick-flag parsing, CI/issue flags, slug-vs-description resolution, and no-argument handling).
 
 ---
 
@@ -251,76 +206,11 @@ Do NOT proceed to create PR automatically. The user must test first.
 
 ### Step 3b: Reviewing (Fix-Iterate Loop)
 
-**When state file has phase `"reviewing"`, or PRD status is `implemented` with `## Pull Request` section:**
+**When state file has phase `"reviewing"`, or PRD status is `implemented` with `## Pull Request` section.**
 
-This loop lets the user iterate on PR review comments without leaving the workflow.
+Fetch PR state, display comment summary, then offer fix/push/mark-ready options. Fixes are committed and pushed, then the loop re-fetches and re-asks.
 
-1. **Fetch PR context:**
-   ```bash
-   gh pr view {PR_NUMBER} --json state,isDraft,reviews,comments,title
-   ```
-
-2. **Fetch review comments (unresolved):**
-   ```bash
-   gh api repos/{OWNER}/{REPO}/pulls/{PR_NUMBER}/comments --jq '[.[] | select(.position != null)] | sort_by(.created_at) | .[] | "- \(.path):\(.position) — \(.body | split("\n") | first)"'
-   ```
-
-3. **Fetch PR-level review comments:**
-   ```bash
-   gh pr view {PR_NUMBER} --json reviews --jq '.reviews[] | select(.state != "APPROVED") | "[\(.state)] \(.body | split("\n") | first)"'
-   ```
-
-4. **Display summary:**
-   ```
-   PR #{PR_NUMBER}: {TITLE}
-   Status: {Draft/Open}
-   Reviews: {count pending/changes-requested/approved}
-   Comments: {count unresolved}
-
-   Recent comments:
-   - path/file.ts:42 — "This should validate the input..."
-   - path/other.ts:15 — "Consider using the existing helper..."
-   ```
-
-5. **Decision point via AskUserQuestion:**
-
-   **If draft PR:**
-   - Option 1: "Fix from PR comments" — Auto-fetch and fix review comments
-   - Option 2: "Fix manually" — Describe issues to fix
-   - Option 3: "Mark ready for review" — Run `gh pr ready`, end workflow
-   - Option 4: "Done" — End workflow without further action
-
-   **If non-draft (entered via PRD resume):**
-   - Option 1: "Fix from PR comments" — Auto-fetch and fix review comments
-   - Option 2: "Fix manually" — Describe issues to fix
-   - Option 3: "Done" — End workflow
-
-6. **Fix routing:**
-
-   **"Fix from PR comments":**
-   - Fetch full comment details via `gh api`
-   - Read the referenced files
-   - Fix issues directly in conversation
-   - Commit fixes (using prdx.json commit config — same as `/prdx:implement` Step 5 commit logic)
-   - Push: `git push`
-   - Loop back to step 1 of this phase (re-fetch, re-ask)
-
-   **"Fix manually":**
-   - Ask user to describe the issues
-   - Fix directly in conversation
-   - Commit fixes (using prdx.json commit config)
-   - Push: `git push`
-   - Loop back to step 1 of this phase
-
-   **"Mark ready for review":**
-   - Run `gh pr ready {PR_NUMBER}`
-   - Update PRD status to `implemented`
-   - Write state: `{"slug": "{SLUG}", "phase": "pushed", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}` (do NOT delete — enables lesson capture)
-   - Display: `PR #{PR_NUMBER} marked ready for review. Lessons will be captured automatically after merge.`
-
-   **"Done":**
-   - Write state: `{"slug": "{SLUG}", "phase": "pushed", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}` (do NOT delete — PR exists, enables lesson capture)
-   - Display: `Lessons will be captured automatically after PR #{PR_NUMBER} is merged.`
+See [skills/prdx-workflow.md#reviewing-loop](../skills/prdx-workflow.md#reviewing-loop) for the full decision-point specification (fetch commands, draft vs non-draft options, fix routing, and state transitions).
 
 ---
 

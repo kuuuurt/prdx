@@ -7,15 +7,11 @@ argument-hint: "[--quick] [description]"
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
-echo "PROJECT_ROOT=$PROJECT_ROOT"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/ensure-gitignore.sh"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/first-run-setup.sh"
-echo "FIRST_RUN=$FIRST_RUN"
-echo "Branch: $(git branch --show-current)"
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-echo "PROJECT_NAME=$PROJECT_NAME"
-git branch -a --format='%(refname:short)' 2>/dev/null | head -50
+BRANCH_LIST=$(git branch -a --format='%(refname:short)' 2>/dev/null | head -50)
+[ "$FIRST_RUN" = "true" ] && echo "PRDX initialized. Plans: $PLANS_DIR"
 ```
 
 # /prdx:plan - Create Product Requirements Document
@@ -547,6 +543,62 @@ For each child platform:
 ```bash
 echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, "parent": "{parent-slug}"}' > .prdx/state/{parent-slug}-{platform}.json
 ```
+
+### Step 4.6: Append Codebase Context to PRD
+
+**Run this step after Step 4.5 (or after Step 4b if single-platform) for normal-mode PRDs only.**
+
+**Skip conditions:**
+- If `QUICK_MODE=true` → skip entirely (quick PRDs are ephemeral; codebase context is not worth the overhead).
+- If the PRD is a multi-platform parent → write `## Codebase Context` into the **parent PRD only**. Children inherit context via the parent reference and do not get their own section.
+
+**Construct the section from exploration summaries gathered during plan-mode Step 2.** Each Task tool result from `prdx:code-explorer` already has the right section structure — concatenate and deduplicate. The section must reflect the actual codebase areas relevant to this PRD so that dev-planner can use it without re-exploring from scratch.
+
+**Format:**
+
+```markdown
+## Codebase Context
+
+*Captured during planning — dev-planner uses this in preference to re-exploring.*
+
+### Summary
+[2-3 sentence overview of the relevant code areas]
+
+### Key Files
+- `path/to/file.ext` — [description]
+
+### Patterns Found
+- [pattern observed in the codebase]
+
+### Relevant Snippets
+[optional — short quotes from the code, only when load-bearing]
+```
+
+**Append to PRD file — this section MUST be the last section in the file.**
+
+**This is a write-once step.** If plan mode is resumed (user exits and re-enters), do NOT re-run this append — the section already exists. Check first:
+
+```bash
+grep -q '^## Codebase Context' "{PLANS_DIR}/prdx-{slug}.md" || cat >> "{PLANS_DIR}/prdx-{slug}.md" << 'EOF'
+
+## Codebase Context
+
+*Captured during planning — dev-planner uses this in preference to re-exploring.*
+
+### Summary
+{2-3 sentence overview from code-explorer output}
+
+### Key Files
+{bullet list of relevant files from code-explorer output}
+
+### Patterns Found
+{bullet list of architectural/coding patterns observed}
+EOF
+```
+
+Omit `### Relevant Snippets` if none are worth capturing.
+
+---
 
 ### Step 5: Verify Plan File Naming
 

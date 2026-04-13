@@ -7,15 +7,10 @@ argument-hint: "[slug]"
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
-echo "Branch: $(git branch --show-current)"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-default-branch.sh"
-echo "DEFAULT_BRANCH=$DEFAULT_BRANCH"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-commit-config.sh"
-echo "COMMIT_FORMAT=$COMMIT_FORMAT COAUTHOR_ENABLED=$COAUTHOR_ENABLED COAUTHOR_NAME=$COAUTHOR_NAME COAUTHOR_EMAIL=$COAUTHOR_EMAIL EXTENDED_DESC=$EXTENDED_DESC_ENABLED CLAUDE_LINK=$CLAUDE_LINK_ENABLED"
-git status --short
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
+AVAILABLE_PRDS=$(grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || true)
 ```
 
 # /prdx:implement - Implement Feature
@@ -107,29 +102,15 @@ Store `NO_CACHE` — it will be passed to the dev-planner agent in Step 5a.
 
 ### Step 2: Load PRD
 
-**Resolve slug to PRD file using enhanced matching:**
+**Resolve slug to PRD file:**
 
-1. **Exact match (prefixed):** `{PLANS_DIR}/prdx-{slug}.md`
-2. **Exact match (unprefixed fallback):** `{PLANS_DIR}/{slug}.md` — for plans created without the `prdx-` prefix
-3. **Substring match:** `ls {PLANS_DIR}/prdx-*{slug}*.md` — slug appears anywhere in prefixed filenames
-4. **Substring match (unprefixed fallback):** `ls {PLANS_DIR}/*{slug}*.md` — search all plans if no prefixed match
-5. **Word-boundary match:** Split slug into words, find PRDs containing all words (in any order)
-6. **Disambiguation:** If multiple matches at any step, use AskUserQuestion to let user select:
-   ```
-   Multiple PRDs match "{slug}":
-     1. backend-auth
-     2. backend-auth-refresh
-   Which one?
-   ```
-   If exactly one match at any step, use it.
-
-7. If no match found at any step, show error and list available PRDs
-
-**Auto-rename unprefixed plans:** If a match is found without the `prdx-` prefix, rename it to add the prefix before proceeding:
 ```bash
-mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-{slug}.md
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-slug.sh" "$SLUG_INPUT"
+# → sets: RESOLVED_SLUG, PRD_FILE, RENAMED
+# → on ambiguity or not-found: writes to stderr and returns 1 — use AskUserQuestion to disambiguate
 ```
-Inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
+
+If `RENAMED=true`, inform the user: `Renamed plan to follow PRDX naming convention: prdx-{slug}.md`
 
 3. Read the PRD file and extract:
    - **Platform** (single-platform PRDs: free-form string, e.g., backend, frontend, android, ios, python, go, etc.)
@@ -296,6 +277,24 @@ Multi-platform features are handled via parent-child PRDs: each child is a singl
 ---
 
 #### Step 5a: Dev Planning (prdx:dev-planner)
+
+**Quick-mode shortcut — check this FIRST:**
+
+If the PRD has `**Quick:** true`, skip this step entirely.
+
+Quick-mode PRDs are small and ephemeral — the dev-planner round-trip is wasted context.
+Instead, jump directly to Step 5c (Phased Execution Loop) with a synthesized single-phase plan:
+
+```
+PHASES = [{"phase": 1, "name": "Implementation", "mode": "sequential", "tasks": ["Execute PRD"]}]
+PHASE_CONTENTS = {1: "<entire PRD Approach section>"}
+```
+
+Treat the PRD's `## Approach` section as the full phase content. If `## Approach` is absent, use the entire PRD body. Then proceed to Step 5c.
+
+---
+
+**Non-quick path (normal PRDs):**
 
 **Display progress:**
 ```
@@ -507,16 +506,16 @@ After all phases complete:
 
 ---
 
-#### Step 5e: AC Verification (prdx:ac-verifier)
+#### Step 5e: AC Verification + Code Review — Parallel First Pass
 
 **Display progress:**
 ```
-Phase 3/3: AC Verification — Checking acceptance criteria...
+Phase 3/3: AC Verification + Code Review — Running in parallel...
 ```
 
-After all platform implementations are complete, verify that acceptance criteria are met before code review.
+After all platform implementations are complete, launch `prdx:ac-verifier` and `prdx:code-reviewer` **simultaneously** as a read-only first pass. Both agents read the same diff (`git diff {DEFAULT_BRANCH}..HEAD`) — there is no conflict.
 
-Invoke the ac-verifier agent using the Task tool:
+**IMPORTANT: Make both Task tool calls in a single message (parallel execution):**
 
 ```
 subagent_type: "prdx:ac-verifier"
@@ -536,9 +535,42 @@ Perform the three-point check: code exists, test exists, coverage (happy + error
 Return only the AC verification summary."
 ```
 
-**If any AC is NOT MET or Partial:**
-1. Display the AC verification summary to the conversation
-2. Feed the unmet/partial ACs back to the platform agent for fixing:
+```
+subagent_type: "prdx:code-reviewer"
+
+prompt: "Review the implementation for this PRD.
+
+PRD Slug: {SLUG}
+Base Branch: {DEFAULT_BRANCH}
+Platform: {PLATFORM}
+
+Review the diff (git diff {DEFAULT_BRANCH}..HEAD) for bugs, security issues, quality problems, and convention adherence.
+Only report high-confidence issues (>80%).
+
+Return only the review summary."
+```
+
+Wait for both agents to complete, then route based on the combined result:
+
+**Routing logic (four branches):**
+
+1. **Both clean** → Skip directly to Step 6 (post-implement hook). This is the happy path — saves one full agent round-trip compared to the old sequential flow.
+
+2. **AC fails, review clean** → Discard the reviewer's first-pass output (it may assume ACs are met — that assumption is now invalid). Run the AC fix loop (Step 5e-fix below — up to 3 attempts). After AC converges, re-run `prdx:code-reviewer` on the new diff. If review now fails, run the review fix loop (Step 5f-fix). If review clean, proceed to Step 6.
+
+3. **AC clean, review fails** → Run the review fix loop directly (Step 5f-fix — up to 2 cycles). AC is already verified so do not re-run it. After fix loop, proceed to Step 6.
+
+4. **Both fail** → Run AC fix loop first (correctness-first invariant — see `skills/fix-loop.md`). Discard the stale reviewer output. After AC converges, re-run `prdx:code-reviewer` on the new diff. If review then fails, run the review fix loop. Proceed to Step 6 when both are clean.
+
+---
+
+#### Step 5e-fix: AC Fix Loop (subroutine)
+
+Invoked when ac-verifier reports one or more ACs NOT MET or Partial. Maximum 3 attempts. On exhaustion → AskUserQuestion (Proceed to code review / Fix manually / Stop).
+
+See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification.
+
+Feed unmet/partial ACs back to the platform agent:
 
 ```
 subagent_type: "prdx:developer"
@@ -572,56 +604,17 @@ prompt: "Fix the following unmet acceptance criteria.
 Return only a summary of fixes applied."
 ```
 
-3. After fixes, re-run the ac-verifier to confirm
-4. If ACs still unmet, loop back: platform agent fixes → ac-verifier re-checks
-5. Continue looping until all ACs are verified or 3 attempts are exhausted
-
-**If all ACs verified (at any attempt):**
-- Continue to Step 5f
-
-**If ACs still unmet after 3 fix attempts:**
-
-Use AskUserQuestion to offer options:
-- Option 1: "Proceed to code review" (Recommended) — Continue with remaining AC gaps noted
-- Option 2: "Fix manually" — Stop here, let user fix AC issues (status stays `in-progress`)
-- Option 3: "Stop implementation" — Halt workflow entirely
-
-Route based on choice:
-- Proceed → Continue to Step 5f, include unmet ACs in completion summary
-- Fix manually → Display unmet ACs, end workflow
-- Stop → End workflow, show how to resume with `/prdx:prdx {slug}`
+Re-run `prdx:ac-verifier` after each fix. Loop until all ACs are met or 3 attempts are exhausted.
 
 ---
 
-#### Step 5f: Code Review (prdx:code-reviewer)
+#### Step 5f-fix: Code Review Fix Loop (subroutine)
 
-**Display progress:**
-```
-Code Review — Reviewing for bugs, security, and quality...
-```
+Invoked when code-reviewer reports issues. Maximum 2 cycles. On exhaustion → AskUserQuestion (Proceed anyway / Fix manually / Stop).
 
-Run code review focused on bugs, security, quality, and conventions (AC verification already done in Step 5e).
+See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification.
 
-Invoke the code-reviewer agent using the Task tool:
-
-```
-subagent_type: "prdx:code-reviewer"
-
-prompt: "Review the implementation for this PRD.
-
-PRD Slug: {SLUG}
-Base Branch: {DEFAULT_BRANCH}
-Platform: {PLATFORM}
-
-Review the diff (git diff {DEFAULT_BRANCH}..HEAD) for bugs, security issues, quality problems, and convention adherence.
-Only report high-confidence issues (>80%).
-
-Return only the review summary."
-```
-
-**If issues found:**
-1. Display the review summary to the conversation
-2. Feed each issue back to the platform agent for fixing:
+Feed review issues back to the platform agent:
 
 ```
 subagent_type: "prdx:developer"
@@ -651,21 +644,9 @@ prompt: "Fix the following code review issues.
 Return only a summary of fixes applied."
 ```
 
-3. After fixes, re-run the code reviewer to verify (max 2 review cycles to avoid loops)
+Re-run `prdx:code-reviewer` after each fix. Loop until clean or 2 cycles exhausted.
 
-**If 2 review cycles exhausted and issues remain:**
-
-Use AskUserQuestion to offer options:
-- Option 1: "Proceed anyway" (Recommended) — Continue to Step 6 with remaining issues noted
-- Option 2: "Fix manually" — Stop here, let user fix remaining issues (status stays `in-progress`)
-- Option 3: "Stop implementation" — Halt workflow entirely
-
-Route based on choice:
-- Proceed → Continue to Step 6, include remaining issues in completion summary
-- Fix manually → Display remaining issues, end workflow
-- Stop → End workflow, show how to resume with `/prdx:prdx {slug}`
-
-**If no issues found (or after fixes verified):**
+**After fix loop completes (or if review was already clean):**
 - Continue to Step 6
 
 ---

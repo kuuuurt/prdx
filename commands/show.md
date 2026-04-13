@@ -46,20 +46,20 @@
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
 ```
 
 ## Phase 1: Determine Mode
 
 **Parse arguments and detect intent:**
 
-1. **Resolve slug using enhanced matching** (exact → substring → word-boundary):
+1. **Resolve slug:**
    ```bash
-   # 1. Exact: {PLANS_DIR}/prdx-{input}.md
-   # 2. Substring: ls {PLANS_DIR}/prdx-*{input}*.md
-   # 3. Word-boundary: split input into words, find PRDs containing all words
+   source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-slug.sh" "$INPUT"
+   # → sets: RESOLVED_SLUG, PRD_FILE, RENAMED
+   # → on ambiguity: writes to stderr and returns 1 — use AskUserQuestion to disambiguate
+   # → on no match: returns 1 → fall through to SEARCH mode
    ```
-   - If exactly 1 match → STATUS mode
+   - If `RESOLVED_SLUG` set → STATUS mode
    - If multiple matches → Ask user to select
    - If no match → SEARCH mode
 

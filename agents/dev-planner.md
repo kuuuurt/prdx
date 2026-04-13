@@ -41,6 +41,25 @@ Continue with planning regardless — PRD gaps are informational, not blocking.
 
 ### 2. Explore Codebase
 
+#### PRD Codebase Context (check first)
+
+Before checking the disk cache, read the PRD file for a `## Codebase Context` section. This section is written by `commands/plan.md` at plan time and survives cache wipes — it is the fastest possible exploration path.
+
+```bash
+PRD_FILE="<path from 'PRD File:' in the prompt>"
+
+# Extract ## Codebase Context section (from heading to next ## heading or EOF)
+CODEBASE_CONTEXT=$(awk '/^## Codebase Context/{found=1; next} found && /^## /{exit} found{print}' "$PRD_FILE")
+```
+
+**If `CODEBASE_CONTEXT` is non-empty:**
+- Use it directly as the exploration result.
+- Skip both the disk cache check and fresh exploration (no agent spawn needed).
+- Note in the dev plan output: `(exploration served from PRD's ## Codebase Context section)`
+
+**If `CODEBASE_CONTEXT` is empty (section absent):**
+- Fall through to the disk cache check below.
+
 #### Cache Read
 
 Before spawning `prdx:code-explorer`, check the exploration cache to avoid redundant codebase scans. The cache is keyed by query content and git HEAD SHA, so any commit to the codebase automatically invalidates stale entries.
