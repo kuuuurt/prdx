@@ -95,7 +95,11 @@ Add PR metadata to the PRD file. **Skip this step in standalone mode.**
 
 ## PR Format — PRD Mode
 
-**Writing style:** Lead with the point. Summary: 1-2 sentences, state the value delivered. Architecture: 2-3 sentences, state the structural approach. No throat-clearing, hedging, or "this PR does X" preambles — the title already says what it does.
+**Writing style — compress prose, keep technical substance exact:**
+
+- **Drop:** articles, filler, pleasantries, hedging, "this PR does X" preambles (title already says what it does), connective fluff. Fragments OK. Active voice, short synonyms.
+- **Preserve exactly:** code blocks, inline `backticks`, file paths, function/API names, tables, numbers, version strings. These are substance.
+- **Section budgets:** Summary 1-2 sentences — state the value delivered. Architecture 2-3 sentences — state the structural approach. Testing 1 sentence — what's tested.
 
 Generate PR with this structure:
 

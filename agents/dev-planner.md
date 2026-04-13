@@ -132,7 +132,11 @@ Produce a detailed implementation plan with:
 
 ## Dev Plan Format
 
-**Writing style:** Architecture section: 2-4 sentences total — integration approach, key decisions, connection points. No justifications or alternatives unless a risk demands it. Task descriptions: start with a verb, one line each. Risk descriptions: 1 sentence each, max 3.
+**Writing style — compress prose, keep technical substance exact:**
+
+- **Drop:** articles, filler (just/really/basically/actually/simply), pleasantries, hedging, preambles, connective fluff. Fragments OK. Active voice, short synonyms.
+- **Preserve exactly:** code blocks, inline `backticks`, file paths, function/API names, tables, numbers. These are substance.
+- **Section budgets:** Architecture 2-4 sentences — integration approach, key decisions, connection points. No justifications or alternatives unless a risk demands it. Task descriptions start with a verb, one line each. Risk descriptions 1 sentence each, max 3.
 
 Return the dev plan in this exact format:
 

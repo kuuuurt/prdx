@@ -254,32 +254,36 @@ Task tool: subagent_type="prdx:docs-explorer", prompt="[your docs question]"
 
 ### PRD Writing Style
 
-Every PRD section follows these rules. The goal is readable but tight — no caveman-speak, just zero filler.
+Compress prose ruthlessly. Technical substance stays exact.
 
-**Lead with the point.** State what's broken, what's needed, or what to do. Justify after if needed — never before.
+**Drop:** articles where natural, filler (just/really/basically/actually/simply/currently), pleasantries, hedging ("might", "could potentially", "it seems"), preambles ("This section describes...", "Below we outline..."), connective fluff ("however", "furthermore", "additionally"), "in order to" → "to", "the reason is because" → "because". No restating the title or type in the Problem statement.
 
-**Section constraints:**
-- **Problem:** 1-3 sentences. What is broken/missing + why it matters.
-- **Goal:** 1 sentence. Desired end state in user/business terms.
-- **User Stories:** Max 3. Omit if the user is obvious from context.
-- **Acceptance Criteria:** Start with a verb. Testable. No inline explanations.
-- **Approach:** 1-3 sentences or a numbered list. Direction only — no implementation details (that's the dev plan's job).
-- **Scope:** Bullets only. No prose introductions.
-- **Risks:** Bullet list, "risk → consequence" format. Max 3 unless genuinely more.
+**Preserve EXACTLY:** code blocks, inline `backticks`, file paths, function and API names, tables, bullet hierarchy, headings, numbers, versions, error messages (quoted exact). These are substance, not fluff — never compress them.
 
-**Cut these patterns:**
-- Throat-clearing: "In order to", "The purpose of this is to", "It should be noted that"
-- Hedging: "might", "possibly", "it seems like", "could potentially"
-- Preambles: "This section describes...", "Below we outline..."
-- Padding: "As mentioned above", "To summarize", "Additionally"
-- Restating the title or type in the Problem statement
+**Style:** Fragments OK. Active voice, present tense. Short synonyms — "fix" not "implement a solution for", "use" not "utilize", "big" not "extensive". Pattern: `[thing] [action] [reason]. [next step].`
 
-**Keep these — they are substance, not fluff:**
-- Tables for comparisons (high signal density)
-- Code snippets and file paths
-- Concrete numbers and evidence
-- Active voice, present tense
-- Fragments in bullet items
+**Section budgets:**
+- **Problem:** 1-3 sentences. What's broken + why it matters.
+- **Goal:** 1 sentence. End state in user/business terms.
+- **User Stories:** Max 3. Omit if user is obvious.
+- **Acceptance Criteria:** Start with a verb. Testable. No inline explanation.
+- **Approach:** 1-3 sentences or a numbered list. Direction only — mechanics go in the dev plan.
+- **Scope:** Bullets only. No prose intro.
+- **Risks:** `risk → consequence` format. Max 3.
+
+**Before / after — Problem (74 words → 20):**
+
+Verbose:
+> B2B users can currently take (claim) any asset within their permitted locations, regardless of the asset's physical GPS position relative to its geofence zone. The release flow already validates that an asset is within its configured geofence area before allowing release, but the take flow has no equivalent check. This means a user could take an asset that is physically located outside the permitted zone, leading to inconsistent enforcement of geofence boundaries.
+
+Compressed:
+> B2B take flow has no geofence check. Release flow already validates. Users can claim assets outside permitted zones — enforcement inconsistent.
+
+**Before / after — Acceptance Criterion:**
+
+Verbose: *When a B2B user attempts to take an asset that is outside its home location's configured geofence zone, the API returns a 400 error with message "Cannot take asset outside permitted area"*
+
+Compressed: *Reject B2B take outside geofence → 400 "Cannot take asset outside permitted area"*
 
 **If QUICK_MODE — use this lightweight template:**
 

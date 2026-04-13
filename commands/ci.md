@@ -83,7 +83,16 @@ PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] |
 
 **1.4: Generate PRD content** using the full PRD template (do NOT write a file).
 
-**Writing style:** Lead with the point. Problem: 1-3 sentences. Goal: 1 sentence. ACs: start with verb, testable, no explanations. Approach: 1-3 sentences. Risks: bullet list, max 3. No throat-clearing, hedging, or preambles.
+**Writing style — compress prose, keep technical substance exact:**
+
+- **Drop:** articles, filler (just/really/basically/actually/simply/currently), pleasantries, hedging, preambles, connective fluff (however/furthermore/additionally), "in order to" → "to". Don't restate the title in Problem.
+- **Preserve exactly:** code blocks, inline `backticks`, file paths, function/API names, tables, numbers, error messages (quoted exact).
+- **Style:** fragments OK, active voice, short synonyms. Pattern: `[thing] [action] [reason]. [next step].`
+- **Budgets:** Problem 1-3 sentences. Goal 1 sentence. ACs start with a verb, testable, no inline explanation. Approach 1-3 sentences or numbered list (direction only). Risks `risk → consequence`, max 2.
+
+**Before / after — AC:**
+- Verbose: *When a B2B user attempts to take an asset outside its home location's configured geofence zone, the API returns a 400 error with message "Cannot take asset outside permitted area"*
+- Compressed: *Reject B2B take outside geofence → 400 "Cannot take asset outside permitted area"*
 
 ```markdown
 # {ISSUE_TITLE}
