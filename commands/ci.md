@@ -38,25 +38,83 @@ export GIT_AUTHOR_EMAIL="${REQUESTOR}@users.noreply.github.com"
 
 Fetch issue: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Store `ISSUE_TITLE` + `ISSUE_BODY`.
 
+Capture the working reaction ID (posts `eyes` on the trigger comment or issue — see Reactions & Output Discipline):
+```bash
+WORKING_REACTION_ID=$(react_working)
+```
+Remember this value — every successful flow below ends with `react_done "$WORKING_REACTION_ID"`.
+
 Route: `--plan-only` → Step 1 | otherwise → Step 2.
 
 ---
 
-## Reactions
+## Reactions & Output Discipline
 
-The workflow's `Acknowledge comment` step already reacts `eyes` on the triggering comment before Claude Code starts, so `ci.md` only needs to post the `rocket` reaction when work completes. All reactions target the triggering comment (not the issue) so the user sees the emoji on the exact comment they typed.
+Status is communicated **only** through GitHub reactions. The reaction transitions `eyes` 👀 (working) → `rocket` 🚀 (done) on a single target. That target is the **triggering comment** if `TRIGGER_COMMENT_ID` is set (e.g., a user's `@claude revise` comment), otherwise the **issue itself** (e.g., an external watcher tool running `/prdx:ci --issue N --plan-only` on a fresh issue with no trigger comment).
 
-The trigger comment is passed via the `TRIGGER_COMMENT_ID` env var. If it is unset (e.g., running outside the workflow), skip reactions silently.
+**Never post status comments on the issue** — no "Planning complete", no "PRD revised", no "Created PR #X", no changelogs. The only Claude-authored comment on the issue should be the PRD body itself (step 1.5 / 1.6). Everything else is a reaction transition.
+
+**GitHub reaction limitation:** only 8 values are accepted — `+1`, `-1`, `laugh`, `confused`, `heart`, `hooray`, `rocket`, `eyes`. Hammer, wrench, and check are not available at the API level.
+
+### Helpers
 
 ```bash
-react_rocket() {
-  [ -z "$TRIGGER_COMMENT_ID" ] && return 0
-  REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
-  gh api "repos/$REPO/issues/comments/$TRIGGER_COMMENT_ID/reactions" -X POST -f content="rocket" >/dev/null 2>&1 || true
+# POST an "eyes" reaction on the trigger comment (if set) or the issue.
+# Prints the reaction's numeric ID to stdout (empty on failure).
+# Idempotent: POSTing the same reaction twice from the same user returns the
+# existing reaction's ID, so this works even if the workflow's
+# `Acknowledge comment` step already reacted eyes.
+react_working() {
+  local repo
+  repo=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+  [ -z "$repo" ] && return 0
+  if [ -n "$TRIGGER_COMMENT_ID" ]; then
+    gh api "repos/$repo/issues/comments/$TRIGGER_COMMENT_ID/reactions" \
+      -X POST -f content="eyes" --jq '.id' 2>/dev/null
+  elif [ -n "$ISSUE_NUMBER" ]; then
+    gh api "repos/$repo/issues/$ISSUE_NUMBER/reactions" \
+      -X POST -f content="eyes" --jq '.id' 2>/dev/null
+  fi
+}
+
+# DELETE the given eyes reaction (by ID), then POST a rocket reaction on the
+# same target. Same target-selection rules as react_working.
+# Args: $1 = working reaction ID (optional — if empty, just posts rocket)
+react_done() {
+  local working_id="$1"
+  local repo
+  repo=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+  [ -z "$repo" ] && return 0
+  if [ -n "$TRIGGER_COMMENT_ID" ]; then
+    [ -n "$working_id" ] && gh api "repos/$repo/issues/comments/$TRIGGER_COMMENT_ID/reactions/$working_id" -X DELETE >/dev/null 2>&1 || true
+    gh api "repos/$repo/issues/comments/$TRIGGER_COMMENT_ID/reactions" -X POST -f content="rocket" >/dev/null 2>&1 || true
+  elif [ -n "$ISSUE_NUMBER" ]; then
+    [ -n "$working_id" ] && gh api "repos/$repo/issues/$ISSUE_NUMBER/reactions/$working_id" -X DELETE >/dev/null 2>&1 || true
+    gh api "repos/$repo/issues/$ISSUE_NUMBER/reactions" -X POST -f content="rocket" >/dev/null 2>&1 || true
+  fi
 }
 ```
 
-Call `react_rocket` at the end of each successful flow below.
+### Usage pattern
+
+Early in Setup, capture the working reaction's ID:
+```bash
+WORKING_REACTION_ID=$(react_working)
+```
+Do the work. At the end of each successful flow, transition to done:
+```bash
+react_done "$WORKING_REACTION_ID"
+```
+
+### Final text output — CRITICAL
+
+`anthropics/claude-code-action@v1` posts your final text response as an issue comment automatically. Your final response **MUST be empty** — emit nothing. No words, no emoji, no summary, no "here's what I did", no tables, no links. Reactions carry all status; any final text becomes visible noise on the issue.
+
+Bad final response:
+> PRD revised with iOS parity (#65, PR #77). Key changes: matched iOS string copy across all 4 locales...
+
+Good final response:
+> *(empty)*
 
 ---
 
@@ -129,7 +187,11 @@ PRDBODY
 )" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
 ```
 
-Call `react_rocket` to signal the PRD is ready.
+Transition the reaction:
+```bash
+react_done "$WORKING_REACTION_ID"
+```
+Your final text response must be empty — see Reactions & Output Discipline.
 
 ---
 
@@ -154,7 +216,7 @@ Call `react_rocket` to signal the PRD is ready.
    gh api "repos/$REPO/issues/comments/$PRD_COMMENT_ID" -X PATCH -f body="<!-- prdx-prd -->
    {REVISED PRD CONTENT}"
    ```
-6. Call `react_rocket` to signal revision is complete.
+6. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Your final text response must be empty — see Reactions & Output Discipline.
 
 ---
 
@@ -219,14 +281,9 @@ Invoke `prdx:pr-author` agent: create a real (non-draft) PR. Include `Closes #{I
 
 **2.6: Finalize:**
 
-Post a single short comment on the issue with the PR link:
-```bash
-gh issue comment "$ISSUE_NUMBER" --body "Created PR #${PR_NUMBER}."
-```
-
 Write state: `{"slug": "${SLUG}", "phase": "review", "quick": false, "pr_number": ${PR_NUMBER}}`
 
-Call `react_rocket` to signal implementation is complete.
+Do NOT post a status comment — the PR is automatically linked to the issue via `Closes #{ISSUE_NUMBER}` in the PR body, which creates a cross-reference in the issue timeline. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Your final text response must be empty — see Reactions & Output Discipline.
 
 ---
 
@@ -236,4 +293,4 @@ Call `react_rocket` to signal implementation is complete.
 2. Write PRD locally (same as 2.3).
 3. Run: `export CI=true` then `/prdx:implement {SLUG}`
 4. Push: `git push origin "$BRANCH"`
-5. Call `react_rocket` to signal fixes are applied. (The workflow already reacted `eyes` on the trigger comment.)
+5. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Your final text response must be empty — see Reactions & Output Discipline.
