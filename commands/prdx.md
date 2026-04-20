@@ -1,6 +1,6 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[--quick] [--ci] [--issue <number>] [--pr <number>] [feature description or PRD slug]"
+argument-hint: "[--quick] [--auto] [--ci] [--issue <number>] [--pr <number>] [feature description or PRD slug]"
 ---
 
 ## Pre-Computed Context
@@ -17,16 +17,17 @@ PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(
 # /prdx:prdx - Complete Feature Workflow
 
 > Main entry point for PRDX. Orchestrates plan → implement → push with decision points.
-> Use `--quick` for ephemeral tasks. Use `--ci --issue N` for CI mode (routes to `/prdx:ci`).
-> Use `--issue N` or `--pr N` (without `--ci`) to resume a CI-created PRD locally.
+> Use `--quick` for ephemeral tasks. Use `--auto --issue N` for non-interactive mode (routes to `/prdx:auto`).
+> `--ci` is a deprecated alias for `--auto` — emits a warning and routes identically.
+> Use `--issue N` or `--pr N` (without `--auto`/`--ci`) to resume a CI-created PRD locally.
 
 ---
 
 ### Step 1: Determine Entry Point
 
-**`--issue N` / `--pr N` flag (resume from CI, no `--ci`):**
+**`--issue N` / `--pr N` flag (resume from CI, no `--auto`/`--ci`):**
 
-If `--issue N` or `--pr N` is present and `--ci` is NOT:
+If `--issue N` or `--pr N` is present and neither `--auto` nor `--ci` is present:
 
 ```bash
 # Set ISSUE_NUMBER=N  (or PR_NUMBER=N — the hook resolves either)

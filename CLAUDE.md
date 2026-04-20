@@ -65,6 +65,7 @@ Plan Mode → PRD saved → [Publish?] → [Implement?] → Implement → Review
 - `/prdx:show` — List/search/view PRDs.
 - `/prdx:publish` — Create GitHub issue from PRD.
 - `/prdx:cleanup` — Capture lessons from merged PRs + delete plan files.
+- `/prdx:auto` — Non-interactive mode (CI/automated): plan-only or implement from issue. `/prdx:ci` is a deprecated alias.
 
 ## Agents
 
@@ -99,7 +100,7 @@ Commands: thin wrappers, delegate to agents/bash, use hooks + native tools. Agen
 - Cap fix loops (3 attempts) to prevent infinite cycling — escalate to user after exhaustion
 
 ### CI Mode for PRDX (2026-03-18, updated 2026-04-01) - backend
-- `--issue` + `--ci` composable flags for flexible interactive/non-interactive use
+- `--issue` + `--auto` composable flags for flexible interactive/non-interactive use (`--ci` is a deprecated alias for `--auto`)
 - `prdx:code-explorer` + Write tool replaces plan mode in non-interactive CI contexts
 - `CI=true` env var (standard across providers) cleanly bypasses interactive hook prompts
 - PRDs as issue comments (`<!-- prdx-prd -->` marker) avoids polluting git history
