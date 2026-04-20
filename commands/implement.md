@@ -15,7 +15,7 @@ AVAILABLE_PRDS=$(grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>
 
 # /prdx:implement - Implement Feature
 
-Three-phase implementation: **Dev Planning** (prdx:dev-planner) → **Development** (Platform agent) → **Code Review** (prdx:code-reviewer)
+Three-phase implementation: **Dev Planning** (prdx:dev-planner) → **Development** (Platform agent) → **Code Review** (prdx:reviewer-orchestrator)
 
 Both agents run in **isolated contexts** to minimize main conversation context usage.
 
@@ -51,12 +51,13 @@ This command orchestrates three agents in **isolated contexts**:
 - Progress displayed: "Phase 2/4: Core Logic (sequential)..."
 - Returns only implementation summary per phase (~1KB each)
 
-**Phase C: Code Review (prdx:code-reviewer)**
+**Phase C: Code Review (prdx:reviewer-orchestrator)**
 - Runs in isolated context
-- Reviews diff against acceptance criteria
-- Flags bugs, security issues, unmet criteria
-- If issues found: platform agent fixes, then re-review (max 2 cycles)
-- Returns only review summary (~2KB)
+- Routes based on diff LOC: <50 LOC uses fast single-pass, ≥50 LOC dispatches specialist sub-agents in parallel
+- Diffs ≥200 LOC or any critical finding also trigger an adversarial red-team pass
+- Classifies findings as AUTO-FIX (applied silently) or ASK (batched into one user prompt)
+- If ASK findings remain after user response: platform agent fixes, then re-review (max 2 cycles)
+- Returns only review pipeline summary (~2KB)
 
 **For Multi-Platform PRDs (parent-child model):**
 - Parent PRDs delegate to child PRDs (Step 2b) — they are never directly implemented
@@ -513,7 +514,12 @@ After all phases complete:
 Phase 3/3: AC Verification + Code Review — Running in parallel...
 ```
 
-After all platform implementations are complete, launch `prdx:ac-verifier` and `prdx:code-reviewer` **simultaneously** as a read-only first pass. Both agents read the same diff (`git diff {DEFAULT_BRANCH}..HEAD`) — there is no conflict.
+After all platform implementations are complete, launch `prdx:ac-verifier` and `prdx:reviewer-orchestrator` **simultaneously** as a read-only first pass. Both agents read the same diff (`git diff {DEFAULT_BRANCH}..HEAD`) — there is no conflict.
+
+Pre-compute diff LOC before dispatching:
+```bash
+DIFF_LOC=$(git diff {DEFAULT_BRANCH}..HEAD | grep -c '^[+-]' || echo 0)
+```
 
 **IMPORTANT: Make both Task tool calls in a single message (parallel execution):**
 
@@ -536,18 +542,20 @@ Return only the AC verification summary."
 ```
 
 ```
-subagent_type: "prdx:code-reviewer"
+subagent_type: "prdx:reviewer-orchestrator"
 
 prompt: "Review the implementation for this PRD.
 
 PRD Slug: {SLUG}
 Base Branch: {DEFAULT_BRANCH}
 Platform: {PLATFORM}
+Diff LOC: {DIFF_LOC}
 
-Review the diff (git diff {DEFAULT_BRANCH}..HEAD) for bugs, security issues, quality problems, and convention adherence.
-Only report high-confidence issues (>80%).
+Review the diff for bugs, security issues, quality problems, and convention adherence.
+Dispatch specialists as needed based on diff size and changed file types.
+Classify findings as AUTO-FIX or ASK. Apply AUTO-FIX items silently.
 
-Return only the review summary."
+Return only the review pipeline summary."
 ```
 
 Wait for both agents to complete, then route based on the combined result:
@@ -556,11 +564,11 @@ Wait for both agents to complete, then route based on the combined result:
 
 1. **Both clean** → Skip directly to Step 6 (post-implement hook). This is the happy path — saves one full agent round-trip compared to the old sequential flow.
 
-2. **AC fails, review clean** → Discard the reviewer's first-pass output (it may assume ACs are met — that assumption is now invalid). Run the AC fix loop (Step 5e-fix below — up to 3 attempts). After AC converges, re-run `prdx:code-reviewer` on the new diff. If review now fails, run the review fix loop (Step 5f-fix). If review clean, proceed to Step 6.
+2. **AC fails, review clean** → Discard the reviewer's first-pass output (it may assume ACs are met — that assumption is now invalid). Run the AC fix loop (Step 5e-fix below — up to 3 attempts). After AC converges, re-run `prdx:reviewer-orchestrator` on the new diff. If review now fails, run the review fix loop (Step 5f-fix). If review clean, proceed to Step 6.
 
 3. **AC clean, review fails** → Run the review fix loop directly (Step 5f-fix — up to 2 cycles). AC is already verified so do not re-run it. After fix loop, proceed to Step 6.
 
-4. **Both fail** → Run AC fix loop first (correctness-first invariant — see `skills/fix-loop.md`). Discard the stale reviewer output. After AC converges, re-run `prdx:code-reviewer` on the new diff. If review then fails, run the review fix loop. Proceed to Step 6 when both are clean.
+4. **Both fail** → Run AC fix loop first (correctness-first invariant — see `skills/fix-loop.md`). Discard the stale reviewer output. After AC converges, re-run `prdx:reviewer-orchestrator` on the new diff. If review then fails, run the review fix loop. Proceed to Step 6 when both are clean.
 
 ---
 
@@ -610,11 +618,11 @@ Re-run `prdx:ac-verifier` after each fix. Loop until all ACs are met or 3 attemp
 
 #### Step 5f-fix: Code Review Fix Loop (subroutine)
 
-Invoked when code-reviewer reports issues. Maximum 2 cycles. On exhaustion → AskUserQuestion (Proceed anyway / Fix manually / Stop).
+Invoked when `prdx:reviewer-orchestrator` reports ASK findings that the user chose to fix. Maximum 2 cycles. On exhaustion → AskUserQuestion (Proceed anyway / Fix manually / Stop).
 
 See [skills/fix-loop.md](../skills/fix-loop.md) for the full loop specification.
 
-Feed review issues back to the platform agent:
+Feed only the ASK findings (user-approved for fixing) back to the platform agent:
 
 ```
 subagent_type: "prdx:developer"
@@ -623,7 +631,7 @@ prompt: "Fix the following code review issues.
 
 ## Review Issues
 
-{REVIEW_ISSUES}
+{ASK_FINDINGS approved by user}
 
 ## Context
 
@@ -644,7 +652,23 @@ prompt: "Fix the following code review issues.
 Return only a summary of fixes applied."
 ```
 
-Re-run `prdx:code-reviewer` after each fix. Loop until clean or 2 cycles exhausted.
+Pre-compute updated diff LOC, then re-run `prdx:reviewer-orchestrator` after each fix:
+
+```
+subagent_type: "prdx:reviewer-orchestrator"
+
+prompt: "Re-review after fixes were applied.
+
+PRD Slug: {SLUG}
+Base Branch: {DEFAULT_BRANCH}
+Platform: {PLATFORM}
+Diff LOC: {UPDATED_DIFF_LOC}
+
+Review the updated diff. Focus on whether the previous findings were resolved.
+Apply any new AUTO-FIX items silently. Return the review pipeline summary."
+```
+
+Loop until clean or 2 cycles exhausted.
 
 **After fix loop completes (or if review was already clean):**
 - Continue to Step 6
@@ -818,5 +842,5 @@ PR_NUMBER=$(gh pr list --head "$BRANCH" --state open --json number,isDraft --jq 
 7. **Return summaries only** - File contents stay in agent context
 8. **Multi-platform uses parent-child model** - Parent delegates to child PRDs in separate sessions
 9. **Child PRDs check prerequisites** - Read sibling state files before starting
-10. **Code review before handoff** - prdx:code-reviewer runs after implementation, fixes issues automatically (max 2 cycles)
+10. **Code review before handoff** - prdx:reviewer-orchestrator runs after implementation; <50 LOC uses fast path, ≥50 LOC dispatches specialists in parallel; AUTO-FIX applied silently, ASK batched into one user prompt (max 2 fix cycles)
 11. **Draft PR auto-update** - If a draft PR exists on the branch, pushes and updates its body after implementation
