@@ -48,7 +48,56 @@ If `--quick` is NOT present, continue with normal entry point logic below.
 
 **If `--ci` present:** Route to `/prdx:ci` with all arguments and stop.
 
-**If `--issue {number}` present (without `--ci`):** Set `HAS_ISSUE=true`, `ISSUE_NUMBER`. Fetch: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Store `ISSUE_TITLE` + `ISSUE_BODY` as feature description. Continue with normal entry point logic.
+**If `--issue N` or `--pr N` present (without `--ci`):** Resume a CI-created PRD locally.
+
+```bash
+# Set ISSUE_NUMBER or PR_NUMBER from the flag, then:
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resume-from-issue.sh"
+# → sets: RESUME_SLUG, RESUME_PR_NUMBER, RESUME_PHASE
+```
+
+Route by `RESUME_PHASE`:
+
+| `RESUME_PHASE` | action |
+|----------------|--------|
+| `"reviewing"` | Jump to Step 3b (Reviewing Loop) using `RESUME_SLUG` + `RESUME_PR_NUMBER` |
+| `"post-implement"` | Jump to Step 3a (Review Status Decision) using `RESUME_SLUG` |
+
+On hook error (`return 1`): show the error message, stop workflow.
+
+**If `--issue {number}` present (without `--ci` and without resume intent — legacy behaviour):** Set `HAS_ISSUE=true`, `ISSUE_NUMBER`. Fetch: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Store `ISSUE_TITLE` + `ISSUE_BODY` as feature description. Continue with normal entry point logic.
+
+> `--issue N` triggers resume when a `<!-- prdx-prd -->` comment exists on that issue; otherwise it falls through to legacy issue-as-description behaviour. The hook handles this distinction internally — it errors only when it finds no PRD comment.
+
+### Auto-Detect from Current Branch
+
+Runs BEFORE falling through to the "no active state / new feature" path, when all of the following are true: no state files exist in `.prdx/state/`, the current branch is not the default branch (`$DEFAULT_BRANCH`).
+
+```bash
+CURRENT_BRANCH=$(git branch --show-current)
+PR_INFO=$(gh pr list --head "$CURRENT_BRANCH" --state all --json number,body --jq '.[0]' 2>/dev/null)
+```
+
+If a PR is found: extract `Closes/Fixes/Resolves #M` from `PR_INFO.body`. If an issue number `M` is found:
+
+```bash
+gh issue view "$M" --json title,comments \
+  --jq '{title:.title, has_prd: ([.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | length > 0)}'
+```
+
+If `has_prd` is true: derive the slug from the issue title (same rule as `/prdx:plan` Step 0 + `resume-from-issue.sh` Step 3). Show AskUserQuestion with message:
+
+```
+Resume CI-created PRD?
+  Slug:   {DERIVED_SLUG}
+  Issue:  #{M}
+  PR:     #{PR_INFO.number}
+```
+
+- **Confirm** → `ISSUE_NUMBER=$M` + source the hook → route by `RESUME_PHASE` (same table above).
+- **Decline** → fall through silently to new-feature path.
+
+If any auto-detect check fails (no PR, no `Closes #M`, no PRD comment) → fall through silently. Never show an error in this path.
 
 ### Slug vs Description Resolution
 

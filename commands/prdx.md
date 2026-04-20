@@ -1,6 +1,6 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[--quick] [--ci] [--issue <number>] [feature description or PRD slug]"
+argument-hint: "[--quick] [--ci] [--issue <number>] [--pr <number>] [feature description or PRD slug]"
 ---
 
 ## Pre-Computed Context
@@ -18,10 +18,48 @@ PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(
 
 > Main entry point for PRDX. Orchestrates plan → implement → push with decision points.
 > Use `--quick` for ephemeral tasks. Use `--ci --issue N` for CI mode (routes to `/prdx:ci`).
+> Use `--issue N` or `--pr N` (without `--ci`) to resume a CI-created PRD locally.
 
 ---
 
 ### Step 1: Determine Entry Point
+
+**`--issue N` / `--pr N` flag (resume from CI, no `--ci`):**
+
+If `--issue N` or `--pr N` is present and `--ci` is NOT:
+
+```bash
+# Set ISSUE_NUMBER=N  (or PR_NUMBER=N — the hook resolves either)
+source "$(git rev-parse --show-toplevel)/hooks/prdx/resume-from-issue.sh"
+# → sets: RESUME_SLUG, RESUME_PR_NUMBER, RESUME_PHASE
+```
+
+Route by `RESUME_PHASE`:
+- `"reviewing"` → Jump to Step 3b using `RESUME_SLUG` + `RESUME_PR_NUMBER`
+- `"post-implement"` → Jump to Step 3a using `RESUME_SLUG`
+
+On hook error: show message, stop.
+
+**Auto-detect from current branch (no flags, no local state):**
+
+Before falling through to new-feature planning: if no `.prdx/state/*.json` files exist and the current branch is not the default branch, run:
+
+```bash
+CURRENT_BRANCH=$(git branch --show-current)
+PR_INFO=$(gh pr list --head "$CURRENT_BRANCH" --state all --json number,body --jq '.[0]' 2>/dev/null)
+```
+
+If a PR is found with `Closes/Fixes/Resolves #M` in body, and issue `#M` has a `<!-- prdx-prd -->` comment → show AskUserQuestion:
+```
+Resume CI-created PRD?
+  Slug:   {DERIVED_SLUG}   (derived from issue title, same rule as /prdx:plan Step 0)
+  Issue:  #{M}
+  PR:     #{PR_INFO.number}
+```
+- Confirm → `ISSUE_NUMBER=$M`, source hook, route by `RESUME_PHASE` (same table above).
+- Decline OR any check fails → fall through silently to normal new-feature flow.
+
+**Normal active-state routing:**
 
 When exactly one active state file is identified (see skill for active detection logic), read that slug's state using the shared hook:
 
