@@ -21,6 +21,12 @@
 # Returns:
 #   0 on success, 1 on error (with message to stderr)
 
+# Requires bash (uses process substitution)
+if [ -z "$BASH_VERSION" ]; then
+  echo "resume-from-issue: requires bash (process substitution not available in current shell)" >&2
+  return 1 2>/dev/null || exit 1
+fi
+
 # Guard: skip if already loaded for this exact ISSUE_NUMBER:PR_NUMBER combination
 _RFI_GUARD_KEY="${ISSUE_NUMBER}:${PR_NUMBER}"
 [ -n "$_RESUME_FROM_ISSUE_LOADED" ] && [ "$_RESUME_FROM_ISSUE_LOADED" = "$_RFI_GUARD_KEY" ] && return 0
