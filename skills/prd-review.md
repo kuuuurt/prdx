@@ -105,3 +105,57 @@ Expert skill for reviewing PRDs against the project's actual patterns and best p
 4. **Technical Approach** — follows project patterns, risks identified, platform pitfalls addressed
 5. **Implementation Plan** — logical phases, testing phase included, dependencies clear
 6. **Multi-Project Impact** — client/backend implications checked, backward compatibility maintained
+
+## Review Pipeline Patterns
+
+These patterns apply to the `prdx:reviewer-orchestrator` and its specialist sub-agents.
+
+### Diff Thresholds
+
+| Diff size | Pipeline |
+|---|---|
+| < 50 LOC | Single-pass fallback (`prdx:code-reviewer`) |
+| ≥ 50 LOC | Scope detection + parallel specialist dispatch |
+| ≥ 200 LOC or any `critical` finding | Specialists + red-team adversarial pass |
+
+### Specialist → File Mapping
+
+| Specialist | Triggered by |
+|---|---|
+| `security` | `auth/`, `security/`, `crypto/`, `*token*`, `*password*`, `*secret*` |
+| `testing` | `*.test.*`, `*.spec.*`, `tests/`, `__tests__/`, `*_test.*` |
+| `data-migration` | `migrations/`, `*migration*`, `*schema*`, `*seed*` |
+| `api-contract` | `routes/`, `controllers/`, `handlers/`, `api/`, `openapi*`, `swagger*` |
+| `performance` | Any file with >30 changed lines |
+| `maintainability` | All files (always included unless diff is test-only) |
+| `red-team` | Conditional: LOC ≥ 200 or critical finding |
+
+### Finding Structure
+
+Every finding must include:
+- `fingerprint` — `{file}:{line}:{rule-id}` (unique identifier for dedup)
+- `severity` — `info` / `warning` / `critical`
+- `classification` — `AUTO-FIX` or `ASK`
+- `specialist` — which agent produced the finding
+
+### Classification Rules
+
+**AUTO-FIX** (silent batch commit, no user prompt):
+- Unused import statements
+- Trailing whitespace on changed lines
+- `console.log` / `print` / debug prints in non-test code
+
+**Always ASK** (batched into single `AskUserQuestion`):
+- Any finding in a test file
+- Any `critical` severity finding
+- Architecture decisions, security tradeoffs, naming choices
+- All red-team findings
+
+**Default**: ASK when uncertain. AUTO-FIX only for patterns with mechanical certainty.
+
+### Deduplication
+
+When multiple specialists flag the same `fingerprint`:
+- Keep one finding
+- Union severity (take the highest: critical > warning > info)
+- Mark `confidence: multi-specialist` to boost signal
