@@ -21,15 +21,19 @@
 # Returns:
 #   0 on success, 1 on error (with message to stderr)
 
-# Guard: skip if already loaded
-[ -n "$_RESUME_FROM_ISSUE_LOADED" ] && return 0
-_RESUME_FROM_ISSUE_LOADED=1
+# Guard: skip if already loaded for this exact ISSUE_NUMBER:PR_NUMBER combination
+_RFI_GUARD_KEY="${ISSUE_NUMBER}:${PR_NUMBER}"
+[ -n "$_RESUME_FROM_ISSUE_LOADED" ] && [ "$_RESUME_FROM_ISSUE_LOADED" = "$_RFI_GUARD_KEY" ] && return 0
 
-# Error helper — echo to stderr and return 1
+# Error helper — unset guard flag, echo to stderr, and return 1
 _rfi_err() {
   echo "resume-from-issue: $*" >&2
+  unset _RESUME_FROM_ISSUE_LOADED
   return 1
 }
+
+# Set guard now; _rfi_err will unset it on any error path so retries work
+_RESUME_FROM_ISSUE_LOADED="$_RFI_GUARD_KEY"
 
 # Reset output vars
 RESUME_SLUG=""
@@ -93,16 +97,33 @@ fi
 
 # ── Step 3: Derive slug from issue title ───────────────────────────────────
 
-# Lowercase, strip filler + prepositions, replace non-alphanumeric runs with -,
-# trim edges, take up to 4 tokens.
-_RFI_SLUG_RAW=$(echo "$_RFI_TITLE" \
-  | tr '[:upper:]' '[:lower:]' \
-  | sed -E 's/\b(add|implement|create|update|fix|refactor|improve|the|a|for|from|to|in|on|of|with|and|or)\b//g' \
-  | sed -E 's/[^a-z0-9]+/-/g' \
-  | sed -E 's/^-+|-+$//g')
+# Filler list aligned exactly with /prdx:plan Step 0 rule (no "and", no "or")
+_RFI_FILLERS="add
+implement
+create
+update
+fix
+refactor
+improve
+the
+a
+for
+from
+to
+in
+on
+of
+with"
 
-# Take up to 4 dash-separated tokens
-RESUME_SLUG=$(echo "$_RFI_SLUG_RAW" | tr '-' '\n' | grep -v '^$' | head -4 | tr '\n' '-' | sed 's/-$//')
+# Tokenize on non-alphanumeric, lowercase, filter fillers, take up to 4 tokens
+RESUME_SLUG=$(echo "$_RFI_TITLE" \
+  | tr '[:upper:]' '[:lower:]' \
+  | tr -cs 'a-z0-9' '\n' \
+  | grep -v '^$' \
+  | grep -Fxvf <(echo "$_RFI_FILLERS") \
+  | head -4 \
+  | tr '\n' '-' \
+  | sed 's/-$//')
 
 if [ -z "$RESUME_SLUG" ]; then
   _rfi_err "Could not derive slug from issue title: $_RFI_TITLE" || return 1
@@ -120,17 +141,13 @@ if [ -f "$_RFI_STATE_FILE" ]; then
   return 0
 fi
 
-# ── Step 5: Write PRD file ─────────────────────────────────────────────────
+# ── Step 5: Gather all remote data before writing anything ─────────────────
 
-mkdir -p "$PLANS_DIR"
-# Strip the <!-- prdx-prd --> marker
-echo "$_RFI_COMMENT_BODY" | sed 's/<!-- prdx-prd -->//' > "$PLANS_DIR/prdx-${RESUME_SLUG}.md"
-
-# ── Step 6: Find associated PR ────────────────────────────────────────────
-
-# Parse **Branch:** from the written PRD
-_RFI_PRD_FILE="$PLANS_DIR/prdx-${RESUME_SLUG}.md"
-_RFI_BRANCH=$(grep -m1 '^\*\*Branch:\*\*' "$_RFI_PRD_FILE" 2>/dev/null | sed -E 's/\*\*Branch:\*\*[[:space:]]*//')
+# Parse **Branch:** from the in-memory PRD body (before writing to disk)
+_RFI_PRD_STRIPPED=$(echo "$_RFI_COMMENT_BODY" | sed 's/<!-- prdx-prd -->//')
+_RFI_BRANCH=$(echo "$_RFI_PRD_STRIPPED" \
+  | grep -m1 '^\*\*Branch:\*\*' \
+  | sed -E 's/\*\*Branch:\*\*[[:space:]]*//')
 
 _RFI_FOUND_PR=""
 if [ -n "$_RFI_BRANCH" ]; then
@@ -142,7 +159,10 @@ if [ -z "$_RFI_FOUND_PR" ] && [ -n "$_RFI_PR_PASSED" ]; then
   _RFI_FOUND_PR="$_RFI_PR_PASSED"
 fi
 
-# ── Step 7: Write state file ───────────────────────────────────────────────
+# ── Step 6: Write PRD file and state file atomically ──────────────────────
+
+mkdir -p "$PLANS_DIR"
+echo "$_RFI_PRD_STRIPPED" > "$PLANS_DIR/prdx-${RESUME_SLUG}.md"
 
 mkdir -p "$PROJECT_ROOT/.prdx/state"
 
