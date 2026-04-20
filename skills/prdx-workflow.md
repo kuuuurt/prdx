@@ -44,11 +44,13 @@ If `--quick` is present:
 
 If `--quick` is NOT present, continue with normal entry point logic below.
 
-### CI and Issue Flag Parsing
+### Auto/CI and Issue Flag Parsing
 
-**If `--ci` present:** Route to `/prdx:ci` with all arguments and stop.
+**If `--auto` present:** Route to `/prdx:auto` with all arguments and stop.
 
-**If `--issue N` or `--pr N` present (without `--ci`):** Resume a CI-created PRD locally.
+**If `--ci` present (deprecated):** Emit `⚠️ --ci is deprecated; use --auto`, then route to `/prdx:auto` with all arguments and stop.
+
+**If `--issue N` or `--pr N` present (without `--auto`/`--ci`):** Resume a CI-created PRD locally.
 
 ```bash
 # Set ISSUE_NUMBER or PR_NUMBER from the flag, then:
@@ -65,7 +67,7 @@ Route by `RESUME_PHASE`:
 
 On hook error (`return 1`): show the error message, stop workflow.
 
-**If `--issue {number}` present (without `--ci` and without resume intent — legacy behaviour):** Set `HAS_ISSUE=true`, `ISSUE_NUMBER`. Fetch: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Store `ISSUE_TITLE` + `ISSUE_BODY` as feature description. Continue with normal entry point logic.
+**If `--issue {number}` present (without `--auto`/`--ci` and without resume intent — legacy behaviour):** Set `HAS_ISSUE=true`, `ISSUE_NUMBER`. Fetch: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Store `ISSUE_TITLE` + `ISSUE_BODY` as feature description. Continue with normal entry point logic.
 
 > `--issue N` triggers resume when a `<!-- prdx-prd -->` comment exists on that issue; otherwise it falls through to legacy issue-as-description behaviour. The hook handles this distinction internally — it errors only when it finds no PRD comment.
 

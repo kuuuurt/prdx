@@ -185,17 +185,19 @@ Same pipeline (dev-planner, code review) but with a lightweight PRD that's clean
 /prdx:push android-biometric-auth        # Create PR
 ```
 
-## CI Mode
+## Auto (Non-Interactive) Mode
 
-Run PRDX from GitHub Actions or any CI environment. PRDs are stored as GitHub issue comments (not committed to the repo). The CI workflow is a thin trigger that calls PRDX commands. Only code review remains in the workflow.
+Run PRDX from GitHub Actions or any CI/automated environment. PRDs are stored as GitHub issue comments (not committed to the repo). The CI workflow is a thin trigger that calls PRDX commands. Only code review remains in the workflow.
 
 ```bash
 # Plan only — generates PRD, posts as issue comment
-/prdx:ci --issue 42 --plan-only --requested-by username
+/prdx:auto --issue 42 --plan-only --requested-by username
 
 # Implement — reads PRD from issue comment, implements, creates PR
-/prdx:ci --issue 42 --requested-by username
+/prdx:auto --issue 42 --requested-by username
 ```
+
+> `/prdx:ci` is a deprecated alias for `/prdx:auto` — it works identically but emits a deprecation warning. Migrate to `/prdx:auto`.
 
 ### Responsibility Boundaries
 

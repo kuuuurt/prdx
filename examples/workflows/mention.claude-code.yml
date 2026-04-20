@@ -40,7 +40,7 @@ jobs:
           claude_args: "--allowedTools Bash,Read,Write,Edit,Glob,Grep,Agent,Skill,TodoWrite,TodoRead"
           prompt: |
             Generate a PRD for issue #${{ github.event.issue.number }} using:
-            /prdx:ci --issue ${{ github.event.issue.number }} --plan-only --requested-by ${{ github.actor }}
+            /prdx:auto --issue ${{ github.event.issue.number }} --plan-only --requested-by ${{ github.actor }}
 
   # @claude revise on issues — update the existing PRD comment in-place
   revise:
@@ -77,7 +77,7 @@ jobs:
           claude_args: "--allowedTools Bash,Read,Write,Edit,Glob,Grep,Agent,Skill,TodoWrite,TodoRead"
           prompt: |
             Revise the PRD for issue #${{ github.event.issue.number }} based on feedback:
-            /prdx:ci --issue ${{ github.event.issue.number }} --plan-only --requested-by ${{ github.actor }}
+            /prdx:auto --issue ${{ github.event.issue.number }} --plan-only --requested-by ${{ github.actor }}
 
   # @claude implement on issues or PRs — create branch + PR (issue) or apply fixes (PR)
   implement:
@@ -141,7 +141,7 @@ jobs:
           claude_args: "--allowedTools Bash,Read,Write,Edit,Glob,Grep,Agent,Skill,TodoWrite,TodoRead"
           prompt: |
             Implement the PRD for issue #${{ steps.resolve.outputs.issue }}:
-            /prdx:ci --issue ${{ steps.resolve.outputs.issue }} --requested-by ${{ github.actor }}
+            /prdx:auto --issue ${{ steps.resolve.outputs.issue }} --requested-by ${{ github.actor }}
         env:
           GH_TOKEN: ${{ github.token }}
           TRIGGER_COMMENT_ID: ${{ github.event.comment.id }}
