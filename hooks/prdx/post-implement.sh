@@ -6,6 +6,8 @@ set -e
 
 # shellcheck source=resolve-plans-dir.sh
 source "$(dirname "$0")/resolve-plans-dir.sh"
+# shellcheck source=discover-commands.sh
+source "$(dirname "$0")/discover-commands.sh"
 
 PRD_SLUG="$1"
 
@@ -45,46 +47,13 @@ fi
 
 # --- Test Verification Gate ---
 # Try common test runners, skip if none found
-TEST_PASSED=true
-TEST_CMD=""
-
-if [ -f "Makefile" ] && grep -q "^test:" Makefile 2>/dev/null; then
-    TEST_CMD="make test"
-elif [ -f "bun.lockb" ] || [ -f "bunfig.toml" ]; then
-    TEST_CMD="bun test"
-elif [ -f "package.json" ] && grep -q '"test"' package.json 2>/dev/null; then
-    TEST_CMD="npm test"
-elif [ -f "build.gradle.kts" ] || [ -f "build.gradle" ]; then
-    TEST_CMD="./gradlew test"
-elif [ -f "Cargo.toml" ]; then
-    TEST_CMD="cargo test"
-elif [ -f "go.mod" ]; then
-    TEST_CMD="go test ./..."
-elif [ -f "Package.swift" ] || ls *.xcodeproj 1>/dev/null 2>&1; then
-    # Swift/Xcode: try swift test first (SPM), fall back to xcodebuild
-    if [ -f "Package.swift" ]; then
-        TEST_CMD="swift test"
-    else
-        # Find the first .xcodeproj and extract scheme
-        XCODEPROJ=$(ls -d *.xcodeproj 2>/dev/null | head -1)
-        SCHEME=$(xcodebuild -list -project "$XCODEPROJ" 2>/dev/null | awk '/Schemes:/{found=1; next} found && /^$/{exit} found{gsub(/^[[:space:]]+/,""); print; exit}')
-        if [ -n "$SCHEME" ]; then
-            # Dynamically detect an available iPhone simulator; fall back to iPhone 16
-            SIM_NAME=$(xcrun simctl list devices available 2>/dev/null | grep -E "iPhone [0-9]" | tail -1 | sed 's/^[[:space:]]*//' | sed 's/ (.*//')
-            SIM_DEST="${SIM_NAME:-iPhone 16}"
-            TEST_CMD="xcodebuild test -project $XCODEPROJ -scheme $SCHEME -destination 'platform=iOS Simulator,name=$SIM_DEST'"
-        fi
-    fi
-elif [ -f "pyproject.toml" ] || [ -f "setup.py" ] || [ -f "setup.cfg" ]; then
-    TEST_CMD="pytest"
-fi
+TEST_CMD=$(discover_test_cmd)
 
 if [ -n "$TEST_CMD" ]; then
     echo "Running tests: $TEST_CMD"
-    if ! $TEST_CMD 2>&1; then
+    if ! eval "$TEST_CMD" 2>&1; then
         echo ""
         echo "Tests failing — agent should fix before review"
-        TEST_PASSED=false
         exit 1
     fi
     echo "Tests passed"

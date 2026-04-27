@@ -52,10 +52,10 @@ Delegates to `prdx:pr-author` agent (isolated context). Two modes: **PRD mode** 
 
 ### Phase 1: Detect Mode
 
-**First, parse `--draft` flag:**
-- Strip `--draft` from arguments if present (can appear anywhere in the argument string)
-- If `--draft` is present: set `DRAFT_FLAG=true`
-- If `--draft` is NOT present: set `DRAFT_FLAG=false`
+**First, parse flags:**
+- Strip `--draft` from arguments if present → set `DRAFT_FLAG=true` (default `false`)
+- Strip `--skip-validation` from arguments if present → set `SKIP_VALIDATION=true` (default `false`). When true, the pre-push hook is bypassed by exporting `PRDX_SKIP_PREPUSH=1` before running it.
+- Both flags can appear anywhere in the argument string
 - Continue with remaining arguments for slug matching below
 
 **If slug provided:**
@@ -152,6 +152,32 @@ fi
 git push -u origin "$CURRENT_BRANCH"
 ```
 
+### Phase 3.5: Pre-Push Validation (PRD Mode)
+
+Run the pre-push validation hook if it exists. If `SKIP_VALIDATION=true`, export `PRDX_SKIP_PREPUSH=1` first so the hook bypasses itself with a logged notice.
+
+```bash
+if [ -f hooks/prdx/pre-push.sh ]; then
+  if [ "$SKIP_VALIDATION" = "true" ]; then
+    PRDX_SKIP_PREPUSH=1 ./hooks/prdx/pre-push.sh
+  else
+    ./hooks/prdx/pre-push.sh
+  fi
+fi
+```
+
+If the hook exits non-zero, abort the push flow. Show:
+
+```
+Pre-push validation failed.
+
+Fix the failures above, or bypass with:
+  /prdx:push {slug} --skip-validation
+  PRDX_SKIP_PREPUSH=1 /prdx:push {slug}
+```
+
+Do NOT proceed to Phase 4a. The branch was already pushed in Phase 3a — that's fine, validation only blocks PR creation.
+
 ### Phase 4a: Invoke PR Author Agent (PRD Mode)
 
 ```
@@ -224,6 +250,10 @@ CURRENT_BRANCH=$(git branch --show-current)
 [ -z "$(git log "$DEFAULT_BRANCH"..HEAD --oneline)" ] && echo "No commits on this branch" && exit 1
 git push -u origin "$CURRENT_BRANCH"
 ```
+
+### Phase 2b.5: Pre-Push Validation (Standalone)
+
+Same as Phase 3.5 (PRD Mode) — run `hooks/prdx/pre-push.sh` if it exists, honor `SKIP_VALIDATION`. Abort PR creation on non-zero exit with the same bypass-hint message.
 
 ### Phase 3b: Invoke PR Author Agent (Standalone)
 
@@ -335,3 +365,5 @@ Create a feature branch first:
 - `/prdx:push` → Auto-detects PRD from branch name, or falls back to standalone mode
 - `/prdx:push --draft` → Creates draft PR (adds "not human-reviewed" notice)
 - `/prdx:push backend-auth --draft` → PRD mode draft PR
+- `/prdx:push backend-auth --skip-validation` → Bypass pre-push typecheck/lint/test gate (emergency)
+- `PRDX_SKIP_PREPUSH=1 /prdx:push backend-auth` → Same bypass via env var
