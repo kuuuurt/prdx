@@ -85,10 +85,13 @@ ${prd_body}"
 
   if [ -n "$existing_id" ] && [ "$existing_id" != "null" ]; then
     # Attempt PATCH
-    local patch_out patch_err patch_exit
+    local patch_out patch_err patch_exit _upc_tmp_err
+    _upc_tmp_err=$(mktemp)
     patch_out=$(gh api "repos/$repo/issues/comments/$existing_id" \
-      -X PATCH -f body="$prd_body" 2>/tmp/_upc_patch_err; patch_exit=$?)
-    patch_err=$(cat /tmp/_upc_patch_err 2>/dev/null)
+      -X PATCH -f body="$prd_body" 2>"$_upc_tmp_err")
+    patch_exit=$?
+    patch_err=$(cat "$_upc_tmp_err" 2>/dev/null)
+    rm -f "$_upc_tmp_err"
 
     if [ "$patch_exit" -eq 0 ]; then
       # PATCH succeeded
