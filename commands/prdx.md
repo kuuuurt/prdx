@@ -135,17 +135,13 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 
 **⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 
-**If `HAS_ISSUE=true`:** After plan mode exits and before showing the decision point, automatically comment the PRD on the issue:
+**If `HAS_ISSUE=true`:** After plan mode exits and before showing the decision point, upsert the PRD on the issue. If a `<!-- prdx-prd -->` comment already exists, it is updated in place; otherwise a new comment is created:
 
 ```bash
-gh issue comment {ISSUE_NUMBER} --body "$(cat <<'PRDBODY'
-## PRDX: Generated PRD
-
----
-
-{FULL PRD CONTENT}
-PRDBODY
-)"
+PRD_BODY="{FULL PRD CONTENT}"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/upsert-prd-comment.sh"
+upsert_prd_comment "{ISSUE_NUMBER}" "$PRD_BODY"
+# PRD_COMMENT_ID and PRD_COMMENT_URL are now exported
 ```
 
 Display: `PRD commented on issue #{ISSUE_NUMBER}`
