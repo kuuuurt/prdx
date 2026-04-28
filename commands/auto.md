@@ -131,7 +131,9 @@ Generates a PRD and posts it as an issue comment.
 **1.2: Check for existing PRD comment:**
 
 ```bash
-PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
+REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
+PRD_COMMENT=$(gh api "repos/$REPO/issues/$ISSUE_NUMBER/comments" --paginate \
+  --jq '[.[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
 ```
 
 - **No PRD comment (fresh plan):** Continue to 1.3. (The workflow has already reacted `eyes` on the trigger comment.)
@@ -177,15 +179,16 @@ PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] |
 {Bullet list. Risk → consequence. Max 2}
 ```
 
-**1.5: Post PRD as issue comment:**
+**1.5: Post PRD as issue comment (upsert):**
 
 ```bash
-PRD_COMMENT_ID=$(gh issue comment "$ISSUE_NUMBER" --body "$(cat <<'PRDBODY'
-<!-- prdx-prd -->
-{FULL PRD CONTENT}
-PRDBODY
-)" | grep -o 'https://[^ ]*' | grep -o '[0-9]*$')
+PRD_BODY="{FULL PRD CONTENT}"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/upsert-prd-comment.sh"
+upsert_prd_comment "$ISSUE_NUMBER" "$PRD_BODY"
+# PRD_COMMENT_ID and PRD_COMMENT_URL are now exported
 ```
+
+The helper prepends `<!-- prdx-prd -->` idempotently and PATCHes any existing marker comment in place, falling back to POST when none exists.
 
 Transition the reaction:
 ```bash
@@ -199,7 +202,6 @@ Your final text response must be empty — see Reactions & Output Discipline.
 
 1. Fetch existing PRD comment:
    ```bash
-   REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
    PRD_COMMENT_ID=$(echo "$PRD_COMMENT" | jq -r '.databaseId // .id' 2>/dev/null)
    PRD_COMMENT_BODY=$(echo "$PRD_COMMENT" | jq -r '.body' 2>/dev/null)
    ```
@@ -210,11 +212,14 @@ Your final text response must be empty — see Reactions & Output Discipline.
      '[.comments[] | select((.databaseId // .id) > $prd_id) | .body] | join("\n---\n")' 2>/dev/null
    ```
 3. Re-explore codebase if needed.
-4. Generate revised PRD (keep `<!-- prdx-prd -->` marker).
-5. Update in-place:
+4. Generate revised PRD content (without the marker — the helper adds it).
+5. Update the PRD comment in place via the upsert helper. If the previously-detected comment was deleted between detection and write, the helper falls back to creating a new comment:
    ```bash
-   gh api "repos/$REPO/issues/comments/$PRD_COMMENT_ID" -X PATCH -f body="<!-- prdx-prd -->
-   {REVISED PRD CONTENT}"
+   # NOTE: feedback query above (sub-step 2) must run before this upsert — uses pre-upsert PRD_COMMENT_ID
+   PRD_BODY="{REVISED PRD CONTENT}"
+   source "$(git rev-parse --show-toplevel)/hooks/prdx/upsert-prd-comment.sh"
+   upsert_prd_comment "$ISSUE_NUMBER" "$PRD_BODY"
+   # PRD_COMMENT_ID and PRD_COMMENT_URL are now exported
    ```
 6. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Your final text response must be empty — see Reactions & Output Discipline.
 
@@ -236,7 +241,8 @@ PROJECT_NAME=$(echo "$REPO" | cut -d'/' -f2)
 **2.2: Find PRD from issue comment:**
 
 ```bash
-PRD_COMMENT=$(gh issue view "$ISSUE_NUMBER" --json comments --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
+PRD_COMMENT=$(gh api "repos/$REPO/issues/$ISSUE_NUMBER/comments" --paginate \
+  --jq '[.[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
 PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)
 ```
 

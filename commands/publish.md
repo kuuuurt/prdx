@@ -171,30 +171,16 @@ If "Create new":
 
 ## Phase 3b: Add Comment to Existing Issue
 
-**Link PRD to existing issue:**
+**Link PRD to existing issue by posting the full PRD with marker:**
 
-1. Format comment body:
-   ```markdown
-   ## PRD Linked
-
-   A Product Requirements Document has been created for this issue.
-
-   ### Goal
-   [From PRD]
-
-   ### Acceptance Criteria
-   [Checkboxes from PRD]
-
-   ### Approach
-   [High-level summary from PRD]
-
-   ---
-   *PRD managed by PRDX*
+1. Read the full PRD content from the local file:
+   ```bash
+   PRD_BODY=$(cat "$PRD_FILE")
    ```
 
 2. **Confirm with user:**
    ```
-   Ready to add PRD comment to issue #[number]:
+   Ready to add or update PRD comment on issue #[number]:
 
    Issue: [title]
    URL: [url]
@@ -202,9 +188,11 @@ If "Create new":
    Proceed? (y/n)
    ```
 
-3. **Add comment:**
+3. **Upsert comment** (PATCHes existing `<!-- prdx-prd -->` comment in place; POSTs new one if none exists):
    ```bash
-   gh issue comment [number] --body "[body]"
+   source "$(git rev-parse --show-toplevel)/hooks/prdx/upsert-prd-comment.sh"
+   upsert_prd_comment "[number]" "$PRD_BODY"
+   # PRD_COMMENT_ID and PRD_COMMENT_URL are now exported
    ```
 
 4. Proceed to Phase 4

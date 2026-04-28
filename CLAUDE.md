@@ -105,3 +105,8 @@ Commands: thin wrappers, delegate to agents/bash, use hooks + native tools. Agen
 - `CI=true` env var (standard across providers) cleanly bypasses interactive hook prompts
 - PRDs as issue comments (`<!-- prdx-prd -->` marker) avoids polluting git history
 - CI flow needed `.prdx/plans-setup-done` marker to skip interactive plans-directory setup prompt
+
+### Upsert PRD comments by marker (2026-04-28) - claude-plugin
+- All paths posting `<!-- prdx-prd -->` content go through `hooks/prdx/upsert-prd-comment.sh` to avoid duplicates
+- Detection uses `gh issue view --json comments` + `jq` filter; PATCH falls back to POST on 404 (manually-deleted comment)
+- Helper idempotently prepends the marker so callers don't need to remember it
