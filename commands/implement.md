@@ -73,16 +73,14 @@ Commit config is pre-loaded via Pre-Computed Context (`resolve-commit-config.sh`
 
 #### Step 1b: Build Commit Instructions
 
-Build `COMMIT_INSTRUCTIONS` from the pre-loaded config values. Use HEREDOC format for commits. Structure:
+Build `COMMIT_INSTRUCTIONS` from the pre-loaded config (HEREDOC commit). Lines, in order, conditional on flags:
 
-- **Subject line:** `{type}: {description}` (conventional) or `{description}` (simple)
-- **Extended description** (only if `EXTENDED_DESC_ENABLED=true`): blank line + explanation
-- **Claude Code link** (only if `CLAUDE_LINK_ENABLED=true`): blank line + attribution
-- **Co-author** (only if `COAUTHOR_ENABLED=true`): blank line + `Co-Authored-By: {name} <{email}>`
+- Subject: `{type}: {desc}` if `COMMIT_FORMAT=conventional`, else `{desc}`
+- Body (if `EXTENDED_DESC_ENABLED=true`)
+- `🤖 Generated with [Claude Code](https://claude.com/claude-code)` (if `CLAUDE_LINK_ENABLED=true`)
+- `Co-Authored-By: {COAUTHOR_NAME} <{COAUTHOR_EMAIL}>` (if `COAUTHOR_ENABLED=true`; `GIT_AUTHOR_NAME` set → use `claude[bot]` + `github-actions[bot]`)
 
-**CI mode override:** If `GIT_AUTHOR_NAME` env var is set, replace co-author with `claude[bot]` and `github-actions[bot]`.
-
-Build ONE example commit matching the resolved config. Store as `COMMIT_INSTRUCTIONS`.
+Store ONE example commit matching the resolved config.
 
 ### Step 1b.5: Parse Flags
 
@@ -422,14 +420,7 @@ You MUST follow the commit configuration below. This is from the project's prdx.
 
 {COMMIT_INSTRUCTIONS from Step 1b}
 
-**Implementation Instructions:**
-
-1. **Execute only YOUR PHASE tasks** — do not work ahead to future phases
-2. **Test-Driven Development:** Write tests FIRST, ensure they fail, then implement
-3. **Follow Platform Patterns:** Read `.claude/skills/impl-patterns.md` for {PLATFORM} patterns
-4. **Testing Strategy:** Reference `.claude/skills/testing-strategy.md`
-5. **Verification:** Run tests after implementation, ensure your phase's tasks pass
-6. **Commit:** Create one atomic commit for this phase's work
+Execute only YOUR PHASE. Follow TDD; consult `skills/impl-patterns.md` and `skills/testing-strategy.md`. Run tests, then commit one atomic commit.
 
 **Return only a summary:**
 
@@ -738,109 +729,19 @@ When all children are done: /prdx:push {parent-slug}
 
 ---
 
-## Error Handling
+### Step 8: Update Existing Draft PR (if any)
 
-### No Slug Provided
-
-```
-❌ No PRD slug provided
-
-Usage: /prdx:implement <slug>
-
-Available PRDs:
-{List PRDs from {PLANS_DIR}/}
-```
-
-### PRD Not Found
-
-```
-❌ PRD not found: {slug}
-
-Available PRDs:
-{List PRDs}
-```
-
-### Hook Failed
-
-```
-❌ Pre-implement validation failed
-
-{Hook error output}
-
-Fix the issues and try again.
-```
-
----
-
-## Developer Agent
-
-A single unified agent handles all platforms. The `**Platform:**` field in a PRD is a free-form string — not limited to a fixed set of values.
-
-| Agent | Handles |
-|-------|---------|
-| prdx:developer | All platforms and stacks — backend, frontend, Android, iOS, Flutter, Go, Rust, Python, Ruby, PHP, and more |
-
-The platform value is passed as `Platform hint: {PLATFORM}` in the agent prompt so it can prioritize the relevant dependency files and ecosystem patterns during discovery.
-
----
-
-## Post-Implementation: Update Existing Draft PR
-
-**After all implementation steps complete**, check if a draft PR already exists for this branch:
+After Step 6, check if a draft PR exists on the branch:
 
 ```bash
 BRANCH=$(git branch --show-current)
 PR_NUMBER=$(gh pr list --head "$BRANCH" --state open --json number,isDraft --jq '.[] | select(.isDraft) | .number' 2>/dev/null)
 ```
 
-**If a draft PR exists:**
+If found, push commits (`git push origin "$BRANCH"`) and invoke `prdx:pr-author` with `Mode: prd`, `PR Number: {PR_NUMBER}`, `PRD File: {PRD_FILE}`, `Branch: {BRANCH}`, `Base Branch: {DEFAULT_BRANCH}`. The agent updates via `gh pr edit`. Display: `PR #{PR_NUMBER} updated with implementation details.`
 
-1. Push implementation commits:
-   ```bash
-   git push origin "$BRANCH"
-   ```
+## Errors
 
-2. Detect default branch:
-   ```bash
-   DEFAULT_BRANCH=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo 'main')
-   ```
-
-3. Invoke `prdx:pr-author` agent to update PR body:
-   ```
-   subagent_type: "prdx:pr-author"
-
-   prompt: "Update the PR body for a completed implementation.
-
-   Mode: prd
-   PR Number: {PR_NUMBER}
-   PRD Slug: {SLUG}
-   PRD File: {PLANS_DIR}/prdx-{SLUG}.md
-   Branch: {BRANCH}
-   Base Branch: {DEFAULT_BRANCH}
-
-   Read the PRD (now including Implementation Notes), analyze commits, and update the PR title and body.
-   Use gh pr edit to update the existing PR.
-   The footer should say: 'Comment `@claude review` for code review.'
-
-   Return confirmation of the update."
-   ```
-
-4. Display: `PR #{PR_NUMBER} updated with implementation details.`
-
-**If no draft PR exists:** Skip this step entirely.
-
----
-
-## Key Points
-
-1. **PRDs from native plan mode** - Read from `{PLANS_DIR}/`
-2. **Status tracking via file edit** - Update `**Status:**` field directly
-3. **Always read prdx.json first** - Config determines commit format
-4. **Build commit instructions dynamically** - Based on actual config values
-5. **Pass commit instructions to agent** - Include in the prompt
-6. **Agents run isolated** - They don't have access to main conversation context
-7. **Return summaries only** - File contents stay in agent context
-8. **Multi-platform uses parent-child model** - Parent delegates to child PRDs in separate sessions
-9. **Child PRDs check prerequisites** - Read sibling state files before starting
-10. **Code review before handoff** - prdx:reviewer-orchestrator runs after implementation; <50 LOC uses fast path, ≥50 LOC dispatches specialists in parallel; AUTO-FIX applied silently, ASK batched into one user prompt (max 2 fix cycles)
-11. **Draft PR auto-update** - If a draft PR exists on the branch, pushes and updates its body after implementation
+- **No slug** → list PRDs from `{PLANS_DIR}/`.
+- **PRD not found** → list available slugs.
+- **Pre-implement hook fails** → show hook output and stop.

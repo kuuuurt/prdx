@@ -89,7 +89,7 @@ See [skills/prdx-workflow.md#entry-point-routing](../skills/prdx-workflow.md#ent
 
 ### Step 2: Planning
 
-**⛔ SCOPE: This step ONLY creates a PRD document. No application code, no branches, no implementation.** `/prdx:plan` enters plan mode to write a document. When the user approves the document, plan mode exits and a decision point is shown. Implementation happens in Step 3 — ONLY if the user chooses "Implement now".
+> **⛔ Step 2 ONLY writes a PRD — no code, branches, or commits. After plan mode exits, plan.md shows the decision point; wait for the user's choice before Step 3. Never call `/prdx:implement` until the user picks "Implement now".**
 
 **If QUICK_MODE:**
 
@@ -107,13 +107,10 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `{PLANS_DIR}/prdx-quick-{slug}.md`
 
-**⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 
 Route based on the user's choice from plan.md:
 - Implement → Phase 3
 - Stop → End workflow. Tell user they can resume with `/prdx:prdx quick-{slug}`
-
-**⛔ SAFETY CHECK:** If you find yourself about to call `/prdx:implement` or start writing code without the user explicitly choosing "Implement now" from the decision point above — STOP. You have skipped a mandatory decision point. Go back and ask the user.
 
 **If NOT QUICK_MODE (normal mode):**
 
@@ -133,7 +130,6 @@ This enters native plan mode and creates a PRD following the PRDX template forma
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
 2. The PRD file exists in `{PLANS_DIR}/prdx-{slug}.md`
 
-**⛔ AFTER PLAN MODE EXITS: Plan.md will show an AskUserQuestion decision point. Wait for the user's choice. DO NOT start implementing.**
 
 **If `HAS_ISSUE=true`:** After plan mode exits and before showing the decision point, automatically comment the PRD on the issue:
 
@@ -154,8 +150,6 @@ Route based on the user's choice from plan.md:
 - Publish → Phase 2a (then ask about implementation)
 - Implement → Phase 3
 - Stop → End workflow. Tell user they can resume with `/prdx:prdx [slug]`
-
-**⛔ SAFETY CHECK:** If you find yourself about to call `/prdx:implement` or start writing code without the user explicitly choosing "Implement now" from the decision point above — STOP. You have skipped a mandatory decision point. Go back and ask the user.
 
 ---
 

@@ -7,16 +7,13 @@ argument-hint: "[--quick] [feature description or PRD slug]"
 
 ```bash
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
-echo "PLANS_DIR=$PLANS_DIR"
-echo "Branch: $(git branch --show-current)"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-default-branch.sh"
-echo "DEFAULT_BRANCH=$DEFAULT_BRANCH"
-git status --short
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
-echo "PROJECT_NAME=$PROJECT_NAME"
-grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || echo "No PRDs found"
-echo "AGENT_TEAMS=${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-not set}"
+AVAILABLE_PRDS=$(grep -rl "^\*\*Project:\*\* $PROJECT_NAME" "$PLANS_DIR"/*.md 2>/dev/null | xargs -I{} basename {} .md | sed 's/^prdx-//' || true)
+AGENT_TEAMS="${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-not set}"
 ```
+
+Platform detection (when needed) reuses `hooks/prdx/detect-platform.sh` — see `commands/plan.md` Step 1 for the full convention.
 
 # /prdx:prdx:agent - Agent Teams Workflow
 
