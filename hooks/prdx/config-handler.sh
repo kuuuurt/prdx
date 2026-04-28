@@ -127,10 +127,11 @@ mode_set() {
     commits.coAuthor.enabled|commits.extendedDescription.enabled|commits.extendedDescription.includeClaudeCodeLink|pullRequest.autoAssign)
       [ "$val" != "true" ] && [ "$val" != "false" ] && { echo "❌ boolean: true|false"; return 1; } ;;
   esac
+  local tmp; tmp=$(mktemp "${CONFIG_FILE}.XXXXXX") || return 1
   if [ "$val" = "true" ] || [ "$val" = "false" ]; then
-    jq ".$key = $val" "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+    jq ".$key = $val" "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
   else
-    jq ".$key = \"$val\"" "$CONFIG_FILE" > "$CONFIG_FILE.tmp" && mv "$CONFIG_FILE.tmp" "$CONFIG_FILE"
+    jq --arg v "$val" ".$key = \$v" "$CONFIG_FILE" > "$tmp" && mv "$tmp" "$CONFIG_FILE"
   fi
   echo "✅ $key = $val"
 }
