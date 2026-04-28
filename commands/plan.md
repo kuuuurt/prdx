@@ -335,7 +335,7 @@ Present the PRD draft and iterate based on user feedback:
 - Add/remove scope items
 - Adjust approach based on discussion
 
-When user approves (says "looks good", "approve", "let's do it", etc.), the plan **document** is finalized — proceed to Step 4 (ExitPlanMode).
+When the user approves (says "looks good", "approve", "let's do it"), Approval means the PRD document is ready — not permission to start implementing. Proceed to Step 4 (ExitPlanMode).
 
 ### Step 4: Save State and Exit Plan Mode
 
