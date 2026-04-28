@@ -19,7 +19,7 @@ CONTEXTS=()
 add() { case " ${CONTEXTS[*]} " in *" $1 "*) ;; *) CONTEXTS+=("$1") ;; esac; }
 
 # Filesystem heuristics
-[ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "setup.py" ] || ls *.py >/dev/null 2>&1 && add python
+{ [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "setup.py" ] || ls *.py >/dev/null 2>&1; } && add python
 [ -f "go.mod" ] && add go
 [ -f "Cargo.toml" ] && add rust
 [ -f "pubspec.yaml" ] && add flutter
@@ -38,9 +38,9 @@ if [ -f "package.json" ]; then
 fi
 [ -f "tsconfig.json" ] && [ ! -f "package.json" ] && add backend
 
-[ -d "terraform" ] || [ -d "ansible" ] || ls *.tf >/dev/null 2>&1 && add infra
-[ -d "backend" ] || [ -d "server" ] || [ -d "api" ] && add backend
-[ -d "frontend" ] || [ -d "web" ] || [ -d "client" ] && add frontend
+{ [ -d "terraform" ] || [ -d "ansible" ] || ls *.tf >/dev/null 2>&1; } && add infra
+{ [ -d "backend" ] || [ -d "server" ] || [ -d "api" ]; } && add backend
+{ [ -d "frontend" ] || [ -d "web" ] || [ -d "client" ]; } && add frontend
 
 if [ "${#CONTEXTS[@]}" -eq 0 ]; then
   [ -f "Dockerfile" ] && add infra
