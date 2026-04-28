@@ -28,8 +28,12 @@ fi
 [ -n "$_UPSERT_PRD_COMMENT_LOADED" ] && return 0
 _UPSERT_PRD_COMMENT_LOADED=1
 
-# Error helper
-_upc_err() { echo "upsert-prd-comment: $*" >&2; return 1; }
+# Error helper — unset guard so a failed source can be retried cleanly
+_upc_err() {
+  echo "upsert-prd-comment: $*" >&2
+  unset _UPSERT_PRD_COMMENT_LOADED
+  return 1
+}
 
 upsert_prd_comment() {
   local issue_number="${1:-$ISSUE_NUMBER}"
@@ -72,13 +76,13 @@ ${prd_body}"
   # ── Detect existing PRD comment ────────────────────────────────────────────
 
   local existing_comment
-  existing_comment=$(gh issue view "$issue_number" --json comments \
-    --jq '[.comments[] | select(.body | contains("<!-- prdx-prd -->"))] | last' \
+  existing_comment=$(gh api "repos/$repo/issues/$issue_number/comments" --paginate \
+    --jq '[.[] | select(.body | contains("<!-- prdx-prd -->"))] | last' \
     2>/dev/null)
 
   local existing_id=""
   if [ -n "$existing_comment" ] && [ "$existing_comment" != "null" ]; then
-    existing_id=$(echo "$existing_comment" | jq -r '.databaseId // .id' 2>/dev/null)
+    existing_id=$(echo "$existing_comment" | jq -r '.id // empty' 2>/dev/null)
   fi
 
   # ── PATCH existing or POST new ─────────────────────────────────────────────
@@ -101,12 +105,9 @@ ${prd_body}"
       echo "upsert-prd-comment: updated #${PRD_COMMENT_ID}" >&2
       export PRD_COMMENT_ID PRD_COMMENT_URL PRD_COMMENT_ACTION
       return 0
-    fi
-
-    # Non-zero exit — check if it's a 404 (comment deleted) or a hard failure
-    if echo "$patch_err" | grep -q "HTTP 404"; then
-      echo "upsert-prd-comment: comment #${existing_id} no longer exists — falling back to POST" >&2
-      # Fall through to POST below
+    elif [ "$patch_exit" -eq 22 ]; then
+      # HTTP 4xx (404 deleted, 410 gone, 403 forbidden, etc.) — fall through to POST
+      echo "upsert-prd-comment: comment #${existing_id} unreachable (HTTP 4xx) — falling back to POST" >&2
     else
       _upc_err "PATCH failed for comment #${existing_id}: ${patch_err}" || return 1
     fi
