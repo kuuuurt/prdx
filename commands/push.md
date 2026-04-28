@@ -253,7 +253,7 @@ git push -u origin "$CURRENT_BRANCH"
 
 ### Phase 2b.5: Pre-Push Validation (Standalone)
 
-Same as Phase 3.5 (PRD Mode) — run `hooks/prdx/pre-push.sh` if it exists, honor `SKIP_VALIDATION`. Abort PR creation on non-zero exit with the same bypass-hint message.
+Same as Phase 3.5 — run pre-push hook, honor `SKIP_VALIDATION`, abort on non-zero.
 
 ### Phase 3b: Invoke PR Author Agent (Standalone)
 
@@ -299,65 +299,9 @@ To view PR: gh pr view {PR_NUMBER} --web
 
 ---
 
-## Error Handling
+## Errors
 
-### GitHub CLI Not Available
-
-```
-GitHub CLI (gh) not found.
-
-This command requires the GitHub CLI to create pull requests.
-
-Install:
-  - macOS: brew install gh
-  - Linux: See https://github.com/cli/cli#installation
-  - Windows: winget install GitHub.cli
-
-Then authenticate:
-  gh auth login
-```
-
-### Not Authenticated
-
-```
-Not authenticated with GitHub.
-
-Please authenticate:
-  gh auth login
-
-Then try again.
-```
-
-### PR Already Exists
-
-```
-PR already exists for this branch:
-#42: feat: Add authentication endpoints
-https://github.com/user/repo/pull/42
-State: open
-
-Options:
-1. Update existing PR description
-2. View PR
-3. Cancel
-```
-
-### No Commits
-
-```
-No commits found on this branch.
-
-Please make and commit changes first.
-```
-
-### On Default Branch
-
-```
-Cannot create PR from main/master.
-
-Create a feature branch first:
-  git checkout -b feat/my-feature
-```
+`gh` not installed / not authenticated → see Step 0. PR already exists → use AskUserQuestion (Update / View / Cancel). No commits → ask user to commit first. On default branch → ask user to create a feature branch first.
 
 ## Examples
 

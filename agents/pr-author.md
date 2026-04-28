@@ -270,23 +270,4 @@ Please fix and retry with: /prdx:push
 
 ## Pre-flight Checks
 
-Before creating PR:
-
-1. Verify branch is pushed:
-   ```bash
-   git push -u origin $(git branch --show-current)
-   ```
-
-2. Verify not on default branch:
-   ```bash
-   CURRENT=$(git branch --show-current)
-   if [ "$CURRENT" = "$DEFAULT_BRANCH" ]; then
-     echo "Cannot create PR from default branch"
-     exit 1
-   fi
-   ```
-
-3. Check for existing PR:
-   ```bash
-   gh pr view --json number 2>/dev/null
-   ```
+Caller (`/prdx:push`) has already validated branch ≠ default, ensured commits exist, pushed the branch, and checked for an existing PR before invoking this agent.

@@ -65,112 +65,36 @@ This ensures the workflow is recoverable from the very start. The slug is derive
 
 ### Step 1: Platform Detection
 
-Auto-detect ALL potential platforms from the description and codebase using an expanded heuristic scan:
+**1. Description keywords** — scan the user's description for these terms and add to `DETECTED_CONTEXTS` (deduplicated):
 
-**1. Description keywords (track all matches):**
-- "backend", "API", "endpoint", "server", "REST", "GraphQL", "gRPC", "microservice" → `DETECTED_CONTEXTS` += `backend`
-- "frontend", "web", "UI", "React", "Vue", "Svelte", "Next.js", "HTML", "CSS", "browser" → `DETECTED_CONTEXTS` += `frontend`
-- "Android", "Kotlin", "Compose", "Jetpack" → `DETECTED_CONTEXTS` += `android`
-- "iOS", "Swift", "SwiftUI", "UIKit", "Xcode" → `DETECTED_CONTEXTS` += `ios`
-- "mobile", "app" (without platform specifics) → `DETECTED_CONTEXTS` += `android` + `ios`
-- "Python", "Django", "FastAPI", "Flask", "pip", "conda", "ML", "machine learning" → `DETECTED_CONTEXTS` += `python`
-- "Go", "Golang" → `DETECTED_CONTEXTS` += `go`
-- "Rust", "Cargo", "crate" → `DETECTED_CONTEXTS` += `rust`
-- "Flutter", "Dart" → `DETECTED_CONTEXTS` += `flutter`
-- "React Native", "Expo" → `DETECTED_CONTEXTS` += `react-native`
-- "Java", "Spring", "Maven", "Gradle" (without Kotlin/Android) → `DETECTED_CONTEXTS` += `java`
-- "data pipeline", "ETL", "dbt", "Airflow", "Spark", "Kafka", "warehouse" → `DETECTED_CONTEXTS` += `data`
-- "infrastructure", "Terraform", "Ansible", "Kubernetes", "k8s", "Helm", "IaC" → `DETECTED_CONTEXTS` += `infra`
-- "CLI", "command line", "terminal tool", "shell script" → `DETECTED_CONTEXTS` += `cli`
+| keywords | context |
+|---|---|
+| backend, API, endpoint, server, REST, GraphQL, gRPC, microservice | `backend` |
+| frontend, web, UI, React, Vue, Svelte, Next.js, HTML, CSS, browser | `frontend` |
+| Android, Kotlin, Compose, Jetpack | `android` |
+| iOS, Swift, SwiftUI, UIKit, Xcode | `ios` |
+| mobile, app (no platform specifics) | `android` + `ios` |
+| Python, Django, FastAPI, Flask, pip, conda, ML | `python` |
+| Go, Golang | `go` |
+| Rust, Cargo, crate | `rust` |
+| Flutter, Dart | `flutter` |
+| React Native, Expo | `react-native` |
+| Java, Spring, Maven, Gradle (no Kotlin/Android) | `java` |
+| data pipeline, ETL, dbt, Airflow, Spark, Kafka, warehouse | `data` |
+| infrastructure, Terraform, Ansible, Kubernetes, k8s, Helm, IaC | `infra` |
+| CLI, command line, terminal tool, shell script | `cli` |
 
-**2. File system heuristics (check in project root):**
-```bash
-# Python
-[ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "setup.py" ] || ls *.py 2>/dev/null | head -1
-→ DETECTED_CONTEXTS += python
-
-# Go
-[ -f "go.mod" ]
-→ DETECTED_CONTEXTS += go
-
-# Rust
-[ -f "Cargo.toml" ]
-→ DETECTED_CONTEXTS += rust
-
-# Flutter / Dart
-[ -f "pubspec.yaml" ]
-→ DETECTED_CONTEXTS += flutter
-
-# Java / Spring (without Kotlin)
-([ -f "pom.xml" ] || [ -f "build.gradle" ]) && ! [ -f "build.gradle.kts" ]
-→ DETECTED_CONTEXTS += java
-
-# Android (Kotlin)
-[ -f "build.gradle.kts" ] || [ -d "android" ]
-→ DETECTED_CONTEXTS += android
-
-# iOS
-[ -f "Package.swift" ] || [ -d "ios" ]
-→ DETECTED_CONTEXTS += ios
-
-# React Native
-[ -f "react-native.config.js" ]
-→ DETECTED_CONTEXTS += react-native
-
-# Node.js / backend or frontend
-[ -f "package.json" ]: inspect for React/Vue/Svelte/Next → frontend; Express/Fastify/Hono/Koa/NestJS → backend
-[ -f "tsconfig.json" ] (without frontend framework) → backend
-
-# Data pipelines
-grep -r "dbt\|airflow\|spark\|kafka" requirements.txt pyproject.toml package.json 2>/dev/null
-→ DETECTED_CONTEXTS += data
-
-# Infrastructure
-[ -d "terraform" ] || [ -d "ansible" ] || ls *.tf 2>/dev/null | head -1
-→ DETECTED_CONTEXTS += infra
-
-# Dockerfile only (no other strong signal)
-[ -f "Dockerfile" ] && [ ${#DETECTED_CONTEXTS[@]} -eq 0 ]
-→ DETECTED_CONTEXTS += infra
-
-# CLI tools (Makefile present, no web/app deps)
-[ -f "Makefile" ] && [ ${#DETECTED_CONTEXTS[@]} -eq 0 ]
-→ DETECTED_CONTEXTS += cli
-
-# Directory structure fallbacks
-[ -d "backend" ] || [ -d "server" ] || [ -d "api" ] → DETECTED_CONTEXTS += backend (if not already present)
-[ -d "frontend" ] || [ -d "web" ] || [ -d "client" ] → DETECTED_CONTEXTS += frontend (if not already present)
-```
-
-**Deduplication:** `DETECTED_CONTEXTS` is a unique list. Do not add the same context twice.
-
-**3. Branch convention detection (run before deriving branch name):**
-
-Scan existing branches to identify the dominant naming pattern:
+**2. Filesystem heuristics + branch convention** — source the hook:
 
 ```bash
-git branch -a --format='%(refname:short)' 2>/dev/null | head -50
+source "$(git rev-parse --show-toplevel)/hooks/prdx/detect-platform.sh"
+# → exports: DETECTED_CONTEXTS (filesystem-detected, space-separated),
+#            BRANCH_PREFIX_FEAT (feat|feature), BRANCH_PREFIX_FIX (fix|bugfix|hotfix)
 ```
 
-Look for prefix patterns in the results:
-- `feature/` or `feat/` → note as `PREFIX_FEAT`
-- `fix/` or `bugfix/` or `hotfix/` → note as `PREFIX_FIX`
-- `chore/` → note as `PREFIX_CHORE`
-- `refactor/` → note as `PREFIX_REFACTOR`
-- Ticket patterns like `ABC-\d+/` (e.g., `PROJ-123/some-feature`) → note as `PREFIX_TICKET`
+Merge the keyword-derived list with `$DETECTED_CONTEXTS` from the hook (deduplicate). Use `$BRANCH_PREFIX_FEAT` and `$BRANCH_PREFIX_FIX` when constructing branch names — they reflect the repo's dominant convention. If neither was triggered, fall back to defaults: feature→`feat/{slug}`, bug-fix→`fix/{slug}`, refactor→`refactor/{slug}`, spike→`chore/{slug}`.
 
-Count occurrences of each pattern. If a single pattern appears 2+ times and accounts for >50% of prefixed branches, treat it as the **dominant pattern** and use it when constructing branch names:
-- If `feature/` is dominant, use `feature/{slug}` (not `feat/{slug}`)
-- If `feat/` is dominant, use `feat/{slug}`
-- Ticket patterns: preserve the ticket prefix style but append the slug (e.g., `PROJ-{NEXT_NUMBER}/{slug}` — if no ticket number is available, fall back to conventional)
-
-If no dominant pattern is found, fall back to the conventional PRDX defaults:
-- feature → `feat/{slug}`
-- bug-fix → `fix/{slug}`
-- refactor → `refactor/{slug}`
-- spike → `chore/{slug}`
-
-**4. Multi-Platform Selection:**
+**3. Multi-Platform Selection:**
 
 **If QUICK_MODE is true:** Skip multi-platform selection entirely. Auto-detect the single most relevant context from the description (prefer the most specific match). Quick mode always targets a single platform — omit `**Platforms:**` and `**Implementation Order:**` fields.
 
@@ -203,7 +127,7 @@ Options: [dynamically built from DETECTED_CONTEXTS only]
 
 The `**Platform:**` field in the PRD is **free-form** — it accepts any string value, not just the 4 legacy values. Use the detected context label directly (e.g., `python`, `go`, `rust`, `flutter`, `data`, `infra`, `cli`).
 
-**5. Implementation Order (when 2+ platforms selected):**
+**4. Implementation Order (when 2+ platforms selected):**
 
 If user selected 2+ platforms, ask about implementation order using **AskUserQuestion**:
 
@@ -235,15 +159,13 @@ Parse the result into the `**Implementation Order:**` field format:
 ```
 Numbered steps. Platforms on the same step separated by commas. Steps execute sequentially.
 
-**6. Single platform detected clearly** → use it directly (no selection needed)
+**5. Single platform detected clearly** → use it directly (no selection needed)
 
 ### Step 2: Enter Plan Mode
 
-Use **EnterPlanMode** tool to begin planning. (`QUICK_MODE` was already parsed in Step 0.)
+> **⛔ Plan mode writes a DOCUMENT, not code. Approval = PRD ready, not permission to implement. After ExitPlanMode you MUST run Steps 4c→4.5→5→5.5 (decision point) and STOP — never call `/prdx:implement` directly.**
 
-**⛔ REMINDER: You are entering plan mode to WRITE A DOCUMENT, not to implement a feature.** Your output in plan mode is a PRD (markdown document). You are NOT writing application code. When the user approves the document, you exit plan mode — you do NOT start coding.
-
-Once in plan mode, explore the codebase using **ONLY the PRDX exploration agents** (see mandatory section above):
+Use **EnterPlanMode** to begin. Explore the codebase using **ONLY the PRDX exploration agents**:
 
 ```
 Task tool: subagent_type="prdx:code-explorer", prompt="[your exploration question]"
@@ -270,20 +192,6 @@ Compress prose ruthlessly. Technical substance stays exact.
 - **Approach:** 1-3 sentences or a numbered list. Direction only — mechanics go in the dev plan.
 - **Scope:** Bullets only. No prose intro.
 - **Risks:** `risk → consequence` format. Max 3.
-
-**Before / after — Problem (74 words → 20):**
-
-Verbose:
-> B2B users can currently take (claim) any asset within their permitted locations, regardless of the asset's physical GPS position relative to its geofence zone. The release flow already validates that an asset is within its configured geofence area before allowing release, but the take flow has no equivalent check. This means a user could take an asset that is physically located outside the permitted zone, leading to inconsistent enforcement of geofence boundaries.
-
-Compressed:
-> B2B take flow has no geofence check. Release flow already validates. Users can claim assets outside permitted zones — enforcement inconsistent.
-
-**Before / after — Acceptance Criterion:**
-
-Verbose: *When a B2B user attempts to take an asset that is outside its home location's configured geofence zone, the API returns a 400 error with message "Cannot take asset outside permitted area"*
-
-Compressed: *Reject B2B take outside geofence → 400 "Cannot take asset outside permitted area"*
 
 **If QUICK_MODE — use this lightweight template:**
 
@@ -427,9 +335,7 @@ Present the PRD draft and iterate based on user feedback:
 - Add/remove scope items
 - Adjust approach based on discussion
 
-When user approves (says "looks good", "approve", "let's do it", etc.), the plan **document** is finalized.
-
-**⛔ "Approval" means the PRD document is ready — NOT that you should start implementing.** When the user approves, proceed to Step 4 (ExitPlanMode). Do NOT interpret approval as permission to write application code, create branches, or start the implementation pipeline.
+When user approves (says "looks good", "approve", "let's do it", etc.), the plan **document** is finalized — proceed to Step 4 (ExitPlanMode).
 
 ### Step 4: Save State and Exit Plan Mode
 
@@ -446,30 +352,7 @@ cat > .prdx/state/{SLUG}.json << EOF
 EOF
 ```
 
-**4b. Call ExitPlanMode.**
-
-**IMPORTANT:** Do NOT ask "Should I exit plan mode?" or "Ready to exit?" - just call ExitPlanMode directly when the user approves the plan. The approval to exit is implicit in their approval of the plan.
-
----
-
-**⛔ CRITICAL — POST-PLAN-MODE INSTRUCTIONS ⛔**
-
-**After calling ExitPlanMode, you MUST follow Steps 4c→4.5→5→5.5 below BEFORE doing anything else.**
-
-**DO NOT skip ahead to implementation. DO NOT call `/prdx:implement`. DO NOT start coding.**
-
-The ONLY things you should do after ExitPlanMode are:
-1. Verify the plan file naming (Step 4c)
-2. Generate child PRDs if multi-platform (Step 4.5)
-3. Verify plan file exists (Step 5)
-4. Show decision point (Step 5.5)
-5. **STOP and wait for user input**
-
-If you find yourself about to implement or write code after plan mode exits — STOP. You are in the wrong phase.
-
-**NOTE:** If context was cleared after ExitPlanMode, the state file already says `post-planning` (saved in Step 4a). Re-running `/prdx:prdx` will find it and show the decision point correctly — no work is lost.
-
----
+**4b. Call ExitPlanMode** directly when the user approves — do not re-ask for permission to exit. If context is cleared after exit, the state file (`post-planning` from 4a) lets `/prdx:prdx` resume to the decision point.
 
 **4c. Verify Plan File Naming:**
 
@@ -704,26 +587,16 @@ cat .prdx/state/{SLUG}.json 2>/dev/null
 
 **If the state file exists with `"phase": "post-planning"`** (called from `/prdx:prdx`):
 
----
+Show the decision point via **AskUserQuestion** and STOP — display the choice only; do not call `/prdx:implement` or start coding. The parent workflow handles routing.
 
-**⛔ MANDATORY DECISION POINT — DO NOT SKIP ⛔**
+**Normal mode** (quick=false):
+- "Publish to GitHub" — Create issue for team visibility
+- "Implement now" — Start coding immediately
+- "Stop here" — Review PRD later
 
-**You are NOT allowed to proceed to implementation. You MUST ask the user what to do next.**
-
----
-
-Show the decision point via **AskUserQuestion**:
-
-**Normal mode** (quick is false):
-- Option 1: "Publish to GitHub" — Create issue for team visibility
-- Option 2: "Implement now" — Start coding immediately
-- Option 3: "Stop here" — Review PRD later
-
-**Quick mode** (quick is true):
-- Option 1: "Implement now" (Recommended) — Start coding immediately
-- Option 2: "Stop here" — Review plan later
-
-**⛔ FULL STOP.** Do NOT proceed beyond this AskUserQuestion. Do NOT call `/prdx:implement`. Do NOT start coding. Do NOT explore the codebase for implementation. Just display the user's choice and STOP. The `/prdx:prdx` workflow (if still in context) or the user's next invocation will handle routing.
+**Quick mode** (quick=true):
+- "Implement now" (Recommended) — Start coding immediately
+- "Stop here" — Review plan later
 
 **If no state file exists** (standalone `/prdx:plan` call):
 
