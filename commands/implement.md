@@ -662,7 +662,42 @@ Apply any new AUTO-FIX items silently. Return the review pipeline summary."
 Loop until clean or 2 cycles exhausted.
 
 **After fix loop completes (or if review was already clean):**
-- Continue to Step 6
+- Continue to Step 5g
+
+---
+
+### Step 5g: Auto-Simplify Changed Files
+
+Once review is clean, run mechanical simplification on files changed in this branch. No re-review afterward — the rules are deterministic (comment removal, single-use inlining) and not expected to introduce review-worthy changes.
+
+1. **Collect changed source files:**
+   ```bash
+   git diff --name-only {DEFAULT_BRANCH}..HEAD | grep -E '\.(kt|swift|ts|tsx|js|jsx|py|go|rb|java|rs)$' || true
+   ```
+   If the list is empty, skip to Step 6.
+
+2. **Apply simplification rules from `commands/simplify.md`** to each changed file. For each file:
+   - Read the file
+   - Remove documentation-style comments (keep `// MARK:`, `// TODO:`, `// FIXME:`, why-comments, workaround explanations, legal headers, `@Suppress`/`@ts-expect-error` with explanations)
+   - Inline single-use local variables when the expression is clear
+   - Inline single-use private functions when simple
+   - Do NOT change behavior, refactor architecture, or touch unchanged files
+
+3. **Commit if anything changed:**
+   ```bash
+   if ! git diff --quiet; then
+     git add -A
+     git commit -m "$(cat <<'EOF'
+   refactor: simplify changed files post-review
+
+   $COMMIT_TRAILERS
+   EOF
+   )"
+   fi
+   ```
+   Use the same `COMMIT_INSTRUCTIONS` trailers built in Step 1b. If nothing was simplified, skip the commit silently.
+
+4. **Continue to Step 6.**
 
 ---
 
