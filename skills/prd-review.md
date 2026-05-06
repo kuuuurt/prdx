@@ -101,10 +101,39 @@ Expert skill for reviewing PRDs against the project's actual patterns and best p
 
 1. **Problem** — clear, specific, affected users identified
 2. **Goal** — measurable, out-of-scope items prevent creep
-3. **Acceptance Criteria** — 3-5 testable items covering functional, error handling, non-functional
+3. **Acceptance Criteria** — testable items covering functional, error handling, non-functional
 4. **Technical Approach** — follows project patterns, risks identified, platform pitfalls addressed
 5. **Implementation Plan** — logical phases, testing phase included, dependencies clear
 6. **Multi-Project Impact** — client/backend implications checked, backward compatibility maintained
+
+## Brevity Caps (enforce on every iteration)
+
+PRDs must be skimmable. Reject and tighten any draft that exceeds these caps:
+
+| Section | Cap |
+|---|---|
+| Problem | ≤3 sentences |
+| Goal | 1 sentence |
+| User Stories | ≤3, omit if user is obvious |
+| Acceptance Criteria | ≤7 items — collapse related conditions ("token created and expires after 24h" = 1 AC) |
+| Approach | ≤3 sentences or a short numbered list |
+| Scope | OMIT by default. Include only for `spike` type or multi-platform parents |
+| Risks & Considerations | ≤3 items in `risk → consequence` form |
+| Codebase Context · Summary | ≤3 sentences |
+| Codebase Context · Key Files | ≤8 bullets, one line each |
+| Codebase Context · Patterns Found | ≤5 bullets, one line each |
+| Codebase Context · everything else | no tables, no per-file maps, no nested headings beyond `###` |
+
+When iterating with the user, propose cuts before adding content. Bias toward removing words rather than rephrasing.
+
+**Caps apply to explanatory prose only — never compress substance.** Preserve in full and do NOT count against any section budget:
+
+- Data models, schemas, type definitions (TypeScript interfaces, Pydantic models, SQL DDL, Protobuf, JSON Schema)
+- Diagrams (mermaid, ASCII art, sequence/ER/state diagrams)
+- Example payloads (request/response JSON, fixtures, sample inputs/outputs)
+- Code blocks, file paths, function/API names, error messages
+
+If a draft is over budget, trim sentences around these artifacts — never the artifacts themselves.
 
 ## Review Pipeline Patterns
 
