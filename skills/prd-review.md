@@ -126,6 +126,15 @@ PRDs must be skimmable. Reject and tighten any draft that exceeds these caps:
 
 When iterating with the user, propose cuts before adding content. Bias toward removing words rather than rephrasing.
 
+**Caps apply to explanatory prose only — never compress substance.** Preserve in full and do NOT count against any section budget:
+
+- Data models, schemas, type definitions (TypeScript interfaces, Pydantic models, SQL DDL, Protobuf, JSON Schema)
+- Diagrams (mermaid, ASCII art, sequence/ER/state diagrams)
+- Example payloads (request/response JSON, fixtures, sample inputs/outputs)
+- Code blocks, file paths, function/API names, error messages
+
+If a draft is over budget, trim sentences around these artifacts — never the artifacts themselves.
+
 ## Review Pipeline Patterns
 
 These patterns apply to the `prdx:reviewer-orchestrator` and its specialist sub-agents.

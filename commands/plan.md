@@ -180,7 +180,16 @@ Compress prose ruthlessly. Technical substance stays exact.
 
 **Drop:** articles where natural, filler (just/really/basically/actually/simply/currently), pleasantries, hedging ("might", "could potentially", "it seems"), preambles ("This section describes...", "Below we outline..."), connective fluff ("however", "furthermore", "additionally"), "in order to" → "to", "the reason is because" → "because". No restating the title or type in the Problem statement.
 
-**Preserve EXACTLY:** code blocks, inline `backticks`, file paths, function and API names, tables, bullet hierarchy, headings, numbers, versions, error messages (quoted exact). These are substance, not fluff — never compress them.
+**Preserve EXACTLY (substance, not prose — never compress, never count against budgets):**
+- Code blocks and inline `backticks`
+- File paths, function names, API names, type names
+- **Data models, schemas, type definitions** (TypeScript interfaces, Pydantic models, SQL DDL, Protobuf, JSON Schema, etc.) — show them in full
+- **Diagrams** — mermaid, ASCII art, sequence diagrams, ER diagrams, state machines
+- **Example payloads** — request/response JSON, sample inputs/outputs, fixtures
+- Tables, bullet hierarchy, headings
+- Numbers, versions, error messages (quoted exact)
+
+The brevity rules below apply to **explanatory prose only**. If a data model, diagram, or example belongs in the PRD, include it in full — section budgets cap surrounding sentences, not embedded artifacts.
 
 **Style:** Fragments OK. Active voice, present tense. Short synonyms — "fix" not "implement a solution for", "use" not "utilize", "big" not "extensive". Pattern: `[thing] [action] [reason]. [next step].`
 
@@ -189,7 +198,7 @@ Compress prose ruthlessly. Technical substance stays exact.
 - **Goal:** 1 sentence. End state in user/business terms.
 - **User Stories:** Max 3. Omit if user is obvious.
 - **Acceptance Criteria:** Max 7 items. Start with a verb. Testable. No inline explanation. If you have more than 7, collapse related conditions into one AC (e.g., "token is created and expires after 24h" — not two ACs).
-- **Approach:** 1-3 sentences or a numbered list. Direction only — mechanics go in the dev plan.
+- **Approach:** 1-3 sentences or a numbered list of explanatory prose. Direction only — mechanics go in the dev plan. Data models, schemas, and diagrams that belong here are exempt from the prose budget; show them in full.
 - **Scope:** Omit by default. Include only for `spike` type or multi-platform parent PRDs. Bullets only, no prose intro.
 - **Risks:** `risk → consequence` format. Max 3.
 
@@ -445,7 +454,7 @@ echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, 
 - **Summary:** ≤3 sentences.
 - **Key Files:** ≤8 bullets, one line each (`path — short description`).
 - **Patterns Found:** ≤5 bullets, one line each.
-- **No tables, no per-file maps, no algorithm writeups, no nested headings beyond `###`.**
+- **No prose tables, no per-file maps, no algorithm writeups, no nested headings beyond `###`.** (Data-model tables and schema definitions discovered in the codebase are substance, not prose — keep them if load-bearing.)
 - **Relevant Snippets:** omit unless a specific quote is load-bearing for the dev plan; if included, ≤2 snippets, ≤10 lines each.
 
 **Format:**
