@@ -65,6 +65,17 @@ upsert_prd_comment() {
     _upc_err "Could not resolve repo via gh repo view — check gh auth status" || return 1
   fi
 
+  # ── Strip Codebase Context tail ────────────────────────────────────────────
+  # `## Codebase Context` seeds dev-planner; issue readers don't need it.
+  prd_body=$(printf '%s\n' "$prd_body" | awk '
+    /^## Codebase Context[[:space:]]*$/ { stop=1 }
+    !stop { lines[++n]=$0 }
+    END {
+      while (n>0 && lines[n] ~ /^[[:space:]]*$/) n--
+      for (i=1;i<=n;i++) print lines[i]
+    }
+  ')
+
   # ── Idempotently prepend marker ────────────────────────────────────────────
 
   local marker="<!-- prdx-prd -->"

@@ -188,9 +188,9 @@ Compress prose ruthlessly. Technical substance stays exact.
 - **Problem:** 1-3 sentences. What's broken + why it matters.
 - **Goal:** 1 sentence. End state in user/business terms.
 - **User Stories:** Max 3. Omit if user is obvious.
-- **Acceptance Criteria:** Start with a verb. Testable. No inline explanation.
+- **Acceptance Criteria:** Max 7 items. Start with a verb. Testable. No inline explanation. If you have more than 7, collapse related conditions into one AC (e.g., "token is created and expires after 24h" — not two ACs).
 - **Approach:** 1-3 sentences or a numbered list. Direction only — mechanics go in the dev plan.
-- **Scope:** Bullets only. No prose intro.
+- **Scope:** Omit by default. Include only for `spike` type or multi-platform parent PRDs. Bullets only, no prose intro.
 - **Risks:** `risk → consequence` format. Max 3.
 
 **If QUICK_MODE — use this lightweight template:**
@@ -260,7 +260,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 - [ ] [User-observable outcome - testable]
 - [ ] [User-observable outcome - testable]
 
-## Scope   ← include only when there are meaningful exclusions worth calling out (omit if scope is obvious)
+## Scope   ← OMIT by default. Include ONLY for `spike` type or multi-platform parent PRDs.
 
 ### Included
 - [What this PRD covers]
@@ -279,7 +279,7 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 
 **Conditional section guidance:**
 - **User Stories** — include when end users interact with the feature (web/mobile/API consumers). Omit for infrastructure changes, data pipelines, internal tooling, CLI tools, and library/SDK work where there are no human end users.
-- **Scope** — include when meaningful boundaries need to be drawn or when the feature could easily be misinterpreted as covering more ground. Omit when scope is self-evident from Problem + Goal.
+- **Scope** — OMIT by default. Include ONLY when type is `spike` (where bounding the exploration is the point) or for multi-platform parent PRDs (where per-platform boundaries clarify the split). For routine features, refactors, and bug-fixes, do not include this section — Problem + Goal already convey scope.
 - **Risks & Considerations** — include when there are real technical risks (performance, security, backwards compatibility), external dependencies, or significant unknowns. Omit for well-understood, low-risk changes.
 
 **Multi-platform (parent) template** — used when 2+ platforms are selected:
@@ -439,7 +439,14 @@ echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, 
 - If `QUICK_MODE=true` → skip entirely (quick PRDs are ephemeral; codebase context is not worth the overhead).
 - If the PRD is a multi-platform parent → write `## Codebase Context` into the **parent PRD only**. Children inherit context via the parent reference and do not get their own section.
 
-**Construct the section from exploration summaries gathered during plan-mode Step 2.** Each Task tool result from `prdx:code-explorer` already has the right section structure — concatenate and deduplicate. The section must reflect the actual codebase areas relevant to this PRD so that dev-planner can use it without re-exploring from scratch.
+**Construct the section from exploration summaries gathered during plan-mode Step 2.** Each Task tool result from `prdx:code-explorer` already has the right section structure — concatenate and deduplicate. The section seeds dev-planner; it is not a place to document the exploration.
+
+**Hard caps (enforce these — do not exceed):**
+- **Summary:** ≤3 sentences.
+- **Key Files:** ≤8 bullets, one line each (`path — short description`).
+- **Patterns Found:** ≤5 bullets, one line each.
+- **No tables, no per-file maps, no algorithm writeups, no nested headings beyond `###`.**
+- **Relevant Snippets:** omit unless a specific quote is load-bearing for the dev plan; if included, ≤2 snippets, ≤10 lines each.
 
 **Format:**
 
@@ -449,16 +456,13 @@ echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, 
 *Captured during planning — dev-planner uses this in preference to re-exploring.*
 
 ### Summary
-[2-3 sentence overview of the relevant code areas]
+[≤3 sentences]
 
 ### Key Files
-- `path/to/file.ext` — [description]
+- `path/to/file.ext` — [≤1 line]
 
 ### Patterns Found
-- [pattern observed in the codebase]
-
-### Relevant Snippets
-[optional — short quotes from the code, only when load-bearing]
+- [≤1 line]
 ```
 
 **Append to PRD file — this section MUST be the last section in the file.**
