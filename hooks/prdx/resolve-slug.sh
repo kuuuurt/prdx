@@ -64,12 +64,12 @@ if [ -f "$_CANDIDATE" ]; then
   return 0
 fi
 
-# Step 2: Exact prefixed with quick: prdx-quick-{slug}.md (when slug doesn't already start with quick-)
-if [[ "$_SLUG" != quick-* ]]; then
-  _QUICK_CANDIDATE="$PLANS_DIR/prdx-quick-$_SLUG.md"
-  if [ -f "$_QUICK_CANDIDATE" ]; then
-    RESOLVED_SLUG="quick-$_SLUG"
-    PRD_FILE="$_QUICK_CANDIDATE"
+# Step 2: Exact prefixed with lite: prdx-lite-{slug}.md (when slug doesn't already start with lite-)
+if [[ "$_SLUG" != lite-* ]]; then
+  _LITE_CANDIDATE="$PLANS_DIR/prdx-lite-$_SLUG.md"
+  if [ -f "$_LITE_CANDIDATE" ]; then
+    RESOLVED_SLUG="lite-$_SLUG"
+    PRD_FILE="$_LITE_CANDIDATE"
     return 0
   fi
 fi

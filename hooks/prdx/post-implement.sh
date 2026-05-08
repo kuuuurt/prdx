@@ -16,15 +16,15 @@ if [ -z "$PRD_SLUG" ]; then
     exit 1
 fi
 
-# Find PRD file — exact match first, then quick, then substring with ambiguity check
+# Find PRD file — exact match first, then lite, then substring with ambiguity check
 PRD_FILE=""
 
 # 1. Exact match: prdx-{slug}.md
 if [ -f "$PLANS_DIR/prdx-${PRD_SLUG}.md" ]; then
     PRD_FILE="$PLANS_DIR/prdx-${PRD_SLUG}.md"
-# 2. Exact match: prdx-quick-{slug}.md
-elif [ -f "$PLANS_DIR/prdx-quick-${PRD_SLUG}.md" ]; then
-    PRD_FILE="$PLANS_DIR/prdx-quick-${PRD_SLUG}.md"
+# 2. Exact match: prdx-lite-{slug}.md
+elif [ -f "$PLANS_DIR/prdx-lite-${PRD_SLUG}.md" ]; then
+    PRD_FILE="$PLANS_DIR/prdx-lite-${PRD_SLUG}.md"
 else
     # 3. Substring match with ambiguity check
     MATCHES=$(ls "$PLANS_DIR/"prdx-*${PRD_SLUG}*.md 2>/dev/null || true)
@@ -89,11 +89,11 @@ PARENT=$(grep '^\*\*Parent:\*\*' "$PRD_FILE" 2>/dev/null | sed 's/\*\*Parent:\*\
 
 if [ -n "$PARENT" ]; then
   cat > .prdx/state/${PRD_SLUG}.json << EOF
-{"slug": "${PRD_SLUG}", "phase": "review", "quick": false, "parent": "${PARENT}"}
+{"slug": "${PRD_SLUG}", "phase": "review", "lite": false, "parent": "${PARENT}"}
 EOF
 else
   cat > .prdx/state/${PRD_SLUG}.json << EOF
-{"slug": "${PRD_SLUG}", "phase": "review", "quick": false}
+{"slug": "${PRD_SLUG}", "phase": "review", "lite": false}
 EOF
 fi
 

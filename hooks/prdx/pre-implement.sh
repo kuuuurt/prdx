@@ -14,15 +14,15 @@ if [ -z "$PRD_SLUG" ]; then
     exit 1
 fi
 
-# Find PRD file — exact match first, then quick, then unprefixed, then substring with ambiguity check
+# Find PRD file — exact match first, then lite, then unprefixed, then substring with ambiguity check
 PRD_FILE=""
 
 # 1. Exact match: prdx-{slug}.md
 if [ -f "$PLANS_DIR/prdx-${PRD_SLUG}.md" ]; then
     PRD_FILE="$PLANS_DIR/prdx-${PRD_SLUG}.md"
-# 2. Exact match: prdx-quick-{slug}.md
-elif [ -f "$PLANS_DIR/prdx-quick-${PRD_SLUG}.md" ]; then
-    PRD_FILE="$PLANS_DIR/prdx-quick-${PRD_SLUG}.md"
+# 2. Exact match: prdx-lite-{slug}.md
+elif [ -f "$PLANS_DIR/prdx-lite-${PRD_SLUG}.md" ]; then
+    PRD_FILE="$PLANS_DIR/prdx-lite-${PRD_SLUG}.md"
 # 3. Exact match (unprefixed): {slug}.md
 elif [ -f "$PLANS_DIR/${PRD_SLUG}.md" ]; then
     PRD_FILE="$PLANS_DIR/${PRD_SLUG}.md"

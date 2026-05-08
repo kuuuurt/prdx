@@ -151,7 +151,7 @@ load helpers/test_helper
     # Should have Project field in templates
     run grep -c "Project.*PROJECT_NAME" "$plan_cmd"
     [ "$status" -eq 0 ]
-    # All 4 templates (quick, single, multi, child) should have it
+    # All 4 templates (lite, single, multi, child) should have it
     [ "${lines[0]}" -ge 4 ]
 }
 

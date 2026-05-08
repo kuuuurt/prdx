@@ -39,6 +39,20 @@ The following gaps were found in the PRD. These don't block implementation but m
 
 Continue with planning regardless — PRD gaps are informational, not blocking.
 
+### 1.5. Read Project Conventions (if present)
+
+Before exploring or planning, check for `.prdx/conventions.md`. This file is auto-maintained by `/prdx:cleanup` and captures non-obvious, project-specific patterns learned from past PRDs (e.g., "this repo uses X for Y", "prefer Z over W in this module").
+
+```bash
+[ -f .prdx/conventions.md ] && cat .prdx/conventions.md
+```
+
+> The "always use exploration agents" rule applies to **codebase reads** (source files, configs, docs). `.prdx/conventions.md` is PRDX metadata — a small, fixed-path file safe to read directly with `cat`.
+
+If present, factor the conventions into your dev plan. Cite specific entries when they shape a design decision so the developer agent knows why. If the file is absent or empty, skip — the project has no captured conventions yet.
+
+The file is kept small (capped at ~100 entries by cleanup); load it whole.
+
 ### 2. Explore Codebase
 
 #### PRD Codebase Context (check first)
