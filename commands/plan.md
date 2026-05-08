@@ -1,6 +1,6 @@
 ---
 description: "Create PRD using native plan mode"
-argument-hint: "[--quick] [description]"
+argument-hint: "[--lite] [description]"
 ---
 
 ## Pre-Computed Context
@@ -27,10 +27,10 @@ Uses Claude's **native plan mode** to explore the codebase and create a business
 
 ### Step 0: Parse Flags, Detect Project, and Derive Slug
 
-**Parse `--quick` flag FIRST (before platform detection):**
-- Strip `--quick` from arguments if present
-- If `--quick` is present: set `QUICK_MODE=true`
-- If `--quick` is NOT present: set `QUICK_MODE=false`
+**Parse `--lite` flag FIRST (before platform detection):**
+- Strip `--lite` from arguments if present
+- If `--lite` is present: set `LITE_MODE=true`
+- If `--lite` is NOT present: set `LITE_MODE=false`
 
 **Detect project name from git remote:**
 ```bash
@@ -44,20 +44,20 @@ If both fail, omit the `**Project:**` field from the PRD.
 
 **Derive slug from description:**
 
-Extract the **core concept** (2-4 words max) from the description and convert to kebab-case to produce `{SLUG}`. Strip filler words (add, implement, create, update, fix, refactor, improve), prepositions (the, a, for, from, to, in, on, of, with), and implementation details — keep only the domain-specific nouns and key verbs. For quick mode, prefix with `quick-`.
+Extract the **core concept** (2-4 words max) from the description and convert to kebab-case to produce `{SLUG}`. Strip filler words (add, implement, create, update, fix, refactor, improve), prepositions (the, a, for, from, to, in, on, of, with), and implementation details — keep only the domain-specific nouns and key verbs. For lite mode, prefix with `lite-`.
 
 Examples:
 - "Add biometric authentication to Android app" → `biometric-auth`
 - "Read monthly report directly from Firestore instead of aggregating daily reports" → `monthly-report-read`
 - "Fix user login failures on slow networks" → `login-failures`
 - "Refactor checkout flow to use new payment provider" → `checkout-payment-refactor`
-- Quick: "fix login validation" → `quick-login-validation`
+- Lite: "fix login validation" → `lite-login-validation`
 
 **Write state file immediately:**
 ```bash
 mkdir -p .prdx/state
 cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "planning", "quick": {QUICK_VALUE}}
+{"slug": "{SLUG}", "phase": "planning", "lite": {LITE_VALUE}}
 EOF
 ```
 
@@ -96,11 +96,11 @@ Merge the keyword-derived list with `$DETECTED_CONTEXTS` from the hook (deduplic
 
 **3. Multi-Platform Selection:**
 
-**If QUICK_MODE is true:** Skip multi-platform selection entirely. Auto-detect the single most relevant context from the description (prefer the most specific match). Quick mode always targets a single platform — omit `**Platforms:**` and `**Implementation Order:**` fields.
+**If LITE_MODE is true:** Skip multi-platform selection entirely. Auto-detect the single most relevant context from the description (prefer the most specific match). Lite mode always targets a single platform — omit `**Platforms:**` and `**Implementation Order:**` fields.
 
-**If exactly one context is detected** AND **QUICK_MODE is false:** Auto-select it without asking. No AskUserQuestion needed.
+**If exactly one context is detected** AND **LITE_MODE is false:** Auto-select it without asking. No AskUserQuestion needed.
 
-**If multiple contexts detected** AND **QUICK_MODE is false:**
+**If multiple contexts detected** AND **LITE_MODE is false:**
 
 Use **AskUserQuestion** with `multiSelect: true` to ask which platforms this PRD should target. **Only show detected contexts as options** — do not show a fixed list of 4 options:
 
@@ -202,9 +202,9 @@ The brevity rules below apply to **explanatory prose only**. If a data model, di
 - **Scope:** Omit by default. Include only for `spike` type or multi-platform parent PRDs. Bullets only, no prose intro.
 - **Risks:** `risk → consequence` format. Max 3.
 
-**If QUICK_MODE — use this lightweight template:**
+**If LITE_MODE — use this lightweight template:**
 
-Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined template:
+Lite mode does a brief codebase scan (not a deep dive) and uses a streamlined template:
 
 ```markdown
 # [Title]
@@ -212,10 +212,10 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 **Type:** bug-fix | feature | refactor
 **Project:** {PROJECT_NAME}
 **Platform:** {DETECTED_PLATFORM}
-**Quick:** true
+**Lite:** true
 **Status:** planning
 **Created:** {TODAY's DATE}
-**Branch:** {CURRENT_BRANCH}
+**Branch:** {BRANCH_NAME}
 
 ## Problem
 
@@ -234,11 +234,11 @@ Quick mode does a brief codebase scan (not a deep dive) and uses a streamlined t
 [1-2 sentences — how to fix/implement this]
 ```
 
-`{CURRENT_BRANCH}` = output of `git branch --show-current`. Quick mode stays on the current branch — no new branch is created.
+Lite mode generates its own branch using the same convention as full mode (see "Branch naming convention" below). It is persistent — same lifecycle as a full PRD, just with a briefer template.
 
-**Filename convention for quick mode:** `prdx-quick-{slug}.md` (e.g., `prdx-quick-fix-login-validation.md`)
+**Filename convention for lite mode:** `prdx-lite-{slug}.md` (e.g., `prdx-lite-fix-login-validation.md`)
 
-**If NOT QUICK_MODE — use the full PRD template:**
+**If NOT LITE_MODE — use the full PRD template:**
 
 **Single-platform template:**
 
@@ -335,7 +335,7 @@ Use the dominant pattern detected in Step 1 (sub-step 3) if one was found. Other
 - refactor → `refactor/{slug}`
 - spike → `chore/{slug}`
 
-**Quick mode exception:** Quick mode uses the current branch (`git branch --show-current`) instead of generating a new branch name.
+Lite mode uses the same branch naming convention as full mode (a new branch with `lite-{slug}` slug, e.g. `feat/lite-login-validation`).
 
 ### Step 3: Iterate Until Approval
 
@@ -357,7 +357,7 @@ This is critical because Claude Code may offer a "clear context" option after Ex
 ```bash
 mkdir -p .prdx/state
 cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "post-planning", "quick": {QUICK_VALUE}}
+{"slug": "{SLUG}", "phase": "post-planning", "lite": {LITE_VALUE}}
 EOF
 ```
 
@@ -365,19 +365,19 @@ EOF
 
 **4c. Verify Plan File Naming:**
 
-**Quick mode:** The filename **MUST** be `prdx-quick-{slug}.md` (e.g., `prdx-quick-fix-login-validation.md`).
+**Lite mode:** The filename **MUST** be `prdx-lite-{slug}.md` (e.g., `prdx-lite-fix-login-validation.md`).
 
 **Normal mode:** The filename **MUST** be `prdx-{slug}.md` (e.g., `prdx-biometric-login.md`).
 
 This prefix is how all PRDX commands discover plans. Without it, the plan is invisible to the workflow.
 
-- Quick mode full path: `{PLANS_DIR}/prdx-quick-{slug}.md`
+- Lite mode full path: `{PLANS_DIR}/prdx-lite-{slug}.md`
 - Normal mode full path: `{PLANS_DIR}/prdx-{slug}.md`
 
 ### Step 4.5: Auto-Generate Child PRDs (Multi-Platform Only)
 
 **Only run this step if ALL of the following are true:**
-- `QUICK_MODE` is `false`
+- `LITE_MODE` is `false`
 - The approved PRD has `**Platforms:**` with 2 or more platforms
 
 **If not applicable, skip to Step 5.**
@@ -437,7 +437,7 @@ mkdir -p .prdx/state
 
 For each child platform:
 ```bash
-echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, "parent": "{parent-slug}"}' > .prdx/state/{parent-slug}-{platform}.json
+echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "lite": false, "parent": "{parent-slug}"}' > .prdx/state/{parent-slug}-{platform}.json
 ```
 
 ### Step 4.6: Append Codebase Context to PRD
@@ -445,7 +445,7 @@ echo '{"slug": "{parent-slug}-{platform}", "phase": "planning", "quick": false, 
 **Run this step after Step 4.5 (or after Step 4b if single-platform) for normal-mode PRDs only.**
 
 **Skip conditions:**
-- If `QUICK_MODE=true` → skip entirely (quick PRDs are ephemeral; codebase context is not worth the overhead).
+- If `LITE_MODE=true` → skip entirely (lite PRDs use a streamlined template; codebase context is not worth the overhead).
 - If the PRD is a multi-platform parent → write `## Codebase Context` into the **parent PRD only**. Children inherit context via the parent reference and do not get their own section.
 
 **Construct the section from exploration summaries gathered during plan-mode Step 2.** Each Task tool result from `prdx:code-explorer` already has the right section structure — concatenate and deduplicate. The section seeds dev-planner; it is not a place to document the exploration.
@@ -506,8 +506,8 @@ Omit `### Relevant Snippets` if none are worth capturing.
 
 1. Check if the plan was saved with the correct name:
    ```bash
-   # Quick mode:
-   ls {PLANS_DIR}/prdx-quick-{slug}.md 2>/dev/null
+   # Lite mode:
+   ls {PLANS_DIR}/prdx-lite-{slug}.md 2>/dev/null
    # Normal mode:
    ls {PLANS_DIR}/prdx-{slug}.md 2>/dev/null
    ```
@@ -522,8 +522,8 @@ Omit `### Relevant Snippets` if none are worth capturing.
 
 3. If a non-prefixed plan is found, rename it:
    ```bash
-   # Quick mode:
-   mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-quick-{slug}.md
+   # Lite mode:
+   mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-lite-{slug}.md
    # Normal mode:
    mv {PLANS_DIR}/{old-name}.md {PLANS_DIR}/prdx-{slug}.md
    ```
@@ -537,18 +537,18 @@ Omit `### Relevant Snippets` if none are worth capturing.
 
 **Display summary:**
 
-**Quick mode:**
+**Lite mode:**
 ```
-Quick plan created and saved
+Lite plan created and saved
 
-PRD: {PLANS_DIR}/prdx-quick-{slug}.md
+PRD: {PLANS_DIR}/prdx-lite-{slug}.md
 Platform: {PLATFORM}
 Status: planning
 Branch: {BRANCH}
 
 Next steps:
-- Run /prdx:implement quick-{slug} to start implementation
-- Or run /prdx:prdx quick-{slug} for guided workflow
+- Run /prdx:implement lite-{slug} to start implementation
+- Or run /prdx:prdx lite-{slug} for guided workflow
 ```
 
 **Normal mode (single platform):**
@@ -602,14 +602,10 @@ cat .prdx/state/{SLUG}.json 2>/dev/null
 
 Show the decision point via **AskUserQuestion** and STOP — display the choice only; do not call `/prdx:implement` or start coding. The parent workflow handles routing.
 
-**Normal mode** (quick=false):
+**Options (same for lite and normal mode):**
 - "Publish to GitHub" — Create issue for team visibility
 - "Implement now" — Start coding immediately
 - "Stop here" — Review PRD later
-
-**Quick mode** (quick=true):
-- "Implement now" (Recommended) — Start coding immediately
-- "Stop here" — Review plan later
 
 **If no state file exists** (standalone `/prdx:plan` call):
 
@@ -635,14 +631,14 @@ Use AskUserQuestion to let user choose platform.
 
 ## Optional Flags
 
-### --quick
+### --lite
 
-Use lightweight template for ephemeral tasks:
+Use lightweight template for small changes that still need a branch and PR:
 ```bash
-/prdx:plan --quick "fix login validation"
+/prdx:plan --lite "fix login validation"
 ```
 
-Creates `prdx-quick-{slug}.md` with a streamlined template (Problem, Goal, AC, Approach only). No User Stories, Scope, or Risks sections. Brief codebase scan instead of deep exploration.
+Creates `prdx-lite-{slug}.md` with a streamlined template (Problem, Goal, AC, Approach only). No User Stories, Scope, or Risks sections. Brief codebase scan instead of deep exploration. Generates its own branch and persists for the full lifecycle (same as full mode, just briefer).
 
 ### --platform
 
@@ -663,9 +659,9 @@ Valid types: `feature`, `bug-fix`, `refactor`, `spike`
 ## Key Points
 
 1. **Uses native plan mode** - Not a custom agent
-2. **Follow the PRD template exactly** - Full template for normal mode, lightweight for `--quick`
+2. **Follow the PRD template exactly** - Full template for normal mode, lightweight for `--lite`
 3. **Plans auto-save** - To `{PLANS_DIR}/` directory
-4. **Naming convention** - `prdx-{slug}.md` (normal) or `prdx-quick-{slug}.md` (quick mode)
+4. **Naming convention** - `prdx-{slug}.md` (normal) or `prdx-lite-{slug}.md` (lite mode)
 5. **Status starts as `planning`** - Updated by implement/push commands
 6. **Branch name in PRD** - Used by implement command
-7. **Quick mode** - Adds `**Quick:** true` field, uses lightweight template, brief exploration
+7. **Lite mode** - Adds `**Lite:** true` field, uses lightweight template, brief exploration. Same lifecycle as full mode (own branch, persistent PRD).

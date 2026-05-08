@@ -175,12 +175,12 @@ mkdir -p "$PROJECT_ROOT/.prdx/state"
 if [ -n "$_RFI_FOUND_PR" ]; then
   RESUME_PR_NUMBER="$_RFI_FOUND_PR"
   RESUME_PHASE="reviewing"
-  printf '{"slug":"%s","phase":"reviewing","quick":false,"pr_number":%s}\n' \
+  printf '{"slug":"%s","phase":"reviewing","lite":false,"pr_number":%s}\n' \
     "$RESUME_SLUG" "$RESUME_PR_NUMBER" > "$_RFI_STATE_FILE"
 else
   RESUME_PHASE="post-implement"
   echo "Resume: no PR found for ${RESUME_SLUG} — setting phase to post-implement" >&2
-  printf '{"slug":"%s","phase":"post-implement","quick":false}\n' \
+  printf '{"slug":"%s","phase":"post-implement","lite":false}\n' \
     "$RESUME_SLUG" > "$_RFI_STATE_FILE"
 fi
 

@@ -1,6 +1,6 @@
 ---
 description: "Complete PRD workflow with agent teams: plan → team implement → push"
-argument-hint: "[--quick] [feature description or PRD slug]"
+argument-hint: "[--lite] [feature description or PRD slug]"
 ---
 
 ## Pre-Computed Context
@@ -76,12 +76,12 @@ Then run the standard `/prdx:prdx` workflow with the same arguments and STOP. Do
 #### Step 2b: Initialize State
 
 **Derive slug from description** (same logic as `/prdx:plan` Step 0):
-Convert description to kebab-case. For quick mode, prefix with `quick-`.
+Convert description to kebab-case. For lite mode, prefix with `lite-`.
 
 ```bash
 mkdir -p .prdx/state .prdx
 cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "planning", "quick": {QUICK_MODE}}
+{"slug": "{SLUG}", "phase": "planning", "lite": {LITE_MODE}}
 EOF
 ```
 
@@ -89,7 +89,7 @@ EOF
 
 **Same logic as `/prdx:plan` Step 1.** Auto-detect platforms from description and codebase. For multi-platform, ask user which platforms and implementation order via AskUserQuestion.
 
-For quick mode: auto-detect single platform, skip multi-platform selection.
+For lite mode: auto-detect single platform, skip multi-platform selection.
 
 #### Step 2d: Spawn Team and Architect
 
@@ -132,7 +132,7 @@ Agent tool:
     5. Iterate based on lead's feedback until approved
     6. When approved, write the final PRD to {PLANS_DIR}/prdx-{SLUG}.md
 
-    {QUICK_MODE_INSTRUCTION}
+    {LITE_MODE_INSTRUCTION}
 
     ## Phase 2: Dev Planning
 
@@ -165,8 +165,8 @@ Agent tool:
     WAIT for the lead to message you with the feature description before starting."
 ```
 
-Where `{QUICK_MODE_INSTRUCTION}` is:
-- If quick mode: `"Use the lightweight quick template: Problem (1-2 sentences), Goal (1 sentence), Acceptance Criteria, Approach (1-2 sentences). Save as prdx-quick-{SLUG}.md. Use current branch: {CURRENT_BRANCH}."`
+Where `{LITE_MODE_INSTRUCTION}` is:
+- If lite mode: `"Use the lightweight lite template: Problem (1-2 sentences), Goal (1 sentence), Acceptance Criteria, Approach (1-2 sentences). Save as prdx-lite-{SLUG}.md. Use the standard branch convention: {BRANCH_PREFIX}/lite-{SLUG}."`
 - If normal mode: `"Use the full PRDX PRD template with all sections (Problem, Goal, User Stories, Acceptance Criteria, Scope, Approach, Risks). Save as prdx-{SLUG}.md."`
 
 ---
@@ -234,7 +234,7 @@ ls {PLANS_DIR}/prdx-{SLUG}.md 2>/dev/null
 Update state:
 ```bash
 cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "post-planning", "quick": {QUICK_MODE}}
+{"slug": "{SLUG}", "phase": "post-planning", "lite": {LITE_MODE}}
 EOF
 ```
 
@@ -242,7 +242,7 @@ EOF
 
 #### Step 3c: Post-Planning Decision Point
 
-Same options as `/prdx:prdx` Step 2 (normal: Publish / Implement / Stop; quick: Implement / Stop). Route: Publish → Step 3d, Implement → Step 4, Stop → shut down team + delete state.
+Same options as `/prdx:prdx` Step 2 (Publish / Implement / Stop, identical for lite and normal). Route: Publish → Step 3d, Implement → Step 4, Stop → shut down team + delete state.
 
 #### Step 3d: Publish (Optional)
 
@@ -255,7 +255,7 @@ Run `/prdx:publish {slug}` (same as `/prdx:prdx` Step 2a). After issue is create
 **Update workflow state:**
 ```bash
 cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "implementing", "quick": {QUICK_MODE}}
+{"slug": "{SLUG}", "phase": "implementing", "lite": {LITE_MODE}}
 EOF
 ```
 
@@ -603,7 +603,7 @@ After review completes:
 5. **Update state:**
    ```bash
    cat > .prdx/state/{SLUG}.json << EOF
-   {"slug": "{SLUG}", "phase": "post-implement", "quick": {QUICK_MODE}}
+   {"slug": "{SLUG}", "phase": "post-implement", "lite": {LITE_MODE}}
    EOF
    ```
 
@@ -611,7 +611,7 @@ After review completes:
 
 ### Step 5: Post-Implementation Decision Point
 
-**Identical to `/prdx:prdx` Step 3 (after implementation).** Same AskUserQuestion options (quick: Create PR / Draft PR / Done / Test first; normal: Test first / Create PR now / Draft PR). PR creation uses `/prdx:push {slug}`.
+**Identical to `/prdx:prdx` Step 3 (after implementation).** Same AskUserQuestion options (Test first / Create PR now / Draft PR — identical for lite and normal). PR creation uses `/prdx:push {slug}`.
 
 ---
 
@@ -633,12 +633,6 @@ Same logic as `/prdx:prdx` Step 3b. See [skills/prdx-workflow.md#reviewing-loop]
 
 ---
 
-### Step 7: Cleanup (Quick Mode Only)
-
-**Identical to `/prdx:prdx` Step 5.** Delete temporary PRD and state files on "Done" (no PR). PRs: cleanup after lesson capture on next startup.
-
----
-
 ## Important Guidelines
 
 **All guidelines from `/prdx:prdx` apply.** Additionally:
@@ -657,7 +651,7 @@ Same logic as `/prdx:prdx` Step 3b. See [skills/prdx-workflow.md#reviewing-loop]
 **Context efficiency:**
 
 The lead's context stays lean. Teammate messages are the only data entering the main context:
-- Architect PRD draft: full template (~2KB normal, ~500B quick)
+- Architect PRD draft: full template (~2KB normal, ~500B lite)
 - Architect dev plan: ~3KB
 - Platform dev summary: ~2KB
 - Auditor AC verification: ~1KB

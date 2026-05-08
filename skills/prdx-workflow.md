@@ -29,20 +29,20 @@ If exactly one active state file exists, route by `phase`:
 
 **Post-planning decision point** (AskUserQuestion):
 - **Normal mode**: Option 1: "Publish to GitHub" → Publish phase | Option 2: "Implement now" → Implementation phase | Option 3: "Stop here"
-- **Quick mode**: Option 1: "Implement now" (Recommended) | Option 2: "Stop here"
+- **Lite mode**: Option 1: "Implement now" (Recommended) | Option 2: "Stop here"
 
 If no active state file qualifies (or no state files exist), continue with normal logic below.
 
-### Quick Flag Parsing
+### Lite Flag Parsing
 
-Strip `--quick` from arguments if present (can appear anywhere in the argument string).
+Strip `--lite` from arguments if present (can appear anywhere in the argument string).
 
-If `--quick` is present:
+If `--lite` is present:
 - Remaining text MUST be a description (not a slug) — error if empty
-- Error: `--quick requires a description. Usage: /prdx:prdx --quick "fix login validation"`
-- Set `QUICK_MODE=true`, skip PRD matching, go directly to planning phase
+- Error: `--lite requires a description. Usage: /prdx:prdx --lite "fix login validation"`
+- Set `LITE_MODE=true`, skip PRD matching, go directly to planning phase
 
-If `--quick` is NOT present, continue with normal entry point logic below.
+If `--lite` is NOT present, continue with normal entry point logic below.
 
 ### Auto/CI and Issue Flag Parsing
 
@@ -106,7 +106,7 @@ If any auto-detect check fails (no PR, no `Closes #M`, no PRD comment) → fall 
 **If the argument matches an existing PRD** (resolve using enhanced matching: exact → substring → word-boundary → disambiguation; see `/prdx:implement` for the full algorithm):
 
 - Read PRD and check its `**Status:**` field
-- **Detect quick mode from PRD:** If the PRD contains `**Quick:** true`, set `QUICK_MODE=true` internally
+- **Detect lite mode from PRD:** If the PRD contains `**Lite:** true`, set `LITE_MODE=true` internally
 - **For parent PRDs** (has `## Children` section): Read child state files from `.prdx/state/` to determine progress. Display the child progress table (same as implement.md Step 2b). If all children are at `review` or beyond, ask if user wants to push each child. Otherwise, show which children still need work and display session instructions.
 - **For single-platform and child PRDs**, resume from the appropriate phase:
   - `planning` → Continue planning
@@ -122,7 +122,7 @@ If any auto-detect check fails (no PR, no `Closes #M`, no PRD comment) → fall 
 
 Scan `.prdx/state/*.json` for active state files (phase NOT `"pushed"` or `"completed"`). Present via AskUserQuestion:
 - One active state file: "Continue {slug}" (Recommended) | "Choose a different PRD" | "Start a new feature"
-- Multiple active: list all (slug, phase, quick) + "Start a new feature"
+- Multiple active: list all (slug, phase, lite) + "Start a new feature"
 - None: list existing project PRDs (`grep -rl "^\*\*Project:\*\* $PROJECT_NAME" {PLANS_DIR}/*.md`) and ask: "Start a new feature or continue an existing PRD?"
 
 ## Reviewing Loop
@@ -195,9 +195,9 @@ Use AskUserQuestion to present options.
 **"Mark ready for review":**
 - Run `gh pr ready {PR_NUMBER}`
 - Update PRD status to `implemented`
-- Write state: `{"slug": "{SLUG}", "phase": "pushed", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}` (do NOT delete — enables lesson capture)
+- Write state: `{"slug": "{SLUG}", "phase": "pushed", "lite": {LITE_MODE}, "pr_number": {PR_NUMBER}}` (do NOT delete — enables lesson capture)
 - Display: `PR #{PR_NUMBER} marked ready for review. Lessons will be captured automatically after merge.`
 
 **"Done":**
-- Write state: `{"slug": "{SLUG}", "phase": "pushed", "quick": {QUICK_MODE}, "pr_number": {PR_NUMBER}}` (do NOT delete — PR exists, enables lesson capture)
+- Write state: `{"slug": "{SLUG}", "phase": "pushed", "lite": {LITE_MODE}, "pr_number": {PR_NUMBER}}` (do NOT delete — PR exists, enables lesson capture)
 - Display: `Lessons will be captured automatically after PR #{PR_NUMBER} is merged.`

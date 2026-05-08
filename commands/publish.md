@@ -72,6 +72,63 @@ source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
 
 5. If already published, inform user and exit
 
+6. **Detect parent-child relationship:**
+   - If PRD has `**Parent:** {parent-slug}` field → set `IS_CHILD=true`, `PARENT_SLUG={parent-slug}`.
+   - Otherwise → `IS_CHILD=false`.
+
+---
+
+## Phase 1.5: Ensure Parent Issue Exists (Children Only)
+
+**Skip this phase entirely if `IS_CHILD=false`.**
+
+When publishing a child PRD for the first time, the parent issue must exist on GitHub so the child can reference it.
+
+1. Locate parent PRD: `{PLANS_DIR}/prdx-{PARENT_SLUG}.md`. If missing, error out: `Parent PRD not found: prdx-{PARENT_SLUG}.md. Run /prdx:plan to create it first.`
+
+2. Check parent PRD for `**Issue:** #{N}` field:
+   - **If present:** capture `PARENT_ISSUE=N`. Skip to Phase 2.
+   - **If absent:** create the parent issue now (continue below).
+
+3. **Create parent issue** with a tracking-issue body:
+
+   ```bash
+   PARENT_TITLE=$(grep -m1 '^# ' "{PLANS_DIR}/prdx-{PARENT_SLUG}.md" | sed 's/^# //')
+   PARENT_PROBLEM=$(awk '/^## Problem/{flag=1; next} /^## /{flag=0} flag' "{PLANS_DIR}/prdx-{PARENT_SLUG}.md")
+   PARENT_GOAL=$(awk '/^## Goal/{flag=1; next} /^## /{flag=0} flag' "{PLANS_DIR}/prdx-{PARENT_SLUG}.md")
+   ```
+
+   Body format:
+
+   ```markdown
+   ## Problem
+   {PARENT_PROBLEM}
+
+   ## Goal
+   {PARENT_GOAL}
+
+   ## Children
+
+   <!-- prdx-children-start -->
+   <!-- prdx-children-end -->
+
+   ---
+   *Parent PRD managed by PRDX. Each child gets its own issue, branch, and PR. Children are listed above as they are published.*
+   ```
+
+   The empty markers between `<!-- prdx-children-start -->` and `<!-- prdx-children-end -->` are where Phase 4.5 will inject child checkboxes. Children appear as they're published.
+
+4. Confirm with user before creating, then:
+
+   ```bash
+   PARENT_ISSUE_URL=$(gh issue create --title "$PARENT_TITLE" --body "$PARENT_BODY")
+   PARENT_ISSUE=$(echo "$PARENT_ISSUE_URL" | grep -oE '[0-9]+$')
+   ```
+
+5. Update the parent PRD file with `**Issue:** #{PARENT_ISSUE}` (insert after the `**Status:**` field).
+
+6. Display: `Created parent issue #{PARENT_ISSUE} for {PARENT_SLUG}.`
+
 ---
 
 ## Phase 2: Check for Existing Issue
@@ -138,6 +195,8 @@ If "Create new":
    *PRD managed by PRDX*
    ```
 
+   **If `IS_CHILD=true`:** prepend a `Parent: #{PARENT_ISSUE}` line above `## Problem` so the child issue links back to the parent on GitHub.
+
 4. Check available labels:
    ```bash
    gh label list --json name
@@ -163,7 +222,7 @@ If "Create new":
      --label "[labels]"
    ```
 
-7. Capture issue number and URL from output
+7. Capture issue number and URL from output. Set `CHILD_ISSUE` to the captured number — Phase 4.5 reads this variable when `IS_CHILD=true`.
 
 8. Proceed to Phase 4
 
@@ -195,7 +254,9 @@ If "Create new":
    # PRD_COMMENT_ID and PRD_COMMENT_URL are now exported
    ```
 
-4. Proceed to Phase 4
+4. Set `CHILD_ISSUE=[number]` (the issue number provided in Phase 2a) so Phase 4.5 can reference it when `IS_CHILD=true`.
+
+5. Proceed to Phase 4
 
 ---
 
@@ -208,6 +269,38 @@ If "Create new":
    - Status stays unchanged (publishing is metadata, not a workflow state)
 
 2. Save original filename for Phase 5
+
+---
+
+## Phase 4.5: Append Child Entry to Parent Issue (Children Only)
+
+**Skip this phase if `IS_CHILD=false`.**
+
+After the child issue is created/linked, append it to the parent issue's `## Children` checklist so the parent has a live view of progress.
+
+1. Fetch parent issue body:
+
+   ```bash
+   PARENT_BODY=$(gh issue view "$PARENT_ISSUE" --json body --jq '.body')
+   ```
+
+2. Build the new child line — `PLATFORM` comes from the child PRD's `**Platform:**` field, `CHILD_ISSUE` is the issue number from Phase 3:
+
+   ```
+   - [ ] #{CHILD_ISSUE} — {PLATFORM}
+   ```
+
+3. Inject the line between the markers `<!-- prdx-children-start -->` and `<!-- prdx-children-end -->`. If a line for the same child issue is already present, leave the body unchanged (idempotent — handles re-publishes).
+
+4. Update the parent issue:
+
+   ```bash
+   gh issue edit "$PARENT_ISSUE" --body "$NEW_PARENT_BODY"
+   ```
+
+5. Display: `Linked child #{CHILD_ISSUE} to parent #{PARENT_ISSUE}.`
+
+**Note:** GitHub does not auto-tick `- [ ]` checkboxes when the linked issue closes. Users (or a future post-merge hook) can tick manually.
 
 ---
 

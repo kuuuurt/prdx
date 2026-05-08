@@ -269,7 +269,7 @@ git checkout -b "$BRANCH"
 ```bash
 mkdir -p .prdx/state
 cat > .prdx/state/${SLUG}.json << EOF
-{"slug": "${SLUG}", "phase": "implementing", "quick": false}
+{"slug": "${SLUG}", "phase": "implementing", "lite": false}
 EOF
 export CI=true
 ```
@@ -287,7 +287,7 @@ Invoke `prdx:pr-author` agent: create a real (non-draft) PR. Include `Closes #{I
 
 **2.6: Finalize:**
 
-Write state: `{"slug": "${SLUG}", "phase": "review", "quick": false, "pr_number": ${PR_NUMBER}}`
+Write state: `{"slug": "${SLUG}", "phase": "review", "lite": false, "pr_number": ${PR_NUMBER}}`
 
 Do NOT post a status comment — the PR is automatically linked to the issue via `Closes #{ISSUE_NUMBER}` in the PR body, which creates a cross-reference in the issue timeline. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Your final text response must be empty — see Reactions & Output Discipline.
 

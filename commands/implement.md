@@ -129,7 +129,7 @@ If `RENAMED=true`, inform the user: `Renamed plan to follow PRDX naming conventi
 ```bash
 mkdir -p .prdx/state
 cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "in-progress", "quick": false, "parent": "{PARENT_SLUG}"}
+{"slug": "{SLUG}", "phase": "in-progress", "lite": false, "parent": "{PARENT_SLUG}"}
 EOF
 ```
 (Extract `{PARENT_SLUG}` from the `**Parent:**` field in the child PRD.)
@@ -277,11 +277,11 @@ Multi-platform features are handled via parent-child PRDs: each child is a singl
 
 #### Step 5a: Dev Planning (prdx:dev-planner)
 
-**Quick-mode shortcut — check this FIRST:**
+**Lite-mode shortcut — check this FIRST:**
 
-If the PRD has `**Quick:** true`, skip this step entirely.
+If the PRD has `**Lite:** true`, skip this step entirely.
 
-Quick-mode PRDs are small and ephemeral — the dev-planner round-trip is wasted context.
+Lite-mode PRDs are small in scope — the dev-planner round-trip is wasted context.
 Instead, jump directly to Step 5c (Phased Execution Loop) with a synthesized single-phase plan:
 
 ```
@@ -293,7 +293,7 @@ Treat the PRD's `## Approach` section as the full phase content. If `## Approach
 
 ---
 
-**Non-quick path (normal PRDs):**
+**Non-lite path (normal PRDs):**
 
 **Display progress:**
 ```
@@ -489,7 +489,7 @@ After all phases complete:
    ```bash
    mkdir -p .prdx/state
    cat > .prdx/state/{SLUG}.json << EOF
-   {"slug": "{SLUG}", "phase": "review", "quick": false, "parent": "{PARENT_SLUG}"}
+   {"slug": "{SLUG}", "phase": "review", "lite": false, "parent": "{PARENT_SLUG}"}
    EOF
    ```
    (Only include the `"parent"` key if the PRD has a `**Parent:**` field.)
@@ -721,14 +721,14 @@ Once review is clean, run mechanical simplification on files changed in this bra
    mkdir -p .prdx/state
    # Write state file (include parent key only for child PRDs)
    cat > .prdx/state/{SLUG}.json << EOF
-   {"slug": "{SLUG}", "phase": "review", "quick": false}
+   {"slug": "{SLUG}", "phase": "review", "lite": false}
    EOF
    ```
    For child PRDs (has `**Parent:**` field), include the parent key:
    ```bash
    mkdir -p .prdx/state
    cat > .prdx/state/{SLUG}.json << EOF
-   {"slug": "{SLUG}", "phase": "review", "quick": false, "parent": "{PARENT_SLUG}"}
+   {"slug": "{SLUG}", "phase": "review", "lite": false, "parent": "{PARENT_SLUG}"}
    EOF
    ```
 

@@ -1,6 +1,6 @@
 ---
 description: "Complete PRD workflow: plan → implement → push"
-argument-hint: "[--quick] [--auto] [--ci] [--issue <number>] [--pr <number>] [feature description or PRD slug]"
+argument-hint: "[--lite] [--auto] [--ci] [--issue <number>] [--pr <number>] [feature description or PRD slug]"
 ---
 
 ## Pre-Computed Context
@@ -17,7 +17,7 @@ PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(
 # /prdx:prdx - Complete Feature Workflow
 
 > Main entry point for PRDX. Orchestrates plan → implement → push with decision points.
-> Use `--quick` for ephemeral tasks. Use `--auto --issue N` for non-interactive mode (routes to `/prdx:auto`).
+> Use `--lite` for small changes that need a branch and PR but not a full PRD. Use `--auto --issue N` for non-interactive mode (routes to `/prdx:auto`).
 > `--ci` is a deprecated alias for `--auto` — emits a warning and routes identically.
 > Use `--issue N` or `--pr N` (without `--auto`/`--ci`) to resume a CI-created PRD locally.
 
@@ -67,7 +67,7 @@ When exactly one active state file is identified (see skill for active detection
 ```bash
 # SLUG = slug extracted from the identified state file name (strip .prdx/state/ prefix and .json suffix)
 source "$(git rev-parse --show-toplevel)/hooks/prdx/read-state.sh" "$SLUG"
-# → sets: STATE_PHASE, STATE_QUICK, STATE_PARENT, STATE_PR_NUMBER
+# → sets: STATE_PHASE, STATE_LITE, STATE_PARENT, STATE_PR_NUMBER
 ```
 
 Route by `STATE_PHASE`:
@@ -83,7 +83,7 @@ Route by `STATE_PHASE`:
 
 > When scanning `.prdx/state/*.json` for multiple active sessions (no single slug identified yet), leave the directory scan loop in place — `read-state.sh` is for single-slug reads and is not a good fit for directory scanning. The loop body could be refactored to call `read-state.sh` per iteration in the future.
 
-See [skills/prdx-workflow.md#entry-point-routing](../skills/prdx-workflow.md#entry-point-routing) for the full routing logic (active state detection, quick-flag parsing, CI/issue flags, slug-vs-description resolution, and no-argument handling).
+See [skills/prdx-workflow.md#entry-point-routing](../skills/prdx-workflow.md#entry-point-routing) for the full routing logic (active state detection, lite-flag parsing, CI/issue flags, slug-vs-description resolution, and no-argument handling).
 
 ---
 
@@ -91,28 +91,28 @@ See [skills/prdx-workflow.md#entry-point-routing](../skills/prdx-workflow.md#ent
 
 > **⛔ Step 2 ONLY writes a PRD — no code, branches, or commits. After plan mode exits, plan.md shows the decision point; wait for the user's choice before Step 3. Never call `/prdx:implement` until the user picks "Implement now".**
 
-**If QUICK_MODE:**
+**If LITE_MODE:**
 
-Run the planning command with the `--quick` flag:
+Run the planning command with the `--lite` flag:
 
 ```
-/prdx:plan --quick [description]
+/prdx:plan --lite [description]
 ```
 
-This enters plan mode with a lightweight template (Problem, Goal, Acceptance Criteria, Approach only). The PRD is saved as `prdx-quick-{slug}.md`. Plan.md derives the slug from the description early (Step 0) and writes the state file immediately — no tentative IDs needed.
+This enters plan mode with a lightweight template (Problem, Goal, Acceptance Criteria, Approach only). The PRD is saved as `prdx-lite-{slug}.md`. Plan.md derives the slug from the description early (Step 0) and writes the state file immediately — no tentative IDs needed.
 
 > **MANDATORY:** During planning, ALL codebase exploration MUST use `prdx:code-explorer` and `prdx:docs-explorer` agents via the Task tool. NEVER use the built-in `Explore` subagent, Glob, Grep, or Read for exploration. See `/prdx:plan` for details.
 
 **IMPORTANT: Stop here and wait.** Plan mode is interactive. Do NOT proceed until:
 1. Plan mode has completed (user approved the plan and ExitPlanMode was called)
-2. The PRD file exists in `{PLANS_DIR}/prdx-quick-{slug}.md`
+2. The PRD file exists in `{PLANS_DIR}/prdx-lite-{slug}.md`
 
 
 Route based on the user's choice from plan.md:
 - Implement → Phase 3
-- Stop → End workflow. Tell user they can resume with `/prdx:prdx quick-{slug}`
+- Stop → End workflow. Tell user they can resume with `/prdx:prdx lite-{slug}`
 
-**If NOT QUICK_MODE (normal mode):**
+**If NOT LITE_MODE (normal mode):**
 
 Run the planning command with the feature description:
 
@@ -173,7 +173,7 @@ Route based on choice:
 ```bash
 mkdir -p .prdx/state
 cat > .prdx/state/{SLUG}.json << EOF
-{"slug": "{SLUG}", "phase": "implementing", "quick": {QUICK_MODE}}
+{"slug": "{SLUG}", "phase": "implementing", "lite": {LITE_MODE}}
 EOF
 ```
 
@@ -196,19 +196,13 @@ After displaying instructions, end workflow. The user manages child sessions ind
 ```
 Wait for implementation to complete, then proceed to review decision.
 
-Write state: `{"slug": "{SLUG}", "phase": "post-implement", "quick": {QUICK_MODE}}`
+Write state: `{"slug": "{SLUG}", "phase": "post-implement", "lite": {LITE_MODE}}`
 
 **STOP and use AskUserQuestion:**
 
 Do NOT proceed to create PR automatically. The user must test first.
 
-**Quick mode options:** "Create PR" (Recommended) | "Create Draft PR" | "Done" (no PR) | "Test first"
-- Create PR → `/prdx:push quick-{slug}` then Phase 5
-- Create Draft PR → `/prdx:push quick-{slug} --draft` → state `"reviewing"` → Step 3b
-- Done → Phase 5 immediately
-- Test first → End workflow, resume with `/prdx:prdx quick-{slug}`
-
-**Normal mode options:** "Test first" (Recommended) | "Create PR now" | "Create Draft PR"
+**Options (same for lite and normal mode):** "Test first" (Recommended) | "Create PR now" | "Create Draft PR"
 - Test first → End workflow, resume with `/prdx:prdx [slug]`
 - Create PR now → `/prdx:push [slug]` (no re-confirmation)
 - Create Draft PR → `/prdx:push [slug] --draft` → state `"reviewing"` → Step 3b
@@ -219,13 +213,7 @@ Do NOT proceed to create PR automatically. The user must test first.
 
 **When PRD status is `review`** — implementation complete but user hasn't confirmed readiness. Use AskUserQuestion:
 
-**Quick mode:** "Create PR" (Recommended) | "Create Draft PR" | "Done" | "Fix issues"
-- Create PR → `/prdx:push quick-{slug}` then Phase 5
-- Create Draft PR → `/prdx:push quick-{slug} --draft` → state `"reviewing"` → Step 3b
-- Done → Phase 5
-- Fix issues → same as normal mode
-
-**Normal mode:** "Create PR" (Recommended) | "Create Draft PR" | "Fix issues" | "View implementation summary"
+**Options (same for lite and normal mode):** "Create PR" (Recommended) | "Create Draft PR" | "Fix issues" | "View implementation summary"
 - Create PR → `/prdx:push [slug]` (no re-confirmation)
 - Create Draft PR → `/prdx:push [slug] --draft` → state `"reviewing"` → Step 3b
 - Fix issues → ask user to describe; fix directly in conversation; commit; ask again (do NOT re-run `/prdx:implement`)
@@ -259,22 +247,11 @@ Route based on choice:
 
 **If `HAS_ISSUE=true`:** When invoking `/prdx:push`, ensure the pr-author agent includes `Closes #{ISSUE_NUMBER}` in the PR body to link and auto-close the issue on merge. Pass this as additional context in the agent prompt.
 
-Write state: `{"slug": "{SLUG}", "phase": "pushing", "quick": {QUICK_MODE}}`
+Write state: `{"slug": "{SLUG}", "phase": "pushing", "lite": {LITE_MODE}}`
 
 **After PR is created:**
 - Draft PR → write state `"reviewing"` with `pr_number` → Step 3b
-- Non-draft PR → write state `"pushed"` with `pr_number` (do NOT delete — enables lesson capture)
-  - Quick mode: inform user lessons captured automatically after merge; do NOT run Phase 5 yet
-  - Normal mode: display `Feature complete! PRD: {PRD_FILE} | PR: #{pr-number}. Lessons will be captured automatically after PR is merged.`
-
----
-
-### Step 5: Cleanup (Quick Mode Only)
-
-**Only runs when QUICK_MODE is true.**
-
-- **"Done" (no PR):** Delete `{PLANS_DIR}/prdx-quick-{slug}.md` and `.prdx/state/quick-{slug}.json`. Display: `Done! Changes committed on {BRANCH}. Push when ready: git push -u origin {BRANCH}`
-- **PR created (non-draft):** Do NOT run cleanup now. State transitions to `"pushed"` (Step 4). Cleanup happens automatically after merge. Display: `Done! PR: #{pr-number}. Lessons and cleanup will happen automatically after merge.`
+- Non-draft PR → write state `"pushed"` with `pr_number` (do NOT delete — enables lesson capture). Display: `Feature complete! PRD: {PRD_FILE} | PR: #{pr-number}. Lessons will be captured automatically after PR is merged.`
 
 ---
 
@@ -284,5 +261,5 @@ Write state: `{"slug": "{SLUG}", "phase": "pushing", "quick": {QUICK_MODE}}`
 2. **After plan mode exits → STOP and ask** (Publish/Implement/Stop). Do NOT start implementing.
 3. **After implementation → STOP and ask** before creating PR. Recommend testing first.
 4. **Status tracking:** Read/update `**Status:**` field in PRD. Flow: planning → in-progress → review → implemented → completed.
-5. **State files** (`.prdx/state/{slug}.json`): written at phase transitions, read at Step 1 for resume. Never deleted when user pauses. Only deleted after PR merge (lesson capture) or Quick mode "Done" (no PR).
+5. **State files** (`.prdx/state/{slug}.json`): written at phase transitions, read at Step 1 for resume. Never deleted when user pauses. Only deleted after PR merge (lesson capture).
 6. **Errors:** Show clear message, offer retry/stop/skip. Never auto-proceed after errors.

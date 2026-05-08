@@ -45,7 +45,10 @@ Display: `Capturing lessons from merged PR #{pr_number} ({slug})...`
 ```
 subagent_type: "general-purpose"
 
-prompt: "Extract repo-wide learnings from this completed PRD. Only include insights applicable to ANY future feature — skip PR-specific observations.
+prompt: "Extract two categories of learnings from this completed PRD:
+
+1. **Lessons** — broad insights applicable to ANY future feature (philosophy, anti-patterns, process improvements). Goes to CLAUDE.md.
+2. **Conventions** — project-specific tactical patterns (this repo uses X for Y, prefer Z over W in this module, file paths, naming rules). Goes to .prdx/conventions.md.
 
 Platform: {PLATFORM} | Title: {TITLE}
 
@@ -53,10 +56,16 @@ Implementation Notes: {NOTES}
 PR Description: {PR_BODY}
 Review Comments: {COMMENTS}
 
-Return 1-5 flat bullet points (fewer is better). Prioritize anti-patterns and 'don't do X' entries. No category headers. If nothing is broadly applicable, respond: NO_LEARNINGS"
+Return JSON:
+{
+  \"lessons\": [\"bullet\", ...],          // 0-3 entries, broad/philosophical only
+  \"conventions\": [\"bullet\", ...]       // 0-5 entries, codebase-specific patterns
+}
+
+If neither category yields anything, return: {\"lessons\": [], \"conventions\": []}. Prefer fewer, higher-signal entries. Conventions should reference concrete paths/names from this repo when relevant."
 ```
 
-**Append to CLAUDE.md** (skip if `NO_LEARNINGS`):
+**Append lessons to CLAUDE.md** (skip if `lessons` is empty):
 
 - If no `## Lessons Learned` section exists, append one
 - Add entry under it:
@@ -67,7 +76,22 @@ Return 1-5 flat bullet points (fewer is better). Prioritize anti-patterns and 'd
   ```
 - If section exceeds ~200 lines, trim oldest `###` subsections
 
-**Commit:** `git add CLAUDE.md && git commit -m "chore: update lessons learned from {SLUG}"`
+**Append conventions to `.prdx/conventions.md`** (skip if `conventions` is empty):
+
+- Create the file with this header if it doesn't exist:
+  ```markdown
+  # Project Conventions
+
+  Auto-maintained by `/prdx:cleanup`. Read by `prdx:dev-planner` and developer agents at the start of work.
+
+  Each entry: `- {pattern} (PR #{N}, {DATE})`. Capped at ~100 entries — oldest are pruned first.
+
+  ---
+  ```
+- Append each convention as: `- {bullet} (PR #{pr_number}, {DATE})`
+- If the file exceeds ~100 bulleted entries, remove the oldest entries first (keep the header).
+
+**Commit:** `git add CLAUDE.md .prdx/conventions.md && git commit -m "chore: capture lessons and conventions from {SLUG}"` (only stage files that actually changed; `.prdx/conventions.md` may need un-gitignoring if the team wants to share it).
 
 ### Clean Up
 
@@ -78,8 +102,8 @@ git add -A .prdx/ "{PLANS_DIR}/" && git commit -m "chore: clean up PRD for {SLUG
 ```
 
 Display per PR:
-- Merged: `Cleaned up "{TITLE}" — lessons captured in CLAUDE.md`
-- Closed: `Cleaned up "{TITLE}" — PR closed without merge, no lessons captured`
+- Merged: `Cleaned up "{TITLE}" — captured {N} lesson(s), {M} convention(s)` (omit categories with zero entries; if both zero, say `no learnings extracted`)
+- Closed: `Cleaned up "{TITLE}" — PR closed without merge, no learnings captured`
 
 ### Push
 

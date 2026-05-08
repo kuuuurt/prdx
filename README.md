@@ -167,15 +167,15 @@ This orchestrates the entire workflow with decision points at each phase.
 Plans auto-save to `.prdx/plans/prdx-{slug}.md`.
 Stop anytime and resume with `/prdx:prdx <slug>`.
 
-### Quick Mode
+### Lite Mode
 
-For one-off tasks that don't need a permanent PRD:
+For small changes that need a branch and PR but not a full PRD:
 
 ```bash
-/prdx:prdx --quick "fix login validation"
+/prdx:prdx --lite "fix login validation"
 ```
 
-Same pipeline (dev-planner, code review) but with a lightweight PRD that's cleaned up after.
+Same pipeline (dev-planner, code review) and creates its own branch + PR — but with a lightweight PRD (Problem, Goal, Acceptance Criteria, Approach only). Persistent like full mode.
 
 ### Individual Commands
 

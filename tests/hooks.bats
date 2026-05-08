@@ -354,21 +354,21 @@ load helpers/test_helper
     export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
     mkdir -p "$TEST_TEMP_DIR/.prdx/state"
     cat > "$TEST_TEMP_DIR/.prdx/state/my-feature.json" <<'EOF'
-{"slug": "my-feature", "phase": "in-progress", "quick": false, "parent": "parent-prd", "pr_number": 42}
+{"slug": "my-feature", "phase": "in-progress", "lite": false, "parent": "parent-prd", "pr_number": 42}
 EOF
 
     run bash -c '
         source "'"$REPO_ROOT"'/hooks/prdx/resolve-plans-dir.sh"
         source "'"$REPO_ROOT"'/hooks/prdx/read-state.sh" my-feature
         echo "PHASE=$STATE_PHASE"
-        echo "QUICK=$STATE_QUICK"
+        echo "LITE=$STATE_LITE"
         echo "PARENT=$STATE_PARENT"
         echo "PR=$STATE_PR_NUMBER"
     '
 
     [ "$status" -eq 0 ]
     echo "$output" | grep -q "PHASE=in-progress"
-    echo "$output" | grep -q "QUICK=false"
+    echo "$output" | grep -q "LITE=false"
     echo "$output" | grep -q "PARENT=parent-prd"
     echo "$output" | grep -q "PR=42"
 }
@@ -377,7 +377,7 @@ EOF
     export PRDX_PROJECT_ROOT="$TEST_TEMP_DIR"
     mkdir -p "$TEST_TEMP_DIR/.prdx/state"
     cat > "$TEST_TEMP_DIR/.prdx/state/simple-feature.json" <<'EOF'
-{"slug": "simple-feature", "phase": "review", "quick": false}
+{"slug": "simple-feature", "phase": "review", "lite": false}
 EOF
 
     run bash -c '

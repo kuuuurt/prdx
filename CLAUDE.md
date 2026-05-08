@@ -26,19 +26,19 @@ PRDX is a Claude Code plugin that provides a PRD (Product Requirements Document)
 
 Plans stored in configurable directory (default `.prdx/plans/`), gitignored. Override via `plansDirectory` in `prdx.json`. A `.prdx/plans-setup-done` marker prevents repeated setup.
 
-**Naming:** `prdx-{slug}.md` normal, `prdx-quick-{slug}.md` quick (ephemeral).
+**Naming:** `prdx-{slug}.md` normal, `prdx-lite-{slug}.md` lite (lightweight template, persistent — same lifecycle as full).
 
 **PLANS_DIR resolution:** Source `hooks/prdx/resolve-plans-dir.sh` — do NOT hardcode `.prdx/plans`.
 
-**PRD templates** (full, quick, child): see `commands/plan.md`. Every PRD includes `**Project:** [git remote repo name]`. Auto-detected via `gh repo view --json name --jq '.name'`, falling back to repo directory name.
+**PRD templates** (full, lite, child): see `commands/plan.md`. Every PRD includes `**Project:** [git remote repo name]`. Auto-detected via `gh repo view --json name --jq '.name'`, falling back to repo directory name.
 
-**Branch naming:** `feature` → `feat/{slug}`, `bug-fix` → `fix/{slug}`, `refactor` → `refactor/{slug}`, `spike` → `chore/{slug}`. Quick PRDs use current branch.
+**Branch naming:** `feature` → `feat/{slug}`, `bug-fix` → `fix/{slug}`, `refactor` → `refactor/{slug}`, `spike` → `chore/{slug}`. Lite PRDs use the same convention with `lite-{slug}` (e.g., `feat/lite-login-validation`).
 
 **Status workflow:** `planning` → `in-progress` → `review` → `implemented` → `completed`
 
 ## State File Schema
 
-`.prdx/state/{slug}.json` — keys: `slug`, `phase`, `quick` (bool), `parent?`, `pr_number?` (when pushed). Ordering: `planning < in-progress < review < implemented < completed`. Phase `"pushed"` = non-draft PR awaiting merge.
+`.prdx/state/{slug}.json` — keys: `slug`, `phase`, `lite` (bool), `parent?`, `pr_number?` (when pushed). Ordering: `planning < in-progress < review < implemented < completed`. Phase `"pushed"` = non-draft PR awaiting merge.
 
 ## Parent-Child PRD Model
 
@@ -53,11 +53,11 @@ Plan Mode → PRD saved → [Publish?] → [Implement?] → Implement → Review
                                                                   ↳ Draft PR → [Review Loop] → Fix → Push → Done
 ```
 
-**Multi-platform:** 1 PRD = 1 Branch = 1 PR. Parent + child PRDs → user runs each child in separate sessions. **Quick mode:** no permanent PRD, cleaned up after. **CI mode:** see `commands/prdx.md`. **Agent Teams:** Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+**Multi-platform:** 1 PRD = 1 Branch = 1 PR. Parent + child PRDs → user runs each child in separate sessions. **Lite mode:** lightweight PRD template (Problem, Goal, AC, Approach), own branch and PR, persistent. **CI mode:** see `commands/prdx.md`. **Agent Teams:** Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
 
 ## Commands
 
-- `/prdx:prdx` — Main entry: plan → implement → push loop. Quick mode cleans up PRD after.
+- `/prdx:prdx` — Main entry: plan → implement → push loop. Supports `--lite` for lightweight PRDs (still get a branch + PR).
 - `/prdx:prdx:agent` — Same with persistent agent teams.
 - `/prdx:plan` — Plan mode: detect platform, create PRD, iterate until approved, call ExitPlanMode. Use `prdx:code-explorer`/`prdx:docs-explorer` (NOT direct Glob/Grep/Read).
 - `/prdx:implement` — Load PRD → hook → branch → dev-planner → phased platform agents → ac-verifier (3 attempts) → code-reviewer (2 cycles) → post-hook → append summary.
@@ -80,7 +80,11 @@ All agents run in **isolated contexts**. ALWAYS use `prdx:code-explorer` and `pr
 
 ## Skills
 
-`skills/prd-review.md`, `skills/impl-patterns.md`, `skills/testing-strategy.md` — read by agents. Lessons learned stored here under `## Lessons Learned`.
+`skills/prd-review.md`, `skills/impl-patterns.md`, `skills/testing-strategy.md` — read by agents. Broad lessons stored here under `## Lessons Learned`.
+
+## Project Conventions
+
+`.prdx/conventions.md` (per-project, gitignored by default) — tactical codebase-specific patterns auto-captured by `/prdx:cleanup` and read by `dev-planner` + developer agents at the start of work. Capped at ~100 entries to limit context bloat. Distinct from `Lessons Learned`: lessons are broad/philosophical, conventions are concrete patterns specific to this repo.
 
 ## Hooks (Validation Gates)
 

@@ -10,7 +10,7 @@
 #
 # Sets (in caller's scope):
 #   STATE_PHASE      — phase field from state file (empty if file absent or field missing)
-#   STATE_QUICK      — quick field from state file (empty if file absent or field missing)
+#   STATE_LITE      — lite field from state file (empty if file absent or field missing)
 #   STATE_PARENT     — parent field from state file (empty if file absent or field missing)
 #   STATE_PR_NUMBER  — pr_number field from state file (empty if file absent or field missing)
 #
@@ -24,7 +24,7 @@ _RS_SLUG="$1"
 _READ_STATE_SLUG="$_RS_SLUG"
 
 STATE_PHASE=""
-STATE_QUICK=""
+STATE_LITE=""
 STATE_PARENT=""
 STATE_PR_NUMBER=""
 
@@ -59,7 +59,7 @@ fi
 
 STATE_PHASE=$(echo "$_RS_CONTENT" | jq -r '.phase // ""')
 # Use 'if . == null then "" else tostring end' to preserve false/0 values correctly
-STATE_QUICK=$(echo "$_RS_CONTENT" | jq -r '.quick | if . == null then "" else tostring end')
+STATE_LITE=$(echo "$_RS_CONTENT" | jq -r '.lite | if . == null then "" else tostring end')
 STATE_PARENT=$(echo "$_RS_CONTENT" | jq -r '.parent // ""')
 STATE_PR_NUMBER=$(echo "$_RS_CONTENT" | jq -r '.pr_number | if . == null then "" else tostring end')
 
