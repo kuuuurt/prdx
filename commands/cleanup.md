@@ -78,8 +78,11 @@ If neither category yields anything, return: {\"lessons\": [], \"conventions\": 
 
 **Append conventions to `.prdx/conventions.md`** (skip if `conventions` is empty):
 
-- Create the file with this header if it doesn't exist:
-  ```markdown
+- **First-time setup:** if `.prdx/conventions.md` does not exist, create it AND add a gitignore exception so the file is tracked despite `.prdx/` being globally ignored:
+  ```bash
+  if [ ! -f .prdx/conventions.md ]; then
+    grep -qxF '!.prdx/conventions.md' .gitignore 2>/dev/null || echo '!.prdx/conventions.md' >> .gitignore
+    cat > .prdx/conventions.md <<'HEADER'
   # Project Conventions
 
   Auto-maintained by `/prdx:cleanup`. Read by `prdx:dev-planner` and developer agents at the start of work.
@@ -87,11 +90,18 @@ If neither category yields anything, return: {\"lessons\": [], \"conventions\": 
   Each entry: `- {pattern} (PR #{N}, {DATE})`. Capped at ~100 entries — oldest are pruned first.
 
   ---
+  HEADER
+  fi
   ```
+  Conventions are committed by default so the whole team benefits. Users can opt out by removing the gitignore exception.
 - Append each convention as: `- {bullet} (PR #{pr_number}, {DATE})`
 - If the file exceeds ~100 bulleted entries, remove the oldest entries first (keep the header).
 
-**Commit:** `git add CLAUDE.md .prdx/conventions.md && git commit -m "chore: capture lessons and conventions from {SLUG}"` (only stage files that actually changed; `.prdx/conventions.md` may need un-gitignoring if the team wants to share it).
+**Commit:** stage and commit only the files that actually changed:
+```bash
+git add CLAUDE.md .gitignore .prdx/conventions.md 2>/dev/null
+git commit -m "chore: capture lessons and conventions from {SLUG}"
+```
 
 ### Clean Up
 

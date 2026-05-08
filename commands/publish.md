@@ -290,7 +290,20 @@ After the child issue is created/linked, append it to the parent issue's `## Chi
    - [ ] #{CHILD_ISSUE} — {PLATFORM}
    ```
 
-3. Inject the line between the markers `<!-- prdx-children-start -->` and `<!-- prdx-children-end -->`. If a line for the same child issue is already present, leave the body unchanged (idempotent — handles re-publishes).
+3. Inject the line between the markers `<!-- prdx-children-start -->` and `<!-- prdx-children-end -->`.
+
+   **If a line for the same child issue is already present**, leave the body unchanged (idempotent — handles re-publishes).
+
+   **If the markers are missing from `PARENT_BODY`** (parent issue was edited by hand), append a fresh `## Children` block with both markers and the new child line at the end of the body. Do NOT fail — the markers should self-heal:
+
+   ```markdown
+
+   ## Children
+
+   <!-- prdx-children-start -->
+   - [ ] #{CHILD_ISSUE} — {PLATFORM}
+   <!-- prdx-children-end -->
+   ```
 
 4. Update the parent issue:
 
