@@ -1,0 +1,16 @@
+{
+  "name": "prdx-tools",
+  "private": true,
+  "type": "module",
+  "description": "Manual prompt-iteration harness for PRDX. Not shipped with the plugin.",
+  "scripts": {
+    "eval": "bun run.ts eval",
+    "generate": "bun run.ts generate",
+    "diff": "bun run.ts diff",
+    "runs": "bun run.ts runs"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  }
+}
