@@ -44,7 +44,8 @@ export const ARTIFACTS: Record<string, Artifact> = {
         c.input.codebaseSummary,
         ``,
         `# Instructions`,
-        `Skip the exploration steps in your system prompt. Produce ONLY the final PRD markdown — no preamble, no tool calls, no plan-mode framing. Output the PRD body that would be saved to .prdx/plans/prdx-{slug}.md.`,
+        `Skip the exploration steps in your system prompt. Produce ONLY the final PRD body — exactly the markdown that would be saved to .prdx/plans/prdx-{slug}.md.`,
+        `Output the raw markdown directly. Do NOT wrap your entire response in a triple-backtick fence. Do NOT add any preamble, summary, or trailing commentary. The first character of your response should be the first character of the PRD.`,
       ].join("\n");
     },
     structural: checkPlan,

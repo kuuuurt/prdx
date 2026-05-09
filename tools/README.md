@@ -22,8 +22,10 @@ scores.
 ```bash
 cd tools
 bun install
-export ANTHROPIC_API_KEY=...
+cp .env.example .env   # then put your key in .env
 ```
+
+Bun auto-loads `.env` from the cwd; no `export` needed.
 
 ## Use
 

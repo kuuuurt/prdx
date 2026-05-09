@@ -1,3 +1,5 @@
 node_modules/
 runs/
 bun.lockb
+.env
+.env.local

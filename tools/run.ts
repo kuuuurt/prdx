@@ -3,7 +3,8 @@ import { readFile, writeFile, mkdir, readdir, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, dirname, resolve } from "node:path";
-import { call, pool } from "./api.ts";
+import { call, pool, getBackend } from "./api.ts";
+import { getCliStats, resetCliStats } from "./claude-cli.ts";
 import { judge } from "./judge.ts";
 import { getArtifact, ARTIFACTS } from "./artifacts.ts";
 import type { Case, CaseResult, RunResult } from "./types.ts";
@@ -14,7 +15,9 @@ const RUNS_DIR = join(EVAL_ROOT, "runs");
 const CACHE_DIR = join(RUNS_DIR, ".cache");
 const CASES_DIR = join(EVAL_ROOT, "cases");
 
-const CONCURRENCY = 8;
+// Lower concurrency on CLI backend: each call spawns a Claude Code process
+// and parallel spawns can hit subscription rate limits / be slow.
+const CONCURRENCY = getBackend() === "cli" ? 3 : 8;
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -51,6 +54,15 @@ async function ensureDir(p: string) {
 
 function mean(xs: number[]): number {
   return xs.length === 0 ? 0 : xs.reduce((a, b) => a + b, 0) / xs.length;
+}
+
+// Strip an outer markdown fence the model sometimes wraps the whole PRD in
+// when invoked as a pure function (an artifact of API/CLI invocation, not of
+// commands/plan.md itself).
+function stripOuterFence(s: string): string {
+  const t = s.trim();
+  const m = t.match(/^```(?:[a-zA-Z]+)?\n([\s\S]*?)\n```\s*$/);
+  return m ? m[1] : s;
 }
 
 // ─── generate ───────────────────────────────────────────────────────────────
@@ -119,8 +131,11 @@ async function cmdEval(artifact: string) {
   const cases = await loadCases(artifact);
 
   const runId = `${new Date().toISOString().slice(0, 10)}-${promptHash}-${Date.now().toString(36).slice(-4)}`;
-  console.log(`Eval ${artifact}  prompt=${promptHash}  cases=${cases.length}  run=${runId}`);
+  console.log(
+    `Eval ${artifact}  prompt=${promptHash}  cases=${cases.length}  backend=${getBackend()}  concurrency=${CONCURRENCY}  run=${runId}`,
+  );
 
+  resetCliStats();
   await ensureDir(CACHE_DIR);
 
   let done = 0;
@@ -169,6 +184,12 @@ async function cmdEval(artifact: string) {
     console.log(`\nerrors: ${errs.length}`);
     for (const e of errs.slice(0, 5)) console.log(`  ${e.case_id}: ${e.error}`);
   }
+  if (getBackend() === "cli") {
+    const stats = getCliStats();
+    console.log(
+      `\ncli stats: ${stats.totalCalls} calls, list-price equivalent $${stats.totalCost.toFixed(3)} (counts against subscription quota; no charge with OAuth)`,
+    );
+  }
   console.log(`\nrun saved → ${runPath}`);
 }
 
@@ -179,7 +200,7 @@ async function scoreCase(
   rubric: string,
   c: Case,
 ): Promise<CaseResult> {
-  const cacheKey = `${a.name}-${c.id}-${promptHash}`;
+  const cacheKey = `${a.name}-${c.id}-${promptHash}-${sha(JSON.stringify(c.input))}`;
   const cachePath = join(CACHE_DIR, `${cacheKey}.json`);
   if (existsSync(cachePath)) {
     return JSON.parse(await readFile(cachePath, "utf-8"));
@@ -187,13 +208,14 @@ async function scoreCase(
 
   let result: CaseResult;
   try {
-    const output = await call({
+    const raw = await call({
       model: a.model,
       system: promptSystem,
       messages: [{ role: "user", content: a.buildUserMessage(c) }],
       temperature: 0,
       maxTokens: a.maxTokens,
     });
+    const output = stripOuterFence(raw);
 
     const structural = a.structural(output, c);
     const passed = Object.values(structural).filter(Boolean).length;
