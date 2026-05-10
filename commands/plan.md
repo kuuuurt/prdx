@@ -197,7 +197,7 @@ The brevity rules below apply to **explanatory prose only**. If a data model, di
 - **Problem:** 1-3 sentences. What's broken + why it matters.
 - **Goal:** 1 sentence. End state in user/business terms.
 - **User Stories:** Max 3. Omit if user is obvious.
-- **Acceptance Criteria:** Max 7 items. Start with a verb. Testable. No inline explanation. If you have more than 7, collapse related conditions into one AC (e.g., "token is created and expires after 24h" — not two ACs).
+- **Acceptance Criteria:** Max 7 items. Each AC must be an **observable behavior** an engineer or QA could verify with a test or manual check — not an aspiration ("works well", "is fast"), not a solution ("uses Redis sliding window"). Start with a verb. No inline explanation. Cover the happy path AND at least one edge case or failure mode where one matters (empty input, auth failure, concurrent write, network timeout, etc.). If you have more than 7, collapse related conditions into one AC (e.g., "token is created and expires after 24h" — not two ACs).
 - **Approach:** 1-3 sentences or a numbered list of explanatory prose. Direction only — mechanics go in the dev plan. Data models, schemas, and diagrams that belong here are exempt from the prose budget; show them in full.
 - **Scope:** Omit by default. Include only for `spike` type or multi-platform parent PRDs. Bullets only, no prose intro.
 - **Risks:** `risk → consequence` format. Max 3.
@@ -284,12 +284,17 @@ Lite mode generates its own branch using the same convention as full mode (see "
 ## Risks & Considerations   ← include only when non-trivial risks or constraints exist (omit for straightforward changes)
 
 - [Risk → consequence. Max 3 unless genuinely more]
+
+## Open Questions   ← include when there are genuine ambiguities that must be resolved before or during implementation (omit if there are none)
+
+- [Question that needs an answer before / during implementation. State the decision required, not a vague concern.]
 ```
 
 **Conditional section guidance:**
 - **User Stories** — include when end users interact with the feature (web/mobile/API consumers). Omit for infrastructure changes, data pipelines, internal tooling, CLI tools, and library/SDK work where there are no human end users.
 - **Scope** — OMIT by default. Include ONLY when type is `spike` (where bounding the exploration is the point) or for multi-platform parent PRDs (where per-platform boundaries clarify the split). For routine features, refactors, and bug-fixes, do not include this section — Problem + Goal already convey scope.
 - **Risks & Considerations** — include when there are real technical risks (performance, security, backwards compatibility), external dependencies, or significant unknowns. Omit for well-understood, low-risk changes.
+- **Open Questions** — include any decision that would block or stall implementation if left ambiguous (algorithm choice, ownership boundary, missing requirement, unclear edge-case behavior). Phrase each as the decision required, not a generic worry. Omit when the PRD is unambiguous.
 
 **Multi-platform (parent) template** — used when 2+ platforms are selected:
 
@@ -318,6 +323,8 @@ Lite mode generates its own branch using the same convention as full mode (see "
 ## Approach
 ...
 ## Risks & Considerations   (include if relevant — see guidance above)
+...
+## Open Questions   (include if relevant — see guidance above)
 ...
 ```
 
