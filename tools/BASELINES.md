@@ -112,27 +112,32 @@ always reproduce every AC from the PRD.
 
 ## `simplify` — `commands/simplify.md`
 
-**No baseline yet.** Attempted 2026-05-11 but hit the OAuth subscription
-quota mid-generation. Resume with either:
+**Current baseline:**
 
-```bash
-# Free — after the quota resets
-cd tools
-bun run.ts generate simplify --n 30
-bun run.ts eval simplify
+| run_id | date | prompt_hash | N | backend | aggregate |
+|---|---|---|---|---|---|
+| `2026-05-11-bc10648e1d7f-jyve` | 2026-05-11 | `bc10648e1d7f` | 30 | cli | **0.962** |
+
+```
+structural   0.995
+graded       0.912
+
+per axis:
+  output_format       1.000
+  no_invention        0.967
+  behavior_preserved  0.925
+  comment_discipline  0.917
+  actually_simpler    0.750   ← weakness
 ```
 
-```bash
-# Paid (~$3) — uses the api backend instead
-cd tools
-PRDX_EVAL_BACKEND=api bun run.ts generate simplify --n 30
-PRDX_EVAL_BACKEND=api bun run.ts eval simplify
-```
+**Context:** initial baseline. The four highest axes show the prompt
+reliably emits clean code without inventing new constructs and preserves
+MARK/TODO comments. `actually_simpler` lagging suggests the simplifications
+are often shortenings that don't read as meaningfully cleaner — likely
+target if you iterate the prompt.
 
-Then add the entry here.
-
-The rubric and structural checks for `simplify` are first drafts — expect to
-tune them before treating the first run as a real baseline.
+Rubric and structural checks are first drafts; expect to tune them before
+treating this number as load-bearing.
 
 ---
 
