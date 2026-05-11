@@ -85,26 +85,48 @@ re-running at N=30 once the scaffold is settled.
 
 ## `pr-author` — `agents/pr-author.md`
 
-**No baseline yet.** Run:
+**Current baseline:**
 
-```bash
-cd tools
-bun run.ts generate pr-author --n 30
-bun run.ts eval pr-author
+| run_id | date | prompt_hash | N | backend | aggregate |
+|---|---|---|---|---|---|
+| `2026-05-11-d48999dde70d-7a2q` | 2026-05-11 | `d48999dde70d` | 30 | cli | **0.921** |
+
+```
+structural   0.997
+graded       0.807
+
+per axis:
+  closes_issue       0.914
+  title_quality      0.879
+  summary_quality    0.836
+  concision          0.733
+  ac_coverage        0.672   ← weakness
 ```
 
-Then add the entry here.
+**Context:** initial baseline. 1 of 30 cases had a judge JSON-parse error
+(case `pr-author-0010`) — minor noise, doesn't change the picture.
+`ac_coverage` is the clear weakness — judge thinks the PR body doesn't
+always reproduce every AC from the PRD.
 
 ---
 
 ## `simplify` — `commands/simplify.md`
 
-**No baseline yet.** Run:
+**No baseline yet.** Attempted 2026-05-11 but hit the OAuth subscription
+quota mid-generation. Resume with either:
 
 ```bash
+# Free — after the quota resets
 cd tools
 bun run.ts generate simplify --n 30
 bun run.ts eval simplify
+```
+
+```bash
+# Paid (~$3) — uses the api backend instead
+cd tools
+PRDX_EVAL_BACKEND=api bun run.ts generate simplify --n 30
+PRDX_EVAL_BACKEND=api bun run.ts eval simplify
 ```
 
 Then add the entry here.
