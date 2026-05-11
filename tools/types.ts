@@ -1,12 +1,29 @@
+// Each artifact has its own input shape. Kept as a permissive bag since each
+// artifact's buildUserMessage knows what fields it needs. The `expectations`
+// field is shared — it's a free-form hint passed to the judge.
 export interface Case {
   id: string;
   input: {
-    request: string;
-    projectName: string;
-    stack: string;
-    codebaseSummary: string;
-    // Free-form: lets the judge know what to look for in this specific case.
     expectations?: string;
+    // plan
+    request?: string;
+    projectName?: string;
+    stack?: string;
+    codebaseSummary?: string;
+    // publish
+    prdMarkdown?: string;
+    isChild?: boolean;
+    parentIssue?: number | null;
+    // pr-author
+    issueNumber?: number | null;
+    branchName?: string;
+    commitSummaries?: string;
+    diffSummary?: string;
+    // simplify
+    language?: string;
+    filePath?: string;
+    code?: string;
+    [key: string]: unknown;
   };
 }
 
