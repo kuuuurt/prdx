@@ -66,6 +66,7 @@ Plan Mode → PRD saved → [Publish?] → [Implement?] → Implement → Review
 - `/prdx:publish` — Create GitHub issue from PRD.
 - `/prdx:cleanup` — Capture lessons from merged PRs + delete plan files.
 - `/prdx:auto` — Non-interactive mode (CI/automated): plan-only or implement from issue. `/prdx:ci` is a deprecated alias.
+- `/prdx:grill` — Interview-style PRD refinement to stress-test plans before implement.
 
 ## Agents
 
@@ -75,8 +76,9 @@ All agents run in **isolated contexts**. ALWAYS use `prdx:code-explorer` and `pr
 - `prdx:pr-author` — PR description + `gh pr create`/`gh pr edit`
 - `prdx:ac-verifier` — 3-point AC check (code exists, test exists, coverage)
 - `prdx:code-reviewer` — bugs/security/quality, >80% confidence only
-- `prdx:backend-developer`, `prdx:frontend-developer`, `prdx:android-developer`, `prdx:ios-developer` — discover stack from codebase; use TodoWrite; return brief summary only
+- `prdx:developer` — single platform-agnostic developer agent; discovers stack from codebase, uses TodoWrite, returns brief summary only
 - `prdx:code-explorer` — architecture + patterns; `prdx:docs-explorer` — web + Context7 docs
+- `prdx:reviewers:*` — orchestrator + specialists (security, performance, testing, api-contract, data-migration, maintainability, red-team) for diff-aware reviews
 
 ## Skills
 
