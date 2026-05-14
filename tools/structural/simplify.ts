@@ -2,6 +2,11 @@
 // Eval invocation gives the prompt a single file's worth of source code; the
 // expected output is the simplified version of that same file (we instruct
 // the prompt to emit the full file content).
+//
+// Scope: /prdx:simplify is a chained command — Phase 2 delegates to the
+// built-in `simplify` skill (sub-agents), Phase 3 is PRDX's pragmatism pass.
+// The pure-function harness can't invoke the skill, so these checks exercise
+// Phase 3 only. Phase 2's reuse/efficiency review is monitored separately.
 
 import type { Case } from "../types.ts";
 

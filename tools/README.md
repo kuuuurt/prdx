@@ -162,6 +162,27 @@ cases). Cases are generated with `temperature: 0.8` for variety.
 - **Structural failure on every case** = check is broken or invocation has a
   systematic bug, not the prompt.
 
+## Token-cost measurement (planned)
+
+The harness currently scores prompt *output quality* but not *token cost*. This
+gap matters now that some commands fan out sub-agents — `/prdx:simplify` chains
+the built-in `simplify` skill (3 parallel review agents) before its own
+pragmatism pass, costing roughly 5–6× a single-context command.
+
+We need a measuring tool that approximates per-command token usage so we can
+watch for regressions as commands grow. Rough shape:
+
+- Capture `usage` (input/output/cache tokens) from each backend call — the API
+  backend returns it directly; the CLI backend can emit it via `claude -p
+  --output-format json`.
+- Aggregate per artifact per run; record alongside the quality aggregate in
+  `runs/<run_id>.json` and surface it in `runs` / `diff`.
+- For commands that spawn sub-agents (simplify), the pure-function eval can't
+  see the fan-out — note that the measured number is a *lower bound* and the
+  real cost is dominated by the sub-agent calls.
+
+Until this exists, treat sub-agent-spawning commands as "monitor cost manually."
+
 ## Recommended sample sizes
 
 - **Iteration**: N=30. ~4 min per run on cli backend, enough to see a 0.05+

@@ -5,7 +5,12 @@ argument-hint: "[files/features]"
 
 # /prdx:simplify - Code Cleanup
 
-Simplify code by removing unnecessary complexity, documentation-style comments, and single-use abstractions.
+Deep code review (reuse, quality, efficiency) followed by a pragmatism pass that
+keeps the result conservative and concise.
+
+This command is a **thin wrapper**: it scopes the target files, hands the heavy
+review to Claude Code's built-in `simplify` skill, then applies PRDX's
+pragmatism and comment-discipline rules on top.
 
 ## Usage
 
@@ -16,54 +21,20 @@ Simplify code by removing unnecessary complexity, documentation-style comments, 
 /prdx:simplify "authentication"     # Feature name (searches for related files)
 ```
 
-## Target Files
-
-**Arguments provided:** Simplify specified files/features.
-
-**No arguments:** Simplify ONLY changed files on the current branch:
-
-```bash
-git diff --name-only $(git merge-base HEAD main)..HEAD
-```
-
-Read those files and focus simplification on changed portions.
-
-## Simplification Rules
-
-### Code Style
-
-| Rule | Action |
-|------|--------|
-| Self-documenting code | Use descriptive names instead of comments |
-| Single-use variables | Inline when expression is clear |
-| Single-use private functions | Inline when simple |
-| Similar functions | Consolidate into one |
-| Unnecessary abstraction | Remove, prefer simplicity |
-
-### Comments
-
-**REMOVE:**
-- Comments describing what code does (code should be self-explanatory)
-- Comments restating the variable/function name
-- Outdated comments that no longer match code
-- Redundant documentation headers
-
-**KEEP:**
-- `// MARK:` comments (iOS section markers)
-- `// TODO:` and `// FIXME:` comments
-- Comments explaining **why** (not what)
-- Workaround explanations with context
-- Complex algorithm descriptions
-- Legal/license headers
-
 ## Workflow
 
-### Phase 1: Identify Target Files
+```
+Phase 1: Scope target files
+Phase 2: Built-in `simplify` skill — deep review (reuse / quality / efficiency)
+Phase 3: PRDX pragmatism pass — enforce scope fence + conciseness + platform rules
+Phase 4: Summary
+```
+
+### Phase 1: Scope Target Files
 
 **If arguments provided:**
 
 ```bash
-# Check if argument is a file/directory
 if [ -f "$ARG" ] || [ -d "$ARG" ]; then
   TARGET="$ARG"
 else
@@ -72,189 +43,95 @@ else
 fi
 ```
 
-**If no arguments:**
+**If no arguments** — changed source files on the current branch vs main:
 
 ```bash
-# Get changed files on current branch vs main
-CHANGED=$(git diff --name-only $(git merge-base HEAD main)..HEAD)
-
-# Filter to source files only
-echo "$CHANGED" | grep -E '\.(kt|swift|ts|tsx|js|jsx)$'
+git diff --name-only $(git merge-base HEAD main)..HEAD | grep -E '\.(kt|swift|ts|tsx|js|jsx)$'
 ```
 
-Display target files:
+Display the target files and confirm before proceeding:
 
 ```
 🎯 Target files:
 
 src/auth/UserService.kt
 src/auth/AuthViewModel.kt
-src/ui/LoginScreen.kt
 
 Proceed with simplification? (y/n)
 ```
 
-### Phase 2: Analyze Each File
+### Phase 2: Deep Review (built-in `simplify` skill)
 
-For each target file:
+Invoke the built-in `simplify` skill via the Skill tool, passing the scoped
+target files so the review is bounded to them. The skill runs three parallel
+review agents — code reuse, code quality, efficiency — and applies fixes:
 
-1. Read the file content
-2. Identify simplification opportunities:
-   - Documentation-style comments to remove
-   - Single-use variables to inline
-   - Single-use functions to inline
-   - Similar code to consolidate
+- **Reuse:** new code that duplicates existing utilities/helpers
+- **Quality:** redundant state, parameter sprawl, copy-paste variation, leaky
+  abstractions, stringly-typed code, nested conditionals
+- **Efficiency:** N+1 patterns, missed concurrency, hot-path bloat, no-op
+  updates, unnecessary existence checks, memory leaks
 
-### Phase 3: Apply Simplifications
+This phase catches structural and efficiency issues that PRDX's own rules are
+blind to. Let it run to completion before Phase 3.
 
-Use the Edit tool to apply changes. Show before/after for significant changes.
+### Phase 3: PRDX Pragmatism Pass
 
-**Example - Inline single-use variable:**
+Re-read the target files (now modified by Phase 2) and enforce the rules the
+built-in skill does not guarantee:
 
-Before:
-```kotlin
-val userName = user.name
-displayGreeting(userName)
-```
+**Pragmatism fence — revert or scope down any Phase 2 change that:**
+- Refactored architecture or restructured public APIs beyond the touched code
+- Changed behavior or logic (simplification must be behavior-preserving)
+- Generalized/abstracted beyond what the immediate code needs — three similar
+  lines beat a premature abstraction
 
-After:
-```kotlin
-displayGreeting(user.name)
-```
+**Conciseness:**
 
-**Example - Remove documentation comment:**
+| Rule | Action |
+|------|--------|
+| Self-documenting code | Use descriptive names instead of comments |
+| Single-use variables | Inline when the expression is clear |
+| Single-use private functions | Inline when simple |
 
-Before:
-```swift
-// Get the current user's profile
-func getCurrentUserProfile() -> Profile {
-```
+**Comment discipline:**
 
-After:
-```swift
-func getCurrentUserProfile() -> Profile {
-```
+REMOVE — comments describing *what* code does, comments restating an
+identifier name, outdated comments, redundant doc headers.
 
-**Example - Keep MARK comment (iOS):**
+KEEP — `// MARK:` / `#pragma mark` section markers, `// TODO:` / `// FIXME:`,
+*why*-comments (hidden constraints, invariants, workarounds with context),
+legal/license headers.
 
-```swift
-// MARK: - Lifecycle  ← KEEP THIS
-override func viewDidLoad() {
-```
-
-**Example - Keep workaround comment:**
-
-```kotlin
-// Workaround for Android 12 splash screen bug
-// See: https://issuetracker.google.com/issues/12345
-Thread.sleep(100)  ← KEEP THE COMMENT
-```
+**Platform-specific:**
+- **iOS/Swift** — keep `// MARK:` and `#pragma mark`; remove `///` docs unless public API
+- **Android/Kotlin** — keep `@Suppress` with an explanation; remove KDoc on private functions
+- **TypeScript** — keep `// @ts-expect-error` with an explanation; remove JSDoc on internal functions
 
 ### Phase 4: Summary
 
 ```
 ✅ Simplification complete!
 
-Files modified: 3
-- src/auth/UserService.kt (removed 5 comments, inlined 2 variables)
-- src/auth/AuthViewModel.kt (consolidated 2 functions)
-- src/ui/LoginScreen.kt (removed 3 comments)
-
-Total: 12 simplifications applied
-```
-
-## Examples
-
-### Simplify Changed Files
-
-```
-User: /prdx:simplify
-
-→ Gets changed files from git diff
-→ Found: UserService.kt, AuthViewModel.kt
-
-🎯 Target files:
-
-src/auth/UserService.kt (45 lines changed)
-src/auth/AuthViewModel.kt (23 lines changed)
-
-Proceed? (y/n)
-
-User: y
-
-→ Analyzes and simplifies each file
-→ Applies edits
-
-✅ Simplification complete!
+Phase 2 (deep review): 3 reuse, 2 quality, 1 efficiency issue fixed
+Phase 3 (pragmatism):  1 over-abstraction reverted, 4 comments removed, 2 vars inlined
 
 Files modified: 2
-Total: 8 simplifications applied
+- src/auth/UserService.kt
+- src/auth/AuthViewModel.kt
 ```
-
-### Simplify Specific File
-
-```
-User: /prdx:simplify src/auth/UserService.kt
-
-→ Reading UserService.kt
-→ Found 6 simplification opportunities
-
-Simplifications:
-1. Line 23: Remove comment "// Get user by ID"
-2. Line 45: Inline single-use variable `result`
-3. Line 67: Remove comment "// Check if valid"
-4. Line 89: Inline single-use function `formatName()`
-5. Line 112: Remove outdated comment
-6. Line 134: Consolidate similar null checks
-
-Apply all? (y/n/select)
-
-User: y
-
-✅ Applied 6 simplifications to UserService.kt
-```
-
-### Simplify by Feature Name
-
-```
-User: /prdx:simplify "authentication"
-
-→ Searching for files related to "authentication"
-→ Found: AuthService.kt, LoginViewModel.kt, AuthRepository.kt
-
-🎯 Target files:
-
-src/auth/AuthService.kt
-src/auth/LoginViewModel.kt
-src/data/AuthRepository.kt
-
-Proceed? (y/n)
-```
-
-## Platform-Specific Rules
-
-### iOS/Swift
-
-- **Keep** `// MARK:` section markers
-- **Keep** `#pragma mark` directives
-- **Remove** `/// Documentation` comments unless public API
-
-### Android/Kotlin
-
-- **Keep** `@Suppress` annotations with explanations
-- **Remove** KDoc on private functions
-- **Inline** single-expression functions when clear
-
-### TypeScript
-
-- **Keep** `// @ts-expect-error` with explanation
-- **Remove** JSDoc on internal functions
-- **Inline** single-use type aliases
 
 ## What This Command Does NOT Do
 
-- Refactor architecture (use `/prdx:plan` for that)
 - Add new functionality
 - Change behavior or logic
-- Format code (use formatter)
+- Format code (use a formatter)
 - Fix bugs
+- Refactor architecture (use `/prdx:plan` for that)
+
+## Cost note
+
+Phase 2 fans out three parallel agents, so this command costs roughly 5–6× a
+plain single-context cleanup. That is acceptable because it runs once at the
+end of a workflow — but the cost should be monitored. See `tools/README.md`
+("Token-cost measurement") for the planned measuring tool.

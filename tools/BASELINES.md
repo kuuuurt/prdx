@@ -139,6 +139,12 @@ target if you iterate the prompt.
 Rubric and structural checks are first drafts; expect to tune them before
 treating this number as load-bearing.
 
+> **Stale (2026-05-15):** `commands/simplify.md` was rewritten as a chained
+> wrapper (built-in `simplify` skill → PRDX pragmatism pass). The eval now
+> scores Phase 3 only — rubric/structural/generator were re-scoped to match.
+> This baseline predates that change; re-run at N≥30 against the new prompt to
+> establish a fresh Phase-3 baseline.
+
 ---
 
 ## Promoting a sanity run to a baseline

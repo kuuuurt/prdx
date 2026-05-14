@@ -1,8 +1,12 @@
 # Case Generator: simplify
 
-Generate test cases for the `/prdx:simplify` command, which rewrites a source
-file to remove ceremony per its simplification rules (inline single-use
-helpers, drop what-style doc comments, keep MARK/TODO/FIXME, etc.).
+Generate test cases for the `/prdx:simplify` command. The command is a chained
+wrapper — Phase 2 delegates a deep review to the built-in `simplify` skill,
+Phase 3 applies PRDX's pragmatism pass. The pure-function eval harness cannot
+invoke Phase 2's sub-agents, so **these cases test Phase 3 only**: rewriting a
+source file to remove ceremony per the pragmatism rules (inline single-use
+helpers, drop what-style doc comments, keep MARK/TODO/FIXME, revert
+over-abstraction, no behavior change).
 
 Each case is a JSON object on a single line (JSONL):
 

@@ -5,6 +5,13 @@ Score each axis 1-5. Be strict; 3 = adequate, 5 = exemplary.
 The artifact is the **full content of the file after simplification**. Compare
 against the original code (provided in the case input).
 
+**Scope:** `/prdx:simplify` is a chained command — Phase 2 delegates a deep
+review to the built-in `simplify` skill (3 sub-agents), then Phase 3 applies
+PRDX's pragmatism pass. The pure-function eval harness cannot invoke the
+skill/sub-agents, so this rubric scores **Phase 3 only**: the conciseness +
+comment-discipline + pragmatism-fence pass over a single file. Reuse/efficiency
+findings (Phase 2) are out of scope here and must be monitored separately.
+
 ## Axes
 
 ### behavior_preserved
@@ -29,12 +36,13 @@ ceremony, better-named identifiers? Not "fewer lines at any cost".
 - 3: modestly cleaner
 - 5: noticeably easier to read; ceremony gone without losing clarity
 
-### no_invention
-Did it avoid adding NEW features, NEW abstractions, NEW error handling, NEW
-comments, or NEW dependencies?
-- 1: added new helpers, new validation, refactored beyond simplification
+### pragmatism_fence
+Did it stay within the pragmatism fence — no NEW features, abstractions, error
+handling, comments, or dependencies, and no architecture/API restructuring or
+behavior change? Phase 3's job is to *revert* over-reach, not introduce it.
+- 1: added new helpers/validation, or refactored/abstracted beyond simplification
 - 3: tiny additions that may be defensible
-- 5: pure subtraction / rewording; no new constructs
+- 5: pure subtraction / rewording; no new constructs, no restructuring
 
 ### output_format
 Did it emit just the file contents (optionally inside one code fence) with
