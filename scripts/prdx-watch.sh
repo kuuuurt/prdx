@@ -53,14 +53,18 @@ if tmux has-session -t "$SESSION" 2>/dev/null; then
   exec tmux attach -t "$SESSION"
 fi
 
-# Per-pane model + effort — sized to the work each loop does.
-#   issues/approvals: lightweight polling, no codebase reasoning  → haiku, low
+# Per-pane model + effort — all opus so every pane can use auto mode.
+#   issues/approvals: lightweight polling, no codebase reasoning   → opus, low
 #   prd:              planning, codebase exploration, PRD drafting → opus, high
 #   implement:        code changes guided by an already-written PRD → opus, medium
-ISSUES_MODEL="haiku";    ISSUES_EFFORT="low"
-PRD_MODEL="opus";        PRD_EFFORT="high"
-APPROVALS_MODEL="haiku"; APPROVALS_EFFORT="low"
-IMPLEMENT_MODEL="opus";  IMPLEMENT_EFFORT="medium"
+ISSUES_MODEL="opus";    ISSUES_EFFORT="low"
+PRD_MODEL="opus";       PRD_EFFORT="high"
+APPROVALS_MODEL="opus"; APPROVALS_EFFORT="low"
+IMPLEMENT_MODEL="opus"; IMPLEMENT_EFFORT="medium"
+
+# Default permission mode for each pane. `auto` lets Claude pick whether to
+# prompt or proceed based on action risk; override by exporting PRDX_WATCH_MODE.
+PERMISSION_MODE="${PRDX_WATCH_MODE:-auto}"
 
 # Each pane runs `claude` with a /loop slash command as the initial prompt.
 # Adjust intervals here if you want a different polling cadence.
@@ -72,22 +76,23 @@ IMPLEMENT_CMD='/loop 2m /prdx:watch-implement'
 # pane_cmd <model> <effort> <claude-prompt>
 # Builds a shell command that cd's into the project and starts claude with the prompt.
 pane_cmd() {
-  printf 'cd %q && claude --model %q --effort %q %q' "$PROJECT_DIR" "$1" "$2" "$3"
+  printf 'cd %q && claude --model %q --effort %q --permission-mode %q %q' \
+    "$PROJECT_DIR" "$1" "$2" "$PERMISSION_MODE" "$3"
 }
 
 # Create the session with the first pane (issues).
 tmux new-session -d -s "$SESSION" -n "watchers" -c "$PROJECT_DIR" \
   "$(pane_cmd "$ISSUES_MODEL" "$ISSUES_EFFORT" "$ISSUES_CMD")"
 
-# Split into 4 panes in a 2x2 grid.
-tmux split-window -h -t "$SESSION:watchers" -c "$PROJECT_DIR" \
+# Split horizontally three more times to get 4 vertical panes: 1 | 2 | 3 | 4
+tmux split-window -h -t "$SESSION:watchers.0" -c "$PROJECT_DIR" \
   "$(pane_cmd "$PRD_MODEL" "$PRD_EFFORT" "$PRD_CMD")"
-tmux split-window -v -t "$SESSION:watchers.0" -c "$PROJECT_DIR" \
+tmux split-window -h -t "$SESSION:watchers.1" -c "$PROJECT_DIR" \
   "$(pane_cmd "$APPROVALS_MODEL" "$APPROVALS_EFFORT" "$APPROVALS_CMD")"
-tmux split-window -v -t "$SESSION:watchers.1" -c "$PROJECT_DIR" \
+tmux split-window -h -t "$SESSION:watchers.2" -c "$PROJECT_DIR" \
   "$(pane_cmd "$IMPLEMENT_MODEL" "$IMPLEMENT_EFFORT" "$IMPLEMENT_CMD")"
 
-tmux select-layout -t "$SESSION:watchers" tiled
+tmux select-layout -t "$SESSION:watchers" even-horizontal
 
 # Label each pane for clarity (requires tmux >= 3.0).
 tmux select-pane -t "$SESSION:watchers.0" -T "issues  (5m, $ISSUES_MODEL/$ISSUES_EFFORT)"

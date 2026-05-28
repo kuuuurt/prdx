@@ -38,10 +38,10 @@ Stop here. Do NOT pick another issue.
 
 ## Step 2: Find the next candidate
 
-Fetch open issues, oldest first:
+Fetch open issues assigned to the current user, oldest first:
 
 ```bash
-gh issue list --state open --limit 100 \
+gh issue list --state open --assignee @me --limit 100 \
   --json number,title,createdAt \
   --jq 'sort_by(.createdAt)'
 ```
