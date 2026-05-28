@@ -5,13 +5,16 @@ description: "One poll iteration of the implementer — implement the approved P
 ## Pre-Computed Context
 
 ```bash
-WATCH_DIR=".prdx/watch"
+MAIN_REPO_DIR=$(git rev-parse --show-toplevel)
+REPO_NAME=$(basename "$MAIN_REPO_DIR")
+WATCH_DIR="$MAIN_REPO_DIR/.prdx/watch"
 CURRENT_FILE="$WATCH_DIR/current.json"
 HISTORY_FILE="$WATCH_DIR/history.jsonl"
 HAS_CURRENT=$([ -f "$CURRENT_FILE" ] && echo "true" || echo "false")
 if [ "$HAS_CURRENT" = "true" ]; then
   ISSUE_NUMBER=$(jq -r '.issue_number' "$CURRENT_FILE")
   PHASE=$(jq -r '.phase' "$CURRENT_FILE")
+  WORKTREE_PATH=$(jq -r '.worktree_path // empty' "$CURRENT_FILE")
 fi
 ```
 
@@ -19,7 +22,7 @@ fi
 
 One iteration of the implementer loop. Designed to run via `/loop 2m /prdx:watch-implement`.
 
-Reads `.prdx/watch/current.json` and, if its phase is `approved`, runs `/prdx:auto --issue N` to implement the PRD and open a PR. On success, archives `current.json` to `history.jsonl` and clears it so the pipeline picks up the next issue.
+Reads `.prdx/watch/current.json` and, if its phase is `approved`, runs `/prdx:auto --issue N` to implement the PRD and open a PR. **All work happens in an isolated git worktree** so your main checkout stays on its current branch — you can keep working in this repo while implementation runs. On success, archives `current.json` to `history.jsonl`, removes the worktree, and clears the state file so the pipeline picks up the next issue.
 
 ---
 
@@ -43,30 +46,44 @@ Stop here.
 
 ---
 
-## Step 2: Mark phase as implementing
+## Step 2: Create a worktree and mark phase as implementing
 
-Before starting (the implement step takes a while), advance the phase so other watcher ticks see it's in flight:
+The implementation runs in a sibling directory (a git worktree) so the main checkout is untouched. Worktrees live at `<repo-parent>/<repo>-prdx-<issue>`.
+
+```bash
+WORKTREE_PATH="${MAIN_REPO_DIR%/*}/${REPO_NAME}-prdx-${ISSUE_NUMBER}"
+
+# If a worktree from a previous failed tick still exists, reuse it.
+if [ ! -d "$WORKTREE_PATH" ]; then
+  git -C "$MAIN_REPO_DIR" worktree add --detach "$WORKTREE_PATH" >/dev/null
+fi
+```
+
+Update the state file to record the worktree path and flip the phase. If anything below fails, the next tick will see `implementing` and the recorded worktree, and can resume:
 
 ```bash
 jq --arg phase "implementing" \
+   --arg wt "$WORKTREE_PATH" \
    --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-   '.phase = $phase | .implement_started_at = $ts' \
+   '.phase = $phase | .worktree_path = $wt | .implement_started_at = $ts' \
    "$CURRENT_FILE" > "$CURRENT_FILE.tmp" && mv "$CURRENT_FILE.tmp" "$CURRENT_FILE"
 ```
 
-> Note: if this Claude Code session is killed mid-implementation, the file will be stuck at `implementing`. The user can manually flip it back to `approved` to retry, or delete the file to skip.
+> If this Claude Code session is killed mid-implementation, the state file stays at `implementing` with the worktree path recorded. To retry: flip the phase back to `approved` (the worktree will be reused). To skip: delete `current.json` and `git worktree remove <path>` manually.
 
 ---
 
-## Step 3: Run the implementation
+## Step 3: Run the implementation inside the worktree
 
-`/prdx:auto --issue N` (without `--plan-only`) does the full flow: read the PRD comment, create a branch, run `/prdx:implement`, push, and open a PR via `prdx:pr-author`:
+Spawn a fresh interactive Claude *inside the worktree* to run `/prdx:auto --issue N` (which does the full flow: read PRD, create branch, implement, push, open PR). Running in a separate process keeps this watcher session's context clean and ensures the working directory is the worktree, not the main checkout:
 
-```
-/prdx:auto --issue {ISSUE_NUMBER}
+```bash
+cd "$WORKTREE_PATH" && claude --model opus --effort medium "/prdx:auto --issue ${ISSUE_NUMBER}"
 ```
 
 **Important:** wait for it to complete. Do NOT proceed if it errors.
+
+> The spawned `claude` session will prompt for tool permissions inside its own pane just like any interactive session. If you want unattended runs, you can add `--dangerously-skip-permissions` to the spawned command — but only do so deliberately, since it disables all approval gates for that session.
 
 ---
 
@@ -98,9 +115,9 @@ Stop here.
 
 ---
 
-## Step 5: Archive and clear current.json
+## Step 5: Archive, clear current.json, remove worktree
 
-Append the completed record to `history.jsonl` and remove `current.json` so `/prdx:watch-issues` is free to pick the next one:
+Append the completed record to `history.jsonl`, remove `current.json`, and tear down the worktree so the main checkout is the only remaining copy:
 
 ```bash
 jq --arg phase "done" \
@@ -109,12 +126,15 @@ jq --arg phase "done" \
    '.phase = $phase | .pr_number = $pr | .completed_at = $ts' \
    "$CURRENT_FILE" >> "$HISTORY_FILE"
 rm "$CURRENT_FILE"
+
+# Remove the worktree. --force handles any leftover untracked files (e.g. build artifacts).
+git -C "$MAIN_REPO_DIR" worktree remove --force "$WORKTREE_PATH" 2>/dev/null || true
 ```
 
 Print:
 
 ```
-[watch-implement] Issue #{ISSUE_NUMBER} → PR #{PR_NUMBER}. Pipeline cleared for next issue.
+[watch-implement] Issue #{ISSUE_NUMBER} → PR #{PR_NUMBER}. Worktree removed, pipeline cleared for next issue.
 ```
 
 ---
@@ -122,6 +142,7 @@ Print:
 ## Notes
 
 - This loop never reviews or merges PRs — that's still on you. The pipeline ends when a PR is opened.
-- If the PR needs revisions, you handle them manually (or via `/prdx:auto --issue N` again, which has a fix-iteration path).
-- If implementation gets stuck at `implementing`, manually flip the phase back to `approved` (or delete `current.json` to skip the issue).
+- If the PR needs revisions, `cd` into the worktree (or re-checkout the branch in any directory) and run `/prdx:auto --issue N` again — it has a fix-iteration path.
+- If implementation gets stuck at `implementing`, manually flip the phase back to `approved` (the worktree is reused) or delete `current.json` + `git worktree remove <path>` to skip.
+- The worktree lives at `<repo-parent>/<repo>-prdx-<issue>` and is removed after a successful PR. To inspect work in progress, `cd` there at any time — your main checkout is unaffected.
 - Like the other watchers, this runs as an interactive Claude Code session — implementation draws from your subscription, not the Agent SDK credit pool.
