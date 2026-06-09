@@ -282,14 +282,17 @@ Multi-platform features are handled via parent-child PRDs: each child is a singl
 If the PRD has `**Lite:** true`, skip this step entirely.
 
 Lite-mode PRDs are small in scope — the dev-planner round-trip is wasted context.
-Instead, jump directly to Step 5c (Phased Execution Loop) with a synthesized single-phase plan:
+Instead, synthesize a single-phase plan and write the shard directly to disk:
 
-```
-PHASES = [{"phase": 1, "name": "Implementation", "mode": "sequential", "tasks": ["Execute PRD"]}]
-PHASE_CONTENTS = {1: "<entire PRD Approach section>"}
+```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh"
+# Use prd/approach.md as the phase content (already sharded in /prdx:plan Step 4.7)
+cp "$(shard_path {SLUG})/prd/approach.md" "$(shard_path {SLUG})/dev-plan/phases/1-implementation.md"
+shard_index_append {SLUG} dev-plan/phases/1-implementation.md "Lite-mode single phase content"
+echo '[{"phase":1,"name":"Implementation","mode":"sequential"}]' | shard_write {SLUG} dev-plan/phase-summary.json "Phase summary"
 ```
 
-Treat the PRD's `## Approach` section as the full phase content. If `## Approach` is absent, use the entire PRD body. Then proceed to Step 5c.
+Then proceed to Step 5c with `PHASES = [{"phase": 1, "name": "Implementation", "mode": "sequential"}]`.
 
 ---
 
@@ -300,25 +303,36 @@ Treat the PRD's `## Approach` section as the full phase content. If `## Approach
 Phase 1/4: Dev Planning — Creating implementation plan...
 ```
 
-Invoke the dev-planner agent using the Task tool:
+Invoke the dev-planner agent using the Task tool. **Pass paths, not content** — the agent reads what it needs from the sharded state directory:
 
 ```
 subagent_type: "prdx:dev-planner"
 
 prompt: "Create a detailed implementation plan for this PRD.
 
-PRD File: {PRD_FILE}
+Slug: {SLUG}
 Platform: {PLATFORM}  (e.g., 'android' or 'ios')
 NO_CACHE: {NO_CACHE}  (true = skip exploration cache and force fresh codebase exploration)
+INDEX: .prdx/state/{SLUG}/INDEX.md
+PRD File (full, human-readable): {PRD_FILE}
 
-{PRD_CONTENT}
+Read INDEX.md first to discover prd/ shards. Read prd/problem.md, prd/acceptance.md, prd/approach.md. Read skills and explore the codebase.
 
-Read the skills files and explore the codebase to create a comprehensive dev plan.
-Use phased task groups (### Implementation Phases) with <!-- parallel: true --> or <!-- sequential --> annotations.
-Return only the dev plan document."
+Write your output as shards under .prdx/state/{SLUG}/dev-plan/:
+- dev-plan/architecture.md     (high-level design)
+- dev-plan/files.md            (file inventory)
+- dev-plan/phases/N-{name}.md  (one per phase; include the phase content the developer will execute)
+- dev-plan/phase-summary.json  (the <!-- phase-summary --> JSON array, as a standalone file)
+
+Use the state-shard helper for writes:
+  source \"\$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh\"
+  cat ... | shard_write {SLUG} dev-plan/architecture.md \"Architecture overview\"
+  ...etc
+
+Return ONLY a brief summary (≤10 lines): phase count, phase names, any PRD gaps. Do NOT echo the dev plan back."
 ```
 
-Wait for the agent to return the dev plan. Store it for the next phase.
+The dev-planner output stays on disk — orchestrator never carries the full plan in main context. Wait for the brief summary.
 
 **If dev-planner fails or returns an error:**
 
@@ -334,31 +348,25 @@ Route based on choice:
 
 #### Step 5b: Parse Dev Plan into Phases
 
-Parse the dev plan from Step 5a into individual phases for phase-by-phase execution.
+The dev-planner wrote a `dev-plan/phase-summary.json` file. Read it to get the phase list — **do not load the full dev plan into context**.
 
-**Three-layer fallback parsing:**
+```bash
+PHASE_SUMMARY_FILE=".prdx/state/{SLUG}/dev-plan/phase-summary.json"
+PHASES=$(cat "$PHASE_SUMMARY_FILE" 2>/dev/null)
+```
 
-1. **Phase-summary JSON** (preferred): Look for `<!-- phase-summary [...] -->` in the dev plan. Extract the JSON array:
+**Fallbacks (if `phase-summary.json` is missing or malformed):**
+
+1. **Glob phase files**: List `.prdx/state/{SLUG}/dev-plan/phases/*.md`. Each filename `N-{name}.md` yields phase number and name. Mode defaults to `sequential` unless filename ends `-parallel.md`.
+2. **Single phase**: If no phase files exist, synthesize:
    ```
-   <!-- phase-summary
-   [
-     {"phase": 1, "name": "Foundation", "mode": "parallel", "tasks": ["Task A", "Task B"]},
-     {"phase": 2, "name": "Core Logic", "mode": "sequential", "tasks": ["Task C", "Task D"]}
-   ]
-   -->
+   PHASES = [{"phase": 1, "name": "Full Implementation", "mode": "sequential"}]
    ```
-   Parse this JSON into a `PHASES` array. If JSON is malformed, fall through to layer 2.
+   and treat the entire dev plan as phase 1.
 
-2. **Header regex** (fallback): Scan for `#### Phase N: [Name]` headers followed by `<!-- parallel: true -->` or `<!-- sequential -->` annotations. Extract phase number, name, mode, and task list (lines starting with `- [ ]`).
+**Phase content is NOT loaded into the orchestrator** — each phase's markdown lives at `.prdx/state/{SLUG}/dev-plan/phases/N-{name}.md` and is read by the developer agent directly.
 
-3. **Single phase** (final fallback): If neither parsing method finds phases, wrap the entire dev plan as a single sequential phase:
-   ```
-   PHASES = [{"phase": 1, "name": "Full Implementation", "mode": "sequential", "tasks": ["Execute entire dev plan"]}]
-   ```
-
-For each parsed phase, also extract the **full phase content** from the dev plan (everything between one `#### Phase N:` header and the next, or end of `### Implementation Phases` section). This full content is passed to the platform agent.
-
-Store the result as `PHASES` array and `PHASE_CONTENTS` map (phase number → full markdown content).
+Store only `PHASES` (the small JSON array of `{phase, name, mode}` triples) in orchestrator memory.
 
 **Display parsing result:**
 ```
@@ -369,7 +377,7 @@ Parsed dev plan: {N} phases ({list of "Phase N: Name (mode)" entries})
 
 Use `prdx:developer` for all platforms. The platform field is a free-form string (e.g., `backend`, `ios`, `android`, `frontend`, `python`, `go`, `rust`, `flutter`, or any other value). Pass it as a hint so the agent can prioritize which dependency files and patterns to look for.
 
-Initialize `COMPLETED_PHASES` as an empty list (stores summaries from each completed phase).
+**No `COMPLETED_PHASES` tracking in orchestrator.** Prior phase summaries live on disk at `.prdx/state/{SLUG}/phases/*.md`. The developer agent reads only what it needs.
 
 **For each phase in PHASES (sequentially):**
 
@@ -378,75 +386,72 @@ Initialize `COMPLETED_PHASES` as an empty list (stores summaries from each compl
 Phase {PHASE_NUM}/{TOTAL_PHASES}: {PHASE_NAME} ({PHASE_MODE})...
 ```
 
-Invoke the developer agent using the Task tool with **phase-scoped context**:
+Invoke the developer agent using the Task tool with **path-based context**:
 
 ```
 subagent_type: "prdx:developer"
 
 prompt: "Implement Phase {PHASE_NUM}/{TOTAL_PHASES}: {PHASE_NAME}
 
+Slug: {SLUG}
 Platform hint: {PLATFORM_FROM_PRD}
+Phase: {PHASE_NUM}
+Phase name: {PHASE_NAME}
+Phase mode: {PHASE_MODE}
+INDEX: .prdx/state/{SLUG}/INDEX.md
 
-## PRD (for reference)
+## Where to read
 
-**Title:** {PRD_TITLE}
-**Acceptance Criteria:**
-{ACCEPTANCE_CRITERIA from PRD}
+- INDEX.md — manifest of all shards
+- prd/acceptance.md — ACs your work must satisfy
+- dev-plan/architecture.md — design context (read once)
+- dev-plan/files.md — file inventory (read once)
+- dev-plan/phases/{PHASE_NUM}-*.md — YOUR phase content (tasks, scope)
+- phases/{PRIOR}.md — prior phase summaries, IF AND ONLY IF this is a sequential phase that depends on prior work. Skip otherwise.
 
-## Dev Plan Context
+Do NOT read prd/problem.md or prd/approach.md unless your phase explicitly needs the rationale.
 
-{ARCHITECTURE_AND_FILES_SECTIONS from dev plan — extract only the ### Architecture and ### Files sections, not the full plan}
+## Phase execution rules
 
-## Completed Phases
+- {PHASE_MODE}: {'Tasks are independent — parallelize Edit/Write calls' if parallel, else 'Tasks depend on each other — sequence them'}
+- Use TodoWrite to track tasks
+- One atomic commit at the end of this phase
 
-{COMPLETED_PHASES summaries — or 'None (this is the first phase)' if empty}
-
-## YOUR PHASE — Phase {PHASE_NUM}: {PHASE_NAME}
-
-**Mode: {PHASE_MODE}**
-
-{PHASE_CONTENT — full markdown content for this phase from PHASE_CONTENTS}
-
-**Phase execution rules:**
-- This is a {PHASE_MODE} phase
-- {'PARALLEL: Tasks are independent. Use parallel tool calls — make multiple Edit/Write calls in a single response for different files.' if mode is 'parallel'}
-- {'SEQUENTIAL: Tasks depend on each other. Complete each task fully before starting the next.' if mode is 'sequential'}
-- Use TodoWrite to track tasks — mark in_progress when starting, completed when done
-- Commit your work at the end of this phase (one atomic commit per phase)
-
-**CRITICAL - COMMIT FORMAT:**
-
-You MUST follow the commit configuration below. This is from the project's prdx.json and OVERRIDES any defaults.
+## Commit format (from prdx.json — overrides defaults)
 
 {COMMIT_INSTRUCTIONS from Step 1b}
 
-Execute only YOUR PHASE. Follow TDD; consult `skills/impl-patterns.md` and `skills/testing-strategy.md`. Run tests, then commit one atomic commit.
+## Output
 
-**Return only a summary:**
+After committing, write your phase summary to disk:
 
-## Phase {PHASE_NUM} Summary
+  source \"\$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh\"
+  cat <<EOF | shard_write {SLUG} phases/{PHASE_NUM}.md \"Phase {PHASE_NUM} summary\"
+  ## Phase {PHASE_NUM} Summary
 
-### Files Created
-- [List new files]
+  ### Files Created
+  - ...
 
-### Files Modified
-- [List modified files]
+  ### Files Modified
+  - ...
 
-### Tests Written
-- [List test files]
+  ### Tests Written
+  - ...
 
-### Commits
-- [List commit messages]
+  ### Commits
+  - ...
 
-### Test Results
-[Pass/fail summary]
-"
+  ### Test Results
+  ...
+  EOF
+
+Return ONLY a one-line confirmation: 'Phase {PHASE_NUM} complete — N files, M commits, tests {pass|fail}'. Do NOT echo the summary back."
 ```
 
 Wait for the platform agent to complete.
 
 **After each phase completes:**
-1. Store the agent's response in `COMPLETED_PHASES` (append phase number, name, and summary)
+1. The summary is already on disk at `.prdx/state/{SLUG}/phases/{PHASE_NUM}.md` — orchestrator does NOT store it in memory.
 2. Display brief phase result:
    ```
    Phase {PHASE_NUM}/{TOTAL}: {PHASE_NAME} — Done
@@ -462,7 +467,7 @@ Use AskUserQuestion to offer recovery options:
 
 Route based on choice:
 - Retry → Re-run current phase
-- Skip → Add skip note to COMPLETED_PHASES, continue loop
+- Skip → Write a skip marker to `.prdx/state/{SLUG}/phases/{N}.md` (one line: `## Phase {N} — SKIPPED`), continue loop
 - Continue manually → Display what was accomplished so far, end workflow
 - Stop → End workflow, show how to resume with `/prdx:implement {slug}`
 
@@ -519,17 +524,23 @@ subagent_type: "prdx:ac-verifier"
 
 prompt: "Verify the acceptance criteria for this PRD.
 
-PRD Slug: {SLUG}
+Slug: {SLUG}
 Base Branch: {DEFAULT_BRANCH}
 Platform: {PLATFORM}
+INDEX: .prdx/state/{SLUG}/INDEX.md
 
-Acceptance Criteria:
-{ACCEPTANCE_CRITERIA from PRD}
+Read ONLY .prdx/state/{SLUG}/prd/acceptance.md for the ACs. Do not read problem.md, approach.md, the dev plan, or phase summaries.
 
-Check the diff (git diff {DEFAULT_BRANCH}..HEAD) against each acceptance criterion.
-Perform the three-point check: code exists, test exists, coverage (happy + error).
+Check the diff (git diff {DEFAULT_BRANCH}..HEAD) against each AC. Three-point check: code exists, test exists, coverage (happy + error).
 
-Return only the AC verification summary."
+Write your verdict to disk:
+  source \"\$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh\"
+  cat <<EOF | shard_write {SLUG} reviews/ac-verdict.md \"AC verifier verdict (latest)\"
+  ## AC Verdict
+  ... (per-AC: MET | PARTIAL | NOT MET, with one-line reason)
+  EOF
+
+Return ONLY a one-line summary: 'AC verdict: X met, Y partial, Z not met'. Do NOT echo the verdict body."
 ```
 
 ```
@@ -537,16 +548,23 @@ subagent_type: "prdx:reviewer-orchestrator"
 
 prompt: "Review the implementation for this PRD.
 
-PRD Slug: {SLUG}
+Slug: {SLUG}
 Base Branch: {DEFAULT_BRANCH}
 Platform: {PLATFORM}
 Diff LOC: {DIFF_LOC}
+INDEX: .prdx/state/{SLUG}/INDEX.md (read prd/acceptance.md only if context-dependent)
 
-Review the diff for bugs, security issues, quality problems, and convention adherence.
-Dispatch specialists as needed based on diff size and changed file types.
-Classify findings as AUTO-FIX or ASK. Apply AUTO-FIX items silently.
+Review git diff {DEFAULT_BRANCH}..HEAD for bugs, security, quality, convention adherence.
+Dispatch specialists as needed. Classify findings as AUTO-FIX or ASK. Apply AUTO-FIX silently.
 
-Return only the review pipeline summary."
+Write findings to disk:
+  source \"\$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh\"
+  cat <<EOF | shard_write {SLUG} reviews/code-review.md \"Code review findings (latest)\"
+  ## Findings
+  ... (one block per finding: severity, file:line, ASK|AUTO-FIX, description)
+  EOF
+
+Return ONLY a one-line summary: 'Review: N ASK findings, M auto-fixed' plus the ASK list (≤10 lines). Do NOT echo the full findings."
 ```
 
 Wait for both agents to complete, then route based on the combined result:
@@ -574,33 +592,33 @@ Feed unmet/partial ACs back to the platform agent:
 ```
 subagent_type: "prdx:developer"
 
-prompt: "Fix the following unmet acceptance criteria.
+prompt: "Fix unmet acceptance criteria.
 
-## AC Issues
+Slug: {SLUG}
+Mode: ac-fix
+Attempt: {ATTEMPT_NUM}
+INDEX: .prdx/state/{SLUG}/INDEX.md
 
-{UNMET_AND_PARTIAL_ACS from ac-verifier output}
+Read these files:
+- reviews/ac-verdict.md — see which ACs failed and why
+- prd/acceptance.md — full AC list
 
-## Context
+Run these for live context:
+- git diff {DEFAULT_BRANCH}..HEAD --name-only
+- git log {DEFAULT_BRANCH}..HEAD --oneline
 
-**Changed files:**
-{OUTPUT of: git diff {DEFAULT_BRANCH}..HEAD --name-only}
-
-**Recent commits:**
-{OUTPUT of: git log {DEFAULT_BRANCH}..HEAD --oneline}
-
-**Full Acceptance Criteria (from PRD):**
-{ACCEPTANCE_CRITERIA from PRD}
-
-## Instructions
-
-1. Fix each unmet/partial AC listed above
-2. Write missing tests where indicated
-3. Run tests to verify fixes
-4. Commit the fixes using the commit format below
+Fix each unmet/partial AC, write missing tests, run tests, commit.
 
 {COMMIT_INSTRUCTIONS from Step 1b}
 
-Return only a summary of fixes applied."
+Write the fix summary to disk:
+  source \"\$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh\"
+  cat <<EOF | shard_write {SLUG} reviews/fixes/ac-{ATTEMPT_NUM}.md \"AC fix attempt {ATTEMPT_NUM}\"
+  ## Fixes
+  ...
+  EOF
+
+Return ONLY a one-line confirmation."
 ```
 
 Re-run `prdx:ac-verifier` after each fix. Loop until all ACs are met or 3 attempts are exhausted.
@@ -618,29 +636,32 @@ Feed only the ASK findings (user-approved for fixing) back to the platform agent
 ```
 subagent_type: "prdx:developer"
 
-prompt: "Fix the following code review issues.
+prompt: "Fix code review issues.
 
-## Review Issues
+Slug: {SLUG}
+Mode: review-fix
+Cycle: {CYCLE_NUM}
+INDEX: .prdx/state/{SLUG}/INDEX.md
 
-{ASK_FINDINGS approved by user}
+User-approved ASK findings (the only ones to fix):
+{ASK_FINDINGS — pass inline, max ≤15 lines; if longer, write to reviews/fixes/review-{CYCLE_NUM}-input.md first and reference the path}
 
-## Context
+Run for live context:
+- git diff {DEFAULT_BRANCH}..HEAD --name-only
+- git log {DEFAULT_BRANCH}..HEAD --oneline
 
-**Changed files:**
-{OUTPUT of: git diff {DEFAULT_BRANCH}..HEAD --name-only}
-
-**Recent commits:**
-{OUTPUT of: git log {DEFAULT_BRANCH}..HEAD --oneline}
-
-## Instructions
-
-1. Fix each issue listed above
-2. Run tests to verify fixes
-3. Commit the fixes using the commit format below
+Fix each issue, run tests, commit.
 
 {COMMIT_INSTRUCTIONS from Step 1b}
 
-Return only a summary of fixes applied."
+Write the fix summary to disk:
+  source \"\$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh\"
+  cat <<EOF | shard_write {SLUG} reviews/fixes/review-{CYCLE_NUM}.md \"Review fix cycle {CYCLE_NUM}\"
+  ## Fixes
+  ...
+  EOF
+
+Return ONLY a one-line confirmation."
 ```
 
 Pre-compute updated diff LOC, then re-run `prdx:reviewer-orchestrator` after each fix:
@@ -648,15 +669,16 @@ Pre-compute updated diff LOC, then re-run `prdx:reviewer-orchestrator` after eac
 ```
 subagent_type: "prdx:reviewer-orchestrator"
 
-prompt: "Re-review after fixes were applied.
+prompt: "Re-review after fixes.
 
-PRD Slug: {SLUG}
+Slug: {SLUG}
 Base Branch: {DEFAULT_BRANCH}
 Platform: {PLATFORM}
 Diff LOC: {UPDATED_DIFF_LOC}
+INDEX: .prdx/state/{SLUG}/INDEX.md
+Prior review: reviews/code-review.md (read to check if findings were resolved)
 
-Review the updated diff. Focus on whether the previous findings were resolved.
-Apply any new AUTO-FIX items silently. Return the review pipeline summary."
+Review the updated diff. Apply AUTO-FIX silently. Overwrite reviews/code-review.md with the new findings (use shard_write). Return ONLY a one-line summary."
 ```
 
 Loop until clean or 2 cycles exhausted.
