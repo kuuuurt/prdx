@@ -26,7 +26,9 @@ git log {BASE_BRANCH}..HEAD --oneline
 
 ### 2. Read Acceptance Criteria
 
-Extract every acceptance criterion from the PRD provided in your prompt. These are the checklist you must verify — not interpret, not infer.
+The prompt passes `Slug:` and `INDEX: .prdx/state/{SLUG}/INDEX.md`. **Read ONLY `.prdx/state/{SLUG}/prd/acceptance.md`** for the ACs. Do NOT load `problem.md`, `approach.md`, the dev plan, or phase summaries — they are not needed for AC verification and only inflate context.
+
+These ACs are the checklist you must verify — not interpret, not infer.
 
 ### 3. Verify Each Acceptance Criterion
 
@@ -52,20 +54,28 @@ Do NOT rely on what the implementation agent reported. Independently verify by r
 - File analysis
 - All code you read
 
-**What you MUST return:**
+**Write the verdict to disk, return only a one-line summary.**
 
-```markdown
+```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh"
+cat <<'EOF' | shard_write "$SLUG" reviews/ac-verdict.md "AC verifier verdict (latest)"
 ## AC Verification: {slug}
 
 ### Acceptance Criteria
 - [x] {AC1} — Verified (code: yes, test: yes, coverage: happy + error)
-- [~] {AC2} — Partial: {what's missing, e.g., "no error path test"}
+- [~] {AC2} — Partial: {what's missing}
 - [ ] {AC3} — NOT MET: {reason}
 
 ### Summary
-{X} of {total} ACs verified. {0 or N} require attention.
+{X} of {total} ACs verified. {N} require attention.
+EOF
 ```
 
 **Partial ACs** should describe specifically what is missing (e.g., "test exists but only covers happy path", "no test found for this AC").
 
-**Keep response under 1KB.** Return only the AC verification table and summary.
+**Return ONLY one line** in your response, e.g.:
+```
+AC verdict: 5 met, 1 partial, 0 not met → reviews/ac-verdict.md
+```
+
+Do NOT echo the verdict body back — the orchestrator reads it from disk on demand.

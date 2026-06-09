@@ -105,9 +105,11 @@ git commit -m "chore: capture lessons and conventions from {SLUG}"
 
 ### Clean Up
 
-Delete PRD and state file:
+Delete PRD, state file, and sharded state directory:
 ```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh"
 rm -f "{PLANS_DIR}/prdx-{slug}.md" ".prdx/state/{slug}.json"
+shard_cleanup "{slug}"   # rm -rf .prdx/state/{slug}/
 git add -A .prdx/ "{PLANS_DIR}/" && git commit -m "chore: clean up PRD for {SLUG}"
 ```
 

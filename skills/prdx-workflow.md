@@ -1,6 +1,6 @@
 # PRDX Workflow Skill
 
-Canonical specification for two recurring logic blocks in the PRDX entry-point commands: the entry-point routing table (Step 1) and the reviewing loop (Step 3b). Both `commands/prdx.md` and `commands/prdx-agent.md` reference this skill.
+Canonical specification for two recurring logic blocks in the PRDX entry-point commands: the entry-point routing table (Step 1) and the reviewing loop (Step 3b). Referenced from `commands/prdx.md`.
 
 ## Entry Point Routing
 

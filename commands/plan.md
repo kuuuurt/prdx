@@ -505,6 +505,38 @@ EOF
 
 Omit `### Relevant Snippets` if none are worth capturing.
 
+### Step 4.7: Shard PRD to `.prdx/state/{slug}/` (Context Handoff)
+
+**Skip conditions:**
+- If this is a multi-platform **parent** PRD (no `**Branch:**` field, has `## Children`): skip — parents are orchestration-only and never implemented directly. Children get their own shards when their own `/prdx:plan` runs (or here, if generated inline in Step 4.5).
+
+For every other PRD (single-platform, child, lite), split the PRD into shards so downstream agents can load only what they need.
+
+```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh"
+shard_init "{SLUG}"
+
+# Extract sections from {PLANS_DIR}/prdx-{slug}.md (or prdx-lite-{slug}.md)
+# Use awk to slice between ## headings; trim leading/trailing whitespace.
+PRD_FILE="{PLANS_DIR}/prdx-{slug}.md"   # or prdx-lite-{slug}.md for lite mode
+
+awk '/^## Problem/{f=1;next} /^## /{f=0} f' "$PRD_FILE"            | shard_write "{SLUG}" prd/problem.md    "Problem + Goal"
+awk '/^## Acceptance Criteria/{f=1;next} /^## /{f=0} f' "$PRD_FILE"| shard_write "{SLUG}" prd/acceptance.md "Acceptance criteria (ac-verifier reads only this)"
+awk '/^## Approach/{f=1;next} /^## /{f=0} f' "$PRD_FILE"           | shard_write "{SLUG}" prd/approach.md   "Approach + technical notes"
+
+# Goal often lives as its own section — append to problem.md if present
+awk '/^## Goal/{f=1;next} /^## /{f=0} f' "$PRD_FILE" | { read -r line || true; [ -n "$line" ] && { echo; echo "## Goal"; echo "$line"; cat; } >> "$(shard_path {SLUG})/prd/problem.md"; }
+```
+
+For child PRDs, also append a one-line `Parent: {parent-slug}` to INDEX status:
+```bash
+shard_set_status "{SLUG}" "Parent" "{PARENT_SLUG}"
+```
+
+For lite PRDs: same flow — `prd/acceptance.md` and `prd/approach.md` are still useful even though the lite Approach drives a single-phase fallback in implement.
+
+The human-readable PRD `{PLANS_DIR}/prdx-{slug}.md` remains the source of truth. Shards are derived. If the PRD is edited later, re-run this sharding step (it's idempotent — `shard_write` overwrites).
+
 ---
 
 ### Step 5: Verify Plan File Naming

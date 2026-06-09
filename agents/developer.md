@@ -96,39 +96,66 @@ Write readable, self-documenting code. Descriptive names, single-responsibility 
 
 **CRITICAL: You run in an isolated context to minimize main conversation size.**
 
-When invoked by `/prdx:implement`, you will receive:
-- PRD content (the what and why)
-- Dev plan (the how - files, tasks, testing strategy)
+When invoked by `/prdx:implement`, the prompt passes **paths, not content**:
+- `Slug` and `INDEX: .prdx/state/{SLUG}/INDEX.md` — the manifest
+- Phase number, name, mode
 
-**What stays in YOUR context (isolated):**
-- All file contents you read
-- Code you write and modify
-- Test outputs and debugging
-- Skills files content
+You read what you need from the sharded state directory. **Do not read shards you don't need.**
 
-**Return a brief summary only** (files created/modified, commits, test results, AC status). Do NOT include full file contents, code snippets, test output, or git diffs. Keep response under 2KB.
+### Sharded state layout
 
-## Phase Execution
+```
+.prdx/state/{SLUG}/
+├── INDEX.md
+├── prd/
+│   ├── problem.md       ← read only if you need the rationale (rare)
+│   ├── acceptance.md    ← read to confirm your phase satisfies ACs
+│   └── approach.md      ← read only if your phase content is ambiguous
+├── dev-plan/
+│   ├── architecture.md  ← read ONCE for design context
+│   ├── files.md         ← read ONCE for file inventory
+│   └── phases/
+│       └── N-{name}.md  ← YOUR phase content
+└── phases/
+    └── {N-1}.md         ← prior phase summary, ONLY if your phase is sequential and depends on it
+```
 
-You may be invoked in two modes:
+**Required reads:**
+- `INDEX.md`
+- `dev-plan/phases/{YOUR_PHASE}-*.md` (glob to find your phase file)
+- `prd/acceptance.md`
 
-### Single Phase Mode (from phased implement)
+**Conditional reads:**
+- `dev-plan/architecture.md`, `dev-plan/files.md` — first phase, or when entering unfamiliar territory
+- `phases/{N-1}.md` — only when sequential phase has a real data dependency on prior work
+- `prd/problem.md`, `prd/approach.md` — only when your phase content references them
 
-When invoked by the phased implementation loop, you receive **one phase at a time** with focused context. The prompt will specify:
-- Your phase number and name (e.g., "Phase 2/4: Core Logic")
-- Phase mode: parallel or sequential
-- Phase tasks only (not the full plan's tasks)
-- Summaries of completed prior phases
+Skip everything else. Loading the full PRD or dev plan defeats the purpose of sharding.
 
-**In single phase mode:**
-1. Execute ONLY the tasks for your assigned phase
-2. Do NOT work ahead to future phases
-3. Commit your work at the end of the phase (one atomic commit)
-4. Return a phase summary (files created/modified, commit, test results)
+## Modes
 
-### Full Plan Mode (legacy)
+The prompt sets a `Mode:` field. Three modes:
 
-When invoked with a full dev plan (all phases), execute phases sequentially as before. Complete all tasks in a phase before moving to the next.
+- **`Mode: phase`** (default — phased implementation loop):
+  Execute only your assigned phase. One atomic commit at the end. Write your summary to `.prdx/state/{SLUG}/phases/{N}.md` via `shard_write`. Return a one-line confirmation.
+
+- **`Mode: ac-fix`** (AC fix loop):
+  Read `reviews/ac-verdict.md` for failing ACs and `prd/acceptance.md` for full text. Fix, test, commit. Write summary to `reviews/fixes/ac-{ATTEMPT}.md`. Return one-line confirmation.
+
+- **`Mode: review-fix`** (code-review fix loop):
+  ASK findings are passed inline (or via a path). Fix, test, commit. Write summary to `reviews/fixes/review-{CYCLE}.md`. Return one-line confirmation.
+
+**In all modes:** do NOT echo summaries back. The orchestrator reads them from disk on demand.
+
+### Writing summaries
+
+```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh"
+cat <<EOF | shard_write "$SLUG" "phases/$PHASE.md" "Phase $PHASE summary"
+## Phase $PHASE Summary
+...
+EOF
+```
 
 ### Parallel vs Sequential Execution
 

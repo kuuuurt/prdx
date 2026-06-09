@@ -246,7 +246,7 @@ Group tasks into phases. Phases execute in order; tasks within a parallel phase 
 4. **DO** map tests to acceptance criteria
 5. **DO** group tasks into phases with parallel/sequential annotations
 6. **DO** include a `### Phase Summary` section with `<!-- phase-summary [...] -->` JSON block at the end (MANDATORY)
-7. **DO** return only the dev plan document
+7. **DO** write your output as shards to `.prdx/state/{SLUG}/dev-plan/` (see Output below) — DO NOT return the full plan in your response.
 
 ## Phase Grouping Guidelines
 
@@ -265,22 +265,64 @@ Group tasks into phases. Phases execute in order; tasks within a parallel phase 
 
 ## What You Return
 
-- Only the dev plan document
-- Specific file paths
-- Phased implementation tasks (with parallel/sequential annotations)
-- Phase summary JSON block (for machine parsing)
-- Testing strategy
+A brief summary (≤10 lines) of what you wrote. The orchestrator does NOT need the full dev plan — it reads shards on demand.
 
-## Output
+## Output — Write Shards, Don't Return Them
 
-When complete, output:
+The orchestrator passes `Slug: {SLUG}` and `INDEX: .prdx/state/{SLUG}/INDEX.md` in your prompt. Read `prd/problem.md`, `prd/acceptance.md`, `prd/approach.md` for PRD context — do NOT load the human-readable `prdx-{slug}.md` unless a shard is missing.
+
+When the dev plan is ready, write it as shards using the state-shard helper:
+
+```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh"
+
+# Architecture (2-4 sentences from "### Architecture" section)
+cat <<'EOF' | shard_write {SLUG} dev-plan/architecture.md "Architecture overview"
+[architecture markdown]
+EOF
+
+# Files inventory (Create + Modify lists)
+cat <<'EOF' | shard_write {SLUG} dev-plan/files.md "File inventory (create/modify)"
+[files markdown]
+EOF
+
+# One file per phase — content is the full phase block (header + tasks + any notes)
+cat <<'EOF' | shard_write {SLUG} dev-plan/phases/1-foundation.md "Phase 1: Foundation (parallel)"
+#### Phase 1: Foundation
+<!-- parallel: true -->
+- [ ] Task A
+- [ ] Task B
+EOF
+# ...repeat per phase, slugified name in filename...
+
+# Testing strategy + AC mapping + risks + dependencies in one shard (rarely needs to be read alone)
+cat <<'EOF' | shard_write {SLUG} dev-plan/testing.md "Testing strategy + AC mapping + risks"
+### Testing Strategy
+...
+### Acceptance Criteria Mapping
+...
+### Technical Risks
+...
+### Dependencies
+...
+EOF
+
+# Phase summary JSON — orchestrator reads this directly to drive the phased loop
+cat <<'EOF' | shard_write {SLUG} dev-plan/phase-summary.json "Phase summary JSON (machine-readable)"
+[
+  {"phase":1,"name":"Foundation","mode":"parallel","tasks":["Task A","Task B"]},
+  {"phase":2,"name":"Core Logic","mode":"sequential","tasks":["Task C","Task D"]}
+]
+EOF
+```
+
+**Phase file naming:** `{N}-{slug-of-name}.md` (e.g., `1-foundation.md`, `2-core-logic.md`). The developer agent globs `dev-plan/phases/N-*.md` to find its phase.
+
+**Return:** a brief summary, e.g.:
 
 ```
-## Dev Plan: [Title]
-
-[Full dev plan content]
-
----
-
-Ready for implementation with platform agent.
+Dev plan written to .prdx/state/{SLUG}/dev-plan/
+Phases: 4 (Foundation [parallel], Core Logic [sequential], Integration [parallel], Verification [sequential])
+PRD gaps: none
 ```
+

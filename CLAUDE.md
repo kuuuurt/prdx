@@ -53,12 +53,11 @@ Plan Mode → PRD saved → [Publish?] → [Implement?] → Implement → Review
                                                                   ↳ Draft PR → [Review Loop] → Fix → Push → Done
 ```
 
-**Multi-platform:** 1 PRD = 1 Branch = 1 PR. Parent + child PRDs → user runs each child in separate sessions. **Lite mode:** lightweight PRD template (Problem, Goal, AC, Approach), own branch and PR, persistent. **CI mode:** see `commands/prdx.md`. **Agent Teams:** Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`.
+**Multi-platform:** 1 PRD = 1 Branch = 1 PR. Parent + child PRDs → user runs each child in separate sessions. **Lite mode:** lightweight PRD template (Problem, Goal, AC, Approach), own branch and PR, persistent. **CI mode:** see `commands/prdx.md`.
 
 ## Commands
 
 - `/prdx:prdx` — Main entry: plan → implement → push loop. Supports `--lite` for lightweight PRDs (still get a branch + PR).
-- `/prdx:prdx:agent` — Same with persistent agent teams.
 - `/prdx:plan` — Plan mode: detect platform, create PRD, iterate until approved, call ExitPlanMode. Use `prdx:code-explorer`/`prdx:docs-explorer` (NOT direct Glob/Grep/Read).
 - `/prdx:implement` — Load PRD → hook → branch → dev-planner → phased platform agents → ac-verifier (3 attempts) → code-reviewer (2 cycles) → post-hook → append summary.
 - `/prdx:push` — Validate git → `prdx:pr-author` → PR via `gh` CLI. Supports `--draft`.

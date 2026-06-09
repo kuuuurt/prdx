@@ -1,8 +1,8 @@
 # Fix Loop Skill
 
-Canonical specification for the AC fix loop and code-review fix loop used in PRDX implementation workflows. Both `commands/implement.md` (Task-tool callers) and `commands/prdx-agent.md` (SendMessage teammates) reference this skill for the loop structure, caps, and escalation options.
+Canonical specification for the AC fix loop and code-review fix loop used in PRDX implementation workflows. Referenced from `commands/implement.md` and `skills/prdx-implement-loop.md`.
 
-Use invocation-agnostic placeholders — callers substitute "invoke ac-verifier" / "invoke code-reviewer" with their actual mechanism (Task tool or SendMessage).
+Use invocation-agnostic placeholders — callers substitute "invoke ac-verifier" / "invoke code-reviewer" with their actual mechanism (Task tool, SendMessage, etc.).
 
 ## AC Fix Loop (max 3 attempts)
 
