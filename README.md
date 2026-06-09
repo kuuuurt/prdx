@@ -285,7 +285,6 @@ ln -s "$(pwd)/prdx" ~/.claude/plugins/prdx
 | Command | Description |
 |---------|-------------|
 | **`/prdx:prdx`** | **Complete workflow orchestrator (recommended)** |
-| `/prdx:prdx:agent` | Agent teams mode (experimental, 3-4x token cost) |
 | `/prdx:plan` | Create PRD |
 | `/prdx:implement` | Implement feature |
 | `/prdx:push` | Create pull request (supports `--draft`) |
