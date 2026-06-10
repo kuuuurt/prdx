@@ -111,7 +111,7 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 
 Route based on the user's choice from plan.md:
 - Implement → Phase 3
-- Stop → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh"` then end workflow. Tell user they can resume with `/prdx:prdx lite-{slug}`
+- Stop → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh" "{slug}"` then end workflow. Tell user they can resume with `/prdx:prdx lite-{slug}`
 
 **If NOT LITE_MODE (normal mode):**
 
@@ -164,7 +164,7 @@ After issue is created, use AskUserQuestion:
 
 Route based on choice:
 - Yes → Phase 3
-- No → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh"` then end workflow (keep state file for future resume)
+- No → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh" "{SLUG}"` then end workflow (keep state file for future resume)
 
 ---
 
@@ -251,8 +251,8 @@ Route based on choice:
 Write state: `{"slug": "{SLUG}", "phase": "pushing", "lite": {LITE_MODE}}`
 
 **After PR is created:**
-- Draft PR → write state `"reviewing"` with `pr_number` → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh"` → Step 3b
-- Non-draft PR → write state `"pushed"` with `pr_number` (do NOT delete — enables lesson capture) → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh"`. Display: `Feature complete! PRD: {PRD_FILE} | PR: #{pr-number}. Lessons will be captured automatically after PR is merged.`
+- Draft PR → write state `"reviewing"` with `pr_number` → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh" "{SLUG}"` → Step 3b
+- Non-draft PR → write state `"pushed"` with `pr_number` (do NOT delete — enables lesson capture) → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh" "{SLUG}"`. Display: `Feature complete! PRD: {PRD_FILE} | PR: #{pr-number}. Lessons will be captured automatically after PR is merged.`
 
 ---
 

@@ -2,7 +2,7 @@
 # Aggregate token usage from transcripts and append a row to usage.jsonl.
 # No-op if active-run.json is absent (e.g. prdx:prdx started before this feature shipped).
 #
-# Usage: source "$(dirname "$0")/metrics-end.sh"
+# Usage: source "$(dirname "$0")/metrics-end.sh" <slug>
 #
 # Reads .prdx/metrics/active-run.json, scans ~/.claude/projects/<encoded-cwd>/*.jsonl
 # for files modified after started_at, aggregates usage by model, prices against
@@ -15,8 +15,10 @@ _ACTIVE_RUN="$_METRICS_DIR/active-run.json"
 # No-op if no active run marker
 [ -f "$_ACTIVE_RUN" ] || return 0 2>/dev/null || exit 0
 
+# Slug is passed as argument (known at call site, not at start time)
+_SLUG="${1:-}"
+
 # Read active run fields
-_SLUG=$(jq -r '.slug // ""' "$_ACTIVE_RUN")
 _STARTED_AT=$(jq -r '.started_at' "$_ACTIVE_RUN")
 _WORKING_DIR=$(jq -r '.working_dir' "$_ACTIVE_RUN")
 
@@ -25,6 +27,13 @@ _ENDED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Encode working dir to match Claude's projects directory naming (/ → -)
 _ENCODED_CWD=$(echo "$_WORKING_DIR" | sed 's/\//-/g')
 _PROJECTS_DIR="$HOME/.claude/projects/$_ENCODED_CWD"
+
+# Guard: if projects dir doesn't exist, log and skip rather than silently recording zero tokens
+if [ ! -d "$_PROJECTS_DIR" ]; then
+  echo "metrics-end: projects dir not found ($_PROJECTS_DIR); skipping" >&2
+  rm -f "$_ACTIVE_RUN"
+  return 0 2>/dev/null || exit 0
+fi
 
 # Create temp reference file with mtime set to started_at for find -newer windowing
 _REF_FILE=$(mktemp /tmp/prdx-metrics-ref.XXXXXX)
@@ -94,12 +103,16 @@ else
   ')
 fi
 
+# Derive phase count from completed phase summary files on disk
+_PHASES=$(ls "$(git rev-parse --show-toplevel)/.prdx/state/$_SLUG/phases/"*.md 2>/dev/null | wc -l | tr -d ' ')
+[ -z "$_PHASES" ] && _PHASES=0
+
 # Append usage row to usage.jsonl
 jq -nc \
   --arg     slug            "$_SLUG" \
   --arg     started_at      "$_STARTED_AT" \
   --arg     ended_at        "$_ENDED_AT" \
-  --argjson phases          1 \
+  --argjson phases          "$_PHASES" \
   --argjson cost_usd        "$_COST_USD" \
   --argjson tokens_total    "$_TOKENS_TOTAL" \
   --argjson tokens_by_model "$_TOKENS_BY_MODEL" \
