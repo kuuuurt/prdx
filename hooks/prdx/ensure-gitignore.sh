@@ -13,3 +13,7 @@ if [ ! -f "$_GITIGNORE" ] || ! { grep -qxF '.prdx/' "$_GITIGNORE" || grep -qxF '
   echo '# PRDX' >> "$_GITIGNORE"
   echo '.prdx/' >> "$_GITIGNORE"
 fi
+
+if ! grep -qxF '.prdx/metrics/' "$_GITIGNORE" 2>/dev/null; then
+  echo '.prdx/metrics/' >> "$_GITIGNORE"
+fi
