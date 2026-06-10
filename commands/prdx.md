@@ -9,6 +9,7 @@ argument-hint: "[--lite] [--auto] [--ci] [--issue <number>] [--pr <number>] [fea
 source "$(git rev-parse --show-toplevel)/hooks/prdx/resolve-plans-dir.sh"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/ensure-gitignore.sh"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/first-run-setup.sh"
+source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-start.sh"
 ACTIVE_STATES=$(ls .prdx/state/*.json 2>/dev/null)
 PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null)
 [ "$FIRST_RUN" = "true" ] && echo "PRDX initialized. Plans: $PLANS_DIR"
@@ -110,7 +111,7 @@ This enters plan mode with a lightweight template (Problem, Goal, Acceptance Cri
 
 Route based on the user's choice from plan.md:
 - Implement → Phase 3
-- Stop → End workflow. Tell user they can resume with `/prdx:prdx lite-{slug}`
+- Stop → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh"` then end workflow. Tell user they can resume with `/prdx:prdx lite-{slug}`
 
 **If NOT LITE_MODE (normal mode):**
 
@@ -163,7 +164,7 @@ After issue is created, use AskUserQuestion:
 
 Route based on choice:
 - Yes → Phase 3
-- No → End workflow (keep state file for future resume)
+- No → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh"` then end workflow (keep state file for future resume)
 
 ---
 
@@ -250,8 +251,8 @@ Route based on choice:
 Write state: `{"slug": "{SLUG}", "phase": "pushing", "lite": {LITE_MODE}}`
 
 **After PR is created:**
-- Draft PR → write state `"reviewing"` with `pr_number` → Step 3b
-- Non-draft PR → write state `"pushed"` with `pr_number` (do NOT delete — enables lesson capture). Display: `Feature complete! PRD: {PRD_FILE} | PR: #{pr-number}. Lessons will be captured automatically after PR is merged.`
+- Draft PR → write state `"reviewing"` with `pr_number` → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh"` → Step 3b
+- Non-draft PR → write state `"pushed"` with `pr_number` (do NOT delete — enables lesson capture) → `source "$(git rev-parse --show-toplevel)/hooks/prdx/metrics-end.sh"`. Display: `Feature complete! PRD: {PRD_FILE} | PR: #{pr-number}. Lessons will be captured automatically after PR is merged.`
 
 ---
 
