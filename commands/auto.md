@@ -1,6 +1,6 @@
 ---
-description: "Run PRDX in auto (non-interactive) mode (plan-only or implement from issue)"
-argument-hint: "--issue <number> [--plan-only] [--requested-by <user>]"
+description: "Run PRDX in auto (non-interactive) mode (plan-only or implement from issue/prompt/file)"
+argument-hint: "(--issue <n> | --prompt <text> | --file <path>) [--slug <slug>] [--plan-only] [--requested-by <user>]"
 ---
 
 ## Pre-Computed Context
@@ -17,17 +17,37 @@ echo "PROJECT_NAME=$(gh repo view --json name --jq '.name' 2>/dev/null || basena
 
 # /prdx:auto - Auto (Non-Interactive) Mode Workflow
 
-Runs PRDX in non-interactive mode. Requires `--issue`. Supports `--plan-only` (generate PRD as issue comment) or full implement (PRD → branch → PR).
+Runs PRDX in non-interactive mode. Takes input from **one** of `--issue`, `--prompt`, or `--file`. Supports `--plan-only` (generate PRD) or full implement (PRD → branch → PR).
+
+Two surfaces share one orchestration core; they differ only in **input adapter** (where the PRD request comes from) and **output adapter** (where status/results go):
+
+| Surface | Detected by | Input | Output |
+|---------|-------------|-------|--------|
+| **GitHub** (Action) | `GITHUB_ACTIONS=true` | `--issue N` | reactions + issue comment + PR; **empty final text** |
+| **Headless** (local `claude -p`) | not under Action | `--prompt` / `--file` / `--issue` | PRD file in PLANS_DIR + plain-text stdout summary + (optional) PR |
 
 ## Prerequisites
 
-- `--issue {number}` is required
+- Exactly one input adapter: `--issue {number}` | `--prompt "{text}"` | `--file {path}`
 - `.prdx/plans-setup-done` must exist (error if missing)
-- `gh auth status` must pass
+- `gh auth status` must pass (required for `--issue` and for PR creation; optional for `--prompt`/`--file` plan-only)
 
 ## Setup
 
-Parse flags from arguments: `--issue {number}`, `--requested-by {user}`, `--plan-only`.
+Parse flags: `--issue {number}` | `--prompt "{text}"` | `--file {path}` (exactly one), plus `--slug {slug}`, `--requested-by {user}`, `--plan-only`.
+
+**Detect the surface** — this drives every adapter choice below:
+```bash
+if [ "$GITHUB_ACTIONS" = "true" ]; then SURFACE="github"; else SURFACE="headless"; export PRDX_HEADLESS=1; fi
+export CI=true   # bypass interactive hook prompts on both surfaces
+```
+
+**Input adapter** — resolve `ISSUE_TITLE` + `ISSUE_BODY` (the PRD request) from whichever flag was given:
+- `--issue N`: `gh issue view {ISSUE_NUMBER} --json title,body,labels` → `ISSUE_TITLE` + `ISSUE_BODY`. (Only this adapter participates in the GitHub reaction/comment flow.)
+- `--prompt "..."`: `ISSUE_BODY` = the prompt text; `ISSUE_TITLE` = first line (or a 3-6 word summary). No issue, no reactions.
+- `--file path.md`: read the file; `ISSUE_TITLE` = first `# ` heading or filename; `ISSUE_BODY` = file contents.
+
+Derive `{SLUG}`: use `--slug` if given, else derive from `ISSUE_TITLE` (same rule as Step 1.1).
 
 If `--requested-by` provided, configure git author:
 ```bash
@@ -36,17 +56,51 @@ export GIT_AUTHOR_NAME="$REQUESTOR_NAME"
 export GIT_AUTHOR_EMAIL="${REQUESTOR}@users.noreply.github.com"
 ```
 
-Fetch issue: `gh issue view {ISSUE_NUMBER} --json title,body,labels`. Store `ISSUE_TITLE` + `ISSUE_BODY`.
-
-Capture the working reaction ID (posts `eyes` on the trigger comment or issue — see Reactions & Output Discipline):
+**GitHub surface only** — capture the working reaction ID (posts `eyes` on the trigger comment or issue — see Reactions & Output Discipline):
 ```bash
-WORKING_REACTION_ID=$(react_working)
+[ "$SURFACE" = "github" ] && WORKING_REACTION_ID=$(react_working)
 ```
-Remember this value — every successful flow below ends with `react_done "$WORKING_REACTION_ID"`.
+On the GitHub surface, every successful flow ends with `react_done "$WORKING_REACTION_ID"`. On the headless surface, reactions are no-ops — see Output Adapters.
+
+**Session resume (headless):** if resuming a prior conversation, the operator's wrapper invokes `claude -p --resume <id>` (see Headless Output Adapters for the contract) — that restores context *before* this command runs, so no special handling here. This command's job is only to *record* its session id after a fresh run, which the wrapper does via `session_store`.
 
 Route: `--plan-only` → Step 1 | otherwise → Step 2.
 
 ---
+
+## Output Adapters
+
+The output adapter is chosen by `SURFACE` (set in Setup). The orchestration core is identical; only reporting differs.
+
+### Headless surface (`SURFACE=headless`)
+
+No GitHub, no reactions. Report results to the local filesystem + stdout:
+
+- **Plan-only:** write the PRD to `$PLANS_DIR/prdx-{SLUG}.md` (do NOT post an issue comment). Final stdout = a one-line confirmation + the PRD path.
+- **Implement:** after the loop, emit a plain-text summary to stdout — slug, branch, AC pass/fail, any `## Items Requiring Input` review findings (from `reviews/code-review.md`), and the PR URL if one was created. Unlike the GitHub surface, **the final text response is the deliverable** — do not suppress it.
+- **Session id:** the operator's wrapper captures `session_id` from `claude -p --output-format json` and persists it via `session_store {SLUG} {id}` (see contract below). This command does not capture its own id.
+
+`react_working` / `react_done` are no-ops here (they early-return when no repo/issue context applies), so the GitHub steps below are simply skipped.
+
+**Headless resume contract (operator wrapper):**
+```bash
+# First run — capture and store the session id:
+OUT=$(claude -p "/prdx:auto --prompt 'Add rate limiting' --slug rate-limit" --output-format json)
+SID=$(echo "$OUT" | jq -r '.session_id')
+source hooks/prdx/resolve-plans-dir.sh && source hooks/prdx/resolve-session.sh
+session_store rate-limit "$SID"
+
+# Later — user replied; resume the SAME conversation (context restored, no re-explore):
+session_resolve rate-limit
+case "$SESSION_MODE" in
+  resumable)   claude -p --resume "$SESSION_ID" "User reply: prefer a token bucket" ;;
+  reconstruct) claude -p "/prdx:auto --slug rate-limit" ;;   # rebuild from shards
+  cold)        claude -p "/prdx:auto --prompt '...' --slug rate-limit" ;;
+esac
+```
+prdx supplies `session_store`/`session_resolve` and detects whether the session survived; the wrapper owns invoking `claude -p` and whether `~/.claude/projects/` persists.
+
+### GitHub surface (`SURFACE=github`)
 
 ## Reactions & Output Discipline
 
@@ -106,9 +160,11 @@ Do the work. At the end of each successful flow, transition to done:
 react_done "$WORKING_REACTION_ID"
 ```
 
-### Final text output — CRITICAL
+### Final text output — CRITICAL (GitHub surface only)
 
-`anthropics/claude-code-action@v1` posts your final text response as an issue comment automatically. Your final response **MUST be empty** — emit nothing. No words, no emoji, no summary, no "here's what I did", no tables, no links. Reactions carry all status; any final text becomes visible noise on the issue.
+This rule applies **only when `SURFACE=github`**. On the headless surface the final text IS the deliverable (see Headless surface above) — emit the summary.
+
+On the GitHub surface: `anthropics/claude-code-action@v1` posts your final text response as an issue comment automatically. Your final response **MUST be empty** — emit nothing. No words, no emoji, no summary, no "here's what I did", no tables, no links. Reactions carry all status; any final text becomes visible noise on the issue.
 
 Bad final response:
 > PRD revised with iOS parity (#65, PR #77). Key changes: matched iOS string copy across all 4 locales...
@@ -179,22 +235,27 @@ PRD_COMMENT=$(gh api "repos/$REPO/issues/$ISSUE_NUMBER/comments" --paginate \
 {Bullet list. Risk → consequence. Max 2}
 ```
 
-**1.5: Post PRD as issue comment (upsert):**
+**1.5: Emit the PRD (output adapter):**
 
+**Headless surface:** write the PRD to the local plan file and finish — no issue comment.
+```bash
+mkdir -p "$PLANS_DIR"
+printf '%s\n' "{FULL PRD CONTENT}" > "$PLANS_DIR/prdx-${SLUG}.md"
+```
+Final stdout: one-line confirmation + the path `$PLANS_DIR/prdx-${SLUG}.md`. Done.
+
+**GitHub surface:** post PRD as issue comment (upsert):
 ```bash
 PRD_BODY="{FULL PRD CONTENT}"
 source "$(git rev-parse --show-toplevel)/hooks/prdx/upsert-prd-comment.sh"
 upsert_prd_comment "$ISSUE_NUMBER" "$PRD_BODY"
 # PRD_COMMENT_ID and PRD_COMMENT_URL are now exported
 ```
-
-The helper prepends `<!-- prdx-prd -->` idempotently and PATCHes any existing marker comment in place, falling back to POST when none exists.
-
-Transition the reaction:
+The helper prepends `<!-- prdx-prd -->` idempotently and PATCHes any existing marker comment in place, falling back to POST when none exists. Then transition the reaction and emit empty final text:
 ```bash
 react_done "$WORKING_REACTION_ID"
 ```
-Your final text response must be empty — see Reactions & Output Discipline.
+(empty final response — see Reactions & Output Discipline)
 
 ---
 
@@ -223,6 +284,8 @@ Your final text response must be empty — see Reactions & Output Discipline.
    ```
 6. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Your final text response must be empty — see Reactions & Output Discipline.
 
+> This revision path is GitHub-specific (it edits the issue's PRD comment). On the headless surface, "revision" is just re-running plan-only with the same `--slug` — Step 1.5's headless branch overwrites `$PLANS_DIR/prdx-${SLUG}.md` in place, or the operator resumes the session (`--resume`) to revise with full context.
+
 ---
 
 ## Step 2: Implement Path
@@ -238,8 +301,16 @@ REPO=$(gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>/dev/null)
 PROJECT_NAME=$(echo "$REPO" | cut -d'/' -f2)
 ```
 
-**2.2: Find PRD from issue comment:**
+**2.2: Find the PRD (input adapter):**
 
+**Headless surface** (`--prompt`/`--file`, no issue): the PRD lives locally at `$PLANS_DIR/prdx-${SLUG}.md`.
+- `--file path.md`: copy it into place if not already there: `cp path.md "$PLANS_DIR/prdx-${SLUG}.md"`.
+- `--prompt` with no existing plan file: run the Step 1 plan-generation logic first to produce `$PLANS_DIR/prdx-${SLUG}.md`, then continue.
+- A plan file already present (e.g. prior `--plan-only` run): use it as-is.
+
+Set `PR_NUMBER=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null)` (empty if no remote), then skip to 2.3 using the local file as the PRD source.
+
+**GitHub surface** (`--issue`): fetch the PRD from the issue comment:
 ```bash
 PRD_COMMENT=$(gh api "repos/$REPO/issues/$ISSUE_NUMBER/comments" --paginate \
   --jq '[.[] | select(.body | contains("<!-- prdx-prd -->"))] | last' 2>/dev/null)
@@ -287,9 +358,11 @@ Invoke `prdx:pr-author` agent: create a real (non-draft) PR. Include `Closes #{I
 
 **2.6: Finalize:**
 
-Write state: `{"slug": "${SLUG}", "phase": "review", "lite": false, "pr_number": ${PR_NUMBER}}`
+Write state: `{"slug": "${SLUG}", "phase": "review", "lite": false, "pr_number": ${PR_NUMBER}}` (preserve any existing `session_id` key — merge, don't overwrite the file).
 
-Do NOT post a status comment — the PR is automatically linked to the issue via `Closes #{ISSUE_NUMBER}` in the PR body, which creates a cross-reference in the issue timeline. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Your final text response must be empty — see Reactions & Output Discipline.
+**Headless surface:** emit the stdout summary (slug, branch, AC status, `## Items Requiring Input` findings from `reviews/code-review.md`, PR URL if created). The final text is the deliverable.
+
+**GitHub surface:** do NOT post a status comment — the PR is auto-linked to the issue via `Closes #{ISSUE_NUMBER}` in the PR body. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Final text response must be empty — see Reactions & Output Discipline.
 
 ---
 
@@ -299,4 +372,4 @@ Do NOT post a status comment — the PR is automatically linked to the issue via
 2. Write PRD locally (same as 2.3).
 3. Run: `export CI=true` then `/prdx:implement {SLUG}`
 4. Push: `git push origin "$BRANCH"`
-5. Transition the reaction: `react_done "$WORKING_REACTION_ID"`. Your final text response must be empty — see Reactions & Output Discipline.
+5. **Headless:** emit the stdout summary (slug, branch, PR URL). **GitHub:** transition the reaction `react_done "$WORKING_REACTION_ID"`; final text response must be empty — see Reactions & Output Discipline.

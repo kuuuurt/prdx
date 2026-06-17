@@ -204,7 +204,9 @@ Wait for auto-fix to complete.
 
 **If ASK is non-empty:**
 
-Use `AskUserQuestion` once at the end of the cycle:
+**Headless mode (`PRDX_HEADLESS=1` or `CI=true`):** no human is available, so do NOT call `AskUserQuestion` — it would hang the run. Instead, log every ASK finding to `reviews/code-review.md` (via the state-shard helpers) under an `## Items Requiring Input` heading, leave the code as-is (apply no judgment-call fixes), and proceed. The findings surface in the Return Summary and the run's stdout/PR output for a human to triage later. Skip the rest of this step.
+
+**Interactive mode:** use `AskUserQuestion` once at the end of the cycle:
 
 ```
 Code review found {N} item(s) requiring your input:
