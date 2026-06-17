@@ -13,6 +13,7 @@
 #   STATE_LITE      — lite field from state file (empty if file absent or field missing)
 #   STATE_PARENT     — parent field from state file (empty if file absent or field missing)
 #   STATE_PR_NUMBER  — pr_number field from state file (empty if file absent or field missing)
+#   STATE_SESSION_ID — session_id field from state file (empty if file absent or field missing)
 #
 # Returns:
 #   0 always (absent or malformed state files are not errors)
@@ -27,6 +28,7 @@ STATE_PHASE=""
 STATE_LITE=""
 STATE_PARENT=""
 STATE_PR_NUMBER=""
+STATE_SESSION_ID=""
 
 if [ -z "$PROJECT_ROOT" ]; then
   echo "read-state.sh: PROJECT_ROOT is not set. Source resolve-plans-dir.sh first." >&2
@@ -62,5 +64,6 @@ STATE_PHASE=$(echo "$_RS_CONTENT" | jq -r '.phase // ""')
 STATE_LITE=$(echo "$_RS_CONTENT" | jq -r '.lite | if . == null then "" else tostring end')
 STATE_PARENT=$(echo "$_RS_CONTENT" | jq -r '.parent // ""')
 STATE_PR_NUMBER=$(echo "$_RS_CONTENT" | jq -r '.pr_number | if . == null then "" else tostring end')
+STATE_SESSION_ID=$(echo "$_RS_CONTENT" | jq -r '.session_id // ""')
 
 return 0

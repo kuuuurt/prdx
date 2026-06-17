@@ -38,7 +38,9 @@ Plans stored in configurable directory (default `.prdx/plans/`), gitignored. Ove
 
 ## State File Schema
 
-`.prdx/state/{slug}.json` — keys: `slug`, `phase`, `lite` (bool), `parent?`, `pr_number?` (when pushed). Ordering: `planning < in-progress < review < implemented < completed`. Phase `"pushed"` = non-draft PR awaiting merge.
+`.prdx/state/{slug}.json` — keys: `slug`, `phase`, `lite` (bool), `parent?`, `pr_number?` (when pushed), `session_id?` (headless resume). Ordering: `planning < in-progress < review < implemented < completed`. Phase `"pushed"` = non-draft PR awaiting merge.
+
+**`session_id` (headless resume):** Stored so a later `claude -p --resume <id>` can continue the prior conversation across a human round-trip instead of cold-starting. prdx only *persists* the id and *detects* whether the session still exists on disk — it never provisions persistence. Whatever runs `claude -p` (container volume, CI cache, local disk) owns whether `~/.claude/projects/` survives. Source `hooks/prdx/resolve-session.sh`: `session_store {slug} {id}` persists it; `session_resolve {slug}` sets `SESSION_MODE` to `resumable` (id stored + JSONL present), `reconstruct` (session gone but `dev-plan/` shards exist), or `cold` (nothing). `--resume` replays the full transcript — cheap only inside the prompt-cache TTL; slow round-trips prefer `reconstruct`.
 
 ## Parent-Child PRD Model
 

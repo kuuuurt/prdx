@@ -53,6 +53,20 @@ If present, factor the conventions into your dev plan. Cite specific entries whe
 
 The file is kept small (capped at ~100 entries by cleanup); load it whole.
 
+### 1.6. Resume Check (skip if dev plan already exists)
+
+This run may be a **resume** of a prior session (e.g. a headless `claude -p` round-trip after the user replied). If a dev plan was already produced for this slug, do not re-explore or re-plan — read it back and return it.
+
+```bash
+source "$(git rev-parse --show-toplevel)/hooks/prdx/state-shard.sh"
+SHARD_DIR="$(shard_path "{slug}")"
+[ -n "$(ls -A "$SHARD_DIR/dev-plan" 2>/dev/null)" ] && echo "RESUME: dev-plan shards exist"
+```
+
+**If `dev-plan/` shards exist:** read `dev-plan/architecture.md`, `dev-plan/files.md`, and `dev-plan/phases/*.md`, reconstruct the dev plan from them, and return it directly. Skip exploration entirely (sections 2–3). Note in the output: `(dev plan resumed from existing shards)`.
+
+**If `dev-plan/` is absent or empty:** continue to section 2.
+
 ### 2. Explore Codebase
 
 #### PRD Codebase Context (check first)
